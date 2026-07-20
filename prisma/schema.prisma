@@ -1,0 +1,307 @@
+// MES – Fábrica de Engates | Schema da Fase 1
+// Docs: https://pris.ly/d/prisma-schema
+//
+// PORTABILIDADE: o provider abaixo é "sqlite" só para desenvolvimento.
+// No servidor da empresa, trocar para "postgresql" (uma linha) + a
+// DATABASE_URL do Postgres. Por isso NÃO usamos enums nativos (o SQLite
+// não suporta): campos como `tipo`, `curva` e `status` são String com os
+// valores permitidos documentados em comentário e validados no código.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Setor de produção (Tubo, Plasma Tubo, Plasma Chapa, Componente,
+/// Ponteira, Agrupamento, Solda, Pintura, Montagem).
+model Setor {
+  id           Int     @id @default(autoincrement())
+  nome         String  @unique
+  ordemPadrao  Int     @default(0) // ordem típica no fluxo, só para exibição
+  metaMensal   Int? // meta de peças/mês do setor — usada no cockpit de Monitoramento
+  lider        String? // líder do setor — exibido no cockpit de Monitoramento
+  diasUteisMes Int? // dias úteis do mês (override do cálculo seg–sex automático)
+
+  roteiros                ModeloRoteiro[]
+  apontamentos            Apontamento[]
+  conferenciasPCP         ConferenciaPCP[]
+  pecas                   Peca[]
+  roteirosPeca            PecaRoteiro[]
+  funcionarios            Funcionario[]
+  recebimentosAgrupamento RecebimentoAgrupamento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Funcionário/operador de um setor — cadastrado em Configurações. Alimenta
+/// as sugestões de soldador/abastecedor e, futuramente, escalas e metas
+/// individuais.
+model Funcionario {
+  id      Int     @id @default(autoincrement())
+  nome    String
+  setorId Int
+  ativo   Boolean @default(true)
+  pin     String? // PIN de 4 dígitos p/ apontar no kiosk e autorizar ajustes
+  papel   String  @default("OPERADOR") // OPERADOR | LIDER | PCP
+
+  setor              Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  ajustesAutorizados AjusteApontamento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([nome, setorId])
+  @@index([setorId])
+}
+
+/// Correção auditada de um apontamento: o valor original é atualizado no
+/// próprio Apontamento, mas cada mudança fica registrada aqui — quem
+/// autorizou (Líder do setor ou PCP, validado por PIN), quando e por quê.
+model AjusteApontamento {
+  id              Int      @id @default(autoincrement())
+  apontamentoId   Int
+  valorAnterior   Int
+  valorNovo       Int
+  motivo          String
+  autorizadoPorId Int
+  dataHora        DateTime @default(now())
+
+  apontamento   Apontamento @relation(fields: [apontamentoId], references: [id], onDelete: Cascade)
+  autorizadoPor Funcionario @relation(fields: [autorizadoPorId], references: [id], onDelete: Restrict)
+
+  @@index([apontamentoId])
+  @@index([autorizadoPorId])
+}
+
+/// Peça/SKU cadastrado (ex.: "Barra Chata 200mm", "Reforço 3mm"). Fabricada
+/// em um setor específico. Vira uma linha da BOM (`ModeloPeca`) de um modelo.
+model Peca {
+  id        Int     @id @default(autoincrement())
+  codigo    String  @unique
+  nome      String
+  medida    String? // texto livre p/ exibição, ex.: "200mm", "3/4mm" — NÃO usar p/ busca
+  imagemUrl String? // foto da peça, ex.: "/uploads/pecas/xxx.jpg"
+  setorId   Int // onde essa peça é fabricada
+
+  // Campos estruturados p/ permitir buscar/filtrar/relacionar o mesmo material
+  // entre peças e modelos diferentes (ex.: "todos os engates que usam tubo 50x50").
+  tipoMaterial  String? // "TUBO" | "BARRA_CHATA" | "CHAPA" | "CANTONEIRA" | "REFORCO" | "PONTEIRA" | "OUTRO"
+  medidaA       Float? // largura ou diâmetro (mm)
+  medidaB       Float? // altura, só em seção retangular/quadrada (mm)
+  espessuraMm   Float?
+  comprimentoMm Float?
+  processos     String? // roteiro interno ordenado: CORTE,FURACAO,DOBRA,CORTE_GRAU
+  observacao    String? // impresso na ficha técnica da OP, ex.: "CORTE EM GRAU", "ITEM RETO"
+
+  setor        Setor         @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  modelos      ModeloPeca[]
+  apontamentos Apontamento[]
+  roteiro      PecaRoteiro[]
+  curvas       PecaCurva[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([setorId])
+  @@index([tipoMaterial, medidaA, medidaB])
+}
+
+/// Curva de dobra de uma peça (tabela "DOBRA" da folha do Tubo na OP
+/// impressa): medida, ângulo e máquina de cada curva, na ordem de execução.
+model PecaCurva {
+  id          Int     @id @default(autoincrement())
+  pecaId      Int
+  ordem       Int // Curva 1, 2, 3...
+  medidaCm    Float? // medida (cm) até a curva
+  anguloGraus Float? // ângulo da dobra
+  quantidade  Int     @default(1)
+  maquina     String? // ex.: "CV1"
+
+  peca Peca @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+
+  @@unique([pecaId, ordem])
+}
+
+/// Confirma que o Agrupamento recebeu as peças fabricadas por um setor para
+/// uma OP e registra onde o material foi guardado. Não altera a produção.
+model RecebimentoAgrupamento {
+  id            Int      @id @default(autoincrement())
+  opId          Int
+  setorOrigemId Int
+  categoria     String // "SETOR:<id>" | "PONTEIRA" | "REFORCO"
+  recebidoPor   String
+  localizacao   String
+  dataHora      DateTime @default(now())
+
+  op          OP    @relation(fields: [opId], references: [id], onDelete: Cascade)
+  setorOrigem Setor @relation(fields: [setorOrigemId], references: [id], onDelete: Restrict)
+
+  @@unique([opId, categoria])
+  @@index([setorOrigemId])
+  @@index([dataHora])
+}
+
+/// Linha da BOM (lista de materiais) de um modelo: "cada engate do modelo X
+/// usa N unidades da peça Y". Junto com OP.quantidade, dá a quantidade total
+/// necessária dessa peça para fechar o kit da OP.
+model ModeloPeca {
+  id                   Int @id @default(autoincrement())
+  modeloId             Int
+  pecaId               Int
+  quantidadeNecessaria Int @default(1) // quantas unidades da peça por engate
+
+  modelo Modelo @relation(fields: [modeloId], references: [id], onDelete: Cascade)
+  peca   Peca   @relation(fields: [pecaId], references: [id], onDelete: Restrict)
+
+  @@unique([modeloId, pecaId])
+  @@index([pecaId])
+}
+
+/// Roteiro real de uma peça. Diferente do setor principal da peça, permite
+/// que uma cantoneira seja cortada em Componentes, dobrada em Ponteira e então
+/// liberada para o Agrupamento.
+model PecaRoteiro {
+  id       Int    @id @default(autoincrement())
+  pecaId   Int
+  setorId  Int
+  processo String
+  ordem    Int
+
+  peca         Peca          @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  setor        Setor         @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  apontamentos Apontamento[]
+
+  @@unique([pecaId, ordem])
+  @@index([setorId])
+  @@index([pecaId, setorId])
+}
+
+/// Modelo de engate. `roteiro` = por quais setores as peças desse modelo passam.
+model Modelo {
+  id              Int     @id @default(autoincrement())
+  codigo          String  @unique
+  nome            String? // nome comercial do engate
+  curva           String // "A" | "B" | "C"
+  tipo            String // "FIXO" | "REMOVIVEL"
+  tamanhoPonteira String? // ex.: "P", "M", "G", "P-16mm" — só p/ removível
+  imagemUrl       String? // foto do engate, ex.: "/uploads/modelos/xxx.jpg"
+  estoqueMinimo   Int? // regulador de estoque — alerta quando o estoque pronto cair abaixo disso
+
+  roteiro ModeloRoteiro[]
+  ops     OP[]
+  pecas   ModeloPeca[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Uma etapa do roteiro de um modelo: "o modelo X passa pelo setor Y na ordem N".
+/// O conjunto de linhas de um modelo define o roteiro configurável dele.
+model ModeloRoteiro {
+  id       Int @id @default(autoincrement())
+  modeloId Int
+  setorId  Int
+  ordem    Int // posição do setor no roteiro do modelo (1, 2, 3...)
+
+  modelo Modelo @relation(fields: [modeloId], references: [id], onDelete: Cascade)
+  setor  Setor  @relation(fields: [setorId], references: [id], onDelete: Restrict)
+
+  @@unique([modeloId, setorId]) // um setor aparece no máximo uma vez por modelo
+  @@unique([modeloId, ordem]) // ordem única dentro do roteiro do modelo
+  @@index([setorId])
+}
+
+/// Ordem de Produção. A OP também é o lote. `numeroSequencia` (0–1000) é a
+/// prioridade de liberação, a mesma em todos os setores.
+model OP {
+  id              Int      @id @default(autoincrement())
+  numeroSequencia Int // 0–1000, prioridade de liberação
+  lote            String?  @unique // lote único p/ rastreabilidade
+  modeloId        Int
+  quantidade      Int
+  status          String   @default("ABERTA") // "ABERTA" | "CONCLUIDA" | "CANCELADA"
+  dataLiberacao   DateTime @default(now())
+  previsaoEntrega DateTime? // impressa na capa do documento da OP
+
+  modelo                  Modelo                   @relation(fields: [modeloId], references: [id], onDelete: Restrict)
+  apontamentos            Apontamento[]
+  recebimentosAgrupamento RecebimentoAgrupamento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modeloId])
+  @@index([numeroSequencia])
+}
+
+/// Apontamento de produção: "na OP X, no setor Y, o líder produziu N boas / M refugo".
+/// É por OP+setor (quantidade), não por peça individual.
+model Apontamento {
+  id                Int      @id @default(autoincrement())
+  opId              Int
+  setorId           Int
+  usuario           String // líder do setor que lançou
+  quantidadeBoa     Int      @default(0)
+  quantidadeRefugo  Int      @default(0)
+  dataHora          DateTime @default(now())
+  soldador          String? // só usado em apontamentos do setor Solda
+  bancada           String? // ex.: "BOX 22" — só usado em apontamentos do setor Solda
+  abastecedor       String? // quem abasteceu a bancada — só usado em apontamentos do setor Solda
+  quantidadeSoldada Int      @default(0) // nos envios de Solda: quanto do abastecido já foi soldado de fato
+  pecaId            Int? // se o setor tem peças (BOM) cadastradas, aponta para qual peça
+  processo          String? // CORTE | FURACAO | DOBRA | CORTE_GRAU
+  roteiroEtapaId    Int? // etapa exata do roteiro entre setores
+  origem            String   @default("OPERADOR") // OPERADOR | LEGADO
+
+  op           OP           @relation(fields: [opId], references: [id], onDelete: Cascade)
+  setor        Setor        @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  peca         Peca?        @relation(fields: [pecaId], references: [id], onDelete: SetNull)
+  roteiroEtapa PecaRoteiro? @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
+  ajustes      AjusteApontamento[]
+
+  @@index([opId])
+  @@index([setorId])
+  @@index([pecaId])
+  @@index([roteiroEtapaId])
+  @@index([setorId, dataHora, origem])
+}
+
+/// Fechamento diario informado pelo PCP. O total conferido nao substitui nem
+/// apaga os apontamentos do operador: ele e usado para reconciliacao e para o
+/// numero oficial dos paineis depois da conferencia.
+model ConferenciaPCP {
+  id             Int      @id @default(autoincrement())
+  setorId        Int
+  data           DateTime
+  usuario        String
+  totalConferido Int
+  observacao     String?
+
+  setor Setor                @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  itens ConferenciaPCPItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([setorId, data])
+  @@index([data])
+}
+
+/// Detalhamento livre por categoria, permitindo reproduzir as tabelas usadas
+/// hoje por Tubo, Plasma, Componentes/Acessorios e Ponteira sem engessar o banco.
+model ConferenciaPCPItem {
+  id            Int    @id @default(autoincrement())
+  conferenciaId Int
+  categoria     String
+  quantidade    Int    @default(0)
+
+  conferencia ConferenciaPCP @relation(fields: [conferenciaId], references: [id], onDelete: Cascade)
+
+  @@unique([conferenciaId, categoria])
+  @@index([conferenciaId])
+}

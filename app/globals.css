@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* Tema escuro global estilo Enterprise Console */
+:root {
+  --background: #242D3C; /* Fundo principal escuro */
+  --foreground: #f1f5f9; /* slate-100 */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Impressão do Documento da OP: esconde a casca do app e quebra por folha */
+@media print {
+  aside,
+  header,
+  .nao-imprimir {
+    display: none !important;
+  }
+  body,
+  main {
+    background: #fff !important;
+    overflow: visible !important;
+  }
+  .folha-op {
+    break-after: page;
+  }
+}

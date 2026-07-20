@@ -1,0 +1,45 @@
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+
+export async function createSetor(formData: FormData) {
+  const nome = String(formData.get("nome") ?? "").trim();
+  const ordemPadrao = Number(formData.get("ordemPadrao") ?? 0);
+
+  if (!nome) throw new Error("Nome do setor é obrigatório.");
+
+  await prisma.setor.create({ data: { nome, ordemPadrao } });
+  revalidatePath("/setores");
+}
+
+/** Configuração do setor: meta mensal, líder e dias úteis do mês. */
+export async function updateSetorConfig(id: number, formData: FormData) {
+  const metaRaw = String(formData.get("metaMensal") ?? "").trim();
+  const lider = String(formData.get("lider") ?? "").trim();
+  const diasRaw = String(formData.get("diasUteisMes") ?? "").trim();
+
+  await prisma.setor.update({
+    where: { id },
+    data: {
+      metaMensal: metaRaw ? Number(metaRaw) : null,
+      lider: lider || null,
+      diasUteisMes: diasRaw ? Number(diasRaw) : null,
+    },
+  });
+
+  revalidatePath("/monitoramento");
+  revalidatePath("/setores");
+  revalidatePath("/configuracoes");
+}
+
+export async function deleteSetor(id: number) {
+  try {
+    await prisma.setor.delete({ where: { id } });
+  } catch {
+    throw new Error(
+      "Não é possível excluir: este setor está em uso em algum roteiro ou apontamento.",
+    );
+  }
+  revalidatePath("/setores");
+}
