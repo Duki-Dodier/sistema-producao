@@ -6,6 +6,7 @@ import { TIPO_MATERIAL_LABEL } from "@/lib/labels";
 import Link from "next/link";
 import { ImageUploader } from "@/components/image-uploader";
 import { uploadImagemModelo, uploadImagemPeca } from "@/lib/actions/upload";
+import { buscarImagensOrganizadas } from "@/lib/upload";
 
 export default async function FichaEngatePage({
   params,
@@ -49,6 +50,12 @@ export default async function FichaEngatePage({
   ]);
 
   if (!modelo) notFound();
+
+  const imagensOrganizadas = await buscarImagensOrganizadas(
+    modelo.codigo,
+    modelo.pecas.map((mp) => mp.peca.codigo),
+  );
+  const imagemModelo = modelo.imagemUrl ?? imagensOrganizadas.modelo;
 
   const boundAddPeca = addPecaToEngate.bind(null, modelo.id);
   const boundDeleteModelo = deleteModelo.bind(null, modelo.id);
@@ -127,8 +134,8 @@ export default async function FichaEngatePage({
                     return uploadImagemModelo(modelo.id, formData);
                   }} 
                 />
-                {modelo.imagemUrl && (
-                  <a href={modelo.imagemUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
+                {imagemModelo && (
+                  <a href={imagemModelo} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
                 )}
               </div>
             </div>
@@ -148,6 +155,7 @@ export default async function FichaEngatePage({
                 const pending = !mp.peca.medida;
                 const borderColor = pending ? 'border-l-[#FF9100]' : 'border-l-[#00E5FF]';
                 const iconColor = pending ? 'text-[#FF9100]' : 'text-cyan-400';
+                const imagemPeca = mp.peca.imagemUrl ?? imagensOrganizadas.pecas.get(mp.peca.codigo);
 
                 return (
                   <div key={mp.id} className="relative flex flex-col items-center">
@@ -190,8 +198,8 @@ export default async function FichaEngatePage({
                               return uploadImagemPeca(mp.peca.id, modelo.id, formData);
                             }} 
                           />
-                          {mp.peca.imagemUrl && (
-                            <a href={mp.peca.imagemUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
+                          {imagemPeca && (
+                            <a href={imagemPeca} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
                           )}
                         </div>
                         <p className="mt-2 truncate font-mono text-[9px] text-slate-500">

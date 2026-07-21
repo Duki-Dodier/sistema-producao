@@ -6,6 +6,7 @@ import { opComProgressoArgs } from "@/lib/pcp";
 import { ehSetor } from "@/lib/setores";
 import { TIPO_LABEL } from "@/lib/labels";
 import { BotaoImprimir } from "@/components/botao-imprimir";
+import { buscarImagensOrganizadas } from "@/lib/upload";
 
 function fData(d: Date | null | undefined) {
   if (!d) return null;
@@ -62,6 +63,12 @@ export default async function DocumentoOPPage({
     },
   });
   if (!op) notFound();
+
+  const imagensOrganizadas = await buscarImagensOrganizadas(
+    op.modelo.codigo,
+    op.modelo.pecas.map((mp) => mp.peca.codigo),
+  );
+  const imagemModelo = op.modelo.imagemUrl ?? imagensOrganizadas.modelo;
 
   const rastreio = calcularRastreamento([op])[0];
   const producao = op.apontamentos.filter((a) => a.soldador === null);
@@ -195,14 +202,14 @@ export default async function DocumentoOPPage({
           </tbody>
         </table>
 
-        {op.modelo.imagemUrl && (
+        {imagemModelo && (
           <div className="mt-6">
             <h2 className="mb-2 border-b-2 border-slate-800 pb-1 text-sm font-bold uppercase tracking-wide">
               Desenho técnico — conjunto completo
             </h2>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={op.modelo.imagemUrl}
+              src={imagemModelo}
               alt={`Conjunto ${op.modelo.codigo}`}
               className="mx-auto max-h-72 object-contain"
             />
@@ -222,6 +229,7 @@ export default async function DocumentoOPPage({
           setor.pecas.map((peca, idx) => {
             const mp = op.modelo.pecas.find((x) => x.pecaId === peca.id);
             const dadosPeca = mp?.peca;
+            const imagemPeca = dadosPeca?.imagemUrl ?? imagensOrganizadas.pecas.get(peca.codigo);
             const info = modoBranco
               ? { nomes: [], ultima: null, aprovadas: 0 }
               : operadoresDaPeca(peca.id, setor.setorId);
@@ -379,10 +387,10 @@ export default async function DocumentoOPPage({
                   </tbody>
                 </table>
 
-                {dadosPeca?.imagemUrl && (
+                {imagemPeca && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={dadosPeca.imagemUrl}
+                    src={imagemPeca}
                     alt={`Desenho ${peca.codigo}`}
                     className="mx-auto mt-3 max-h-56 object-contain"
                   />
@@ -430,10 +438,10 @@ export default async function DocumentoOPPage({
           <tbody>
             <tr>
               <td>
-                {op.modelo.imagemUrl ? (
+                {imagemModelo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={op.modelo.imagemUrl}
+            src={imagemModelo}
             alt={`Montagem ${op.modelo.codigo}`}
             className="mx-auto max-h-80 object-contain"
           />

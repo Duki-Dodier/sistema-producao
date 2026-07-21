@@ -14,6 +14,56 @@ function segmentoSeguro(valor: string, fallback: string) {
   return normalizado || fallback;
 }
 
+type ImagensOrganizadas = {
+  modelo: string | null;
+  pecas: Map<string, string>;
+};
+
+/**
+ * Recupera imagens organizadas que ainda existem no R2 mesmo quando uma
+ * referência antiga do banco foi removida. Uma única listagem atende o modelo
+ * e todas as peças, evitando várias chamadas ao armazenamento.
+ */
+export async function buscarImagensOrganizadas(
+  codigoModelo: string,
+  codigosPecas: string[],
+): Promise<ImagensOrganizadas> {
+  const pastaModelo = segmentoSeguro(codigoModelo, "MODELO");
+  const objetos: Array<{ key: string; uploaded: Date }> = [];
+  let cursor: string | undefined;
+
+  do {
+    const pagina = await env.UPLOADS.list({
+      prefix: `${codigoModelo}/`,
+      cursor,
+    });
+    objetos.push(...pagina.objects.map((objeto) => ({
+      key: objeto.key,
+      uploaded: objeto.uploaded,
+    })));
+    cursor = pagina.truncated ? pagina.cursor : undefined;
+  } while (cursor);
+
+  const maisRecente = (prefixo: string) => {
+    const encontrado = objetos
+      .filter((objeto) => objeto.key.startsWith(prefixo))
+      .sort((a, b) => b.uploaded.getTime() - a.uploaded.getTime())[0];
+    return encontrado ? `/api/uploads/${encontrado.key}` : null;
+  };
+
+  const pecas = new Map<string, string>();
+  for (const codigoPeca of codigosPecas) {
+    const nomePeca = segmentoSeguro(codigoPeca, "PECA");
+    const imagem = maisRecente(`${codigoModelo}/pecas/${nomePeca}-`);
+    if (imagem) pecas.set(codigoPeca, imagem);
+  }
+
+  return {
+    modelo: maisRecente(`${codigoModelo}/modelo/${pastaModelo}-`),
+    pecas,
+  };
+}
+
 /**
  * Salva uma imagem no armazenamento persistente da hospedagem e devolve a URL pública.
  * Devolve null se nenhum arquivo válido foi enviado (input vazio é comum e não é erro).
