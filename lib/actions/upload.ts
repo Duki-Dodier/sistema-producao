@@ -9,7 +9,13 @@ export async function uploadImagemModelo(modeloId: number, formData: FormData) {
     const file = formData.get("file") as File;
     if (!file || file.size === 0) return { error: "Nenhum arquivo enviado" };
 
-    const fileUrl = await salvarImagem(file, "modelos");
+    const modelo = await prisma.modelo.findUnique({
+      where: { id: modeloId },
+      select: { codigo: true },
+    });
+    if (!modelo) return { error: "Modelo não encontrado" };
+
+    const fileUrl = await salvarImagem(file, `${modelo.codigo}/modelo`, modelo.codigo);
     if (!fileUrl) return { error: "Nenhum arquivo enviado" };
 
     await prisma.modelo.update({
@@ -30,7 +36,13 @@ export async function uploadImagemPeca(pecaId: number, modeloId: number, formDat
     const file = formData.get("file") as File;
     if (!file || file.size === 0) return { error: "Nenhum arquivo enviado" };
 
-    const fileUrl = await salvarImagem(file, "pecas");
+    const [modelo, peca] = await Promise.all([
+      prisma.modelo.findUnique({ where: { id: modeloId }, select: { codigo: true } }),
+      prisma.peca.findUnique({ where: { id: pecaId }, select: { codigo: true } }),
+    ]);
+    if (!modelo || !peca) return { error: "Modelo ou peça não encontrado" };
+
+    const fileUrl = await salvarImagem(file, `${modelo.codigo}/pecas`, peca.codigo);
     if (!fileUrl) return { error: "Nenhum arquivo enviado" };
 
     await prisma.peca.update({

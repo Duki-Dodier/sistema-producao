@@ -34,7 +34,12 @@ export default async function FichaEngatePage({
       {/* HEADER / TOPBAR ESTILO SYSTEM MONITOR */}
       <div className="flex shrink-0 items-center justify-between border-b border-[#1E293B] bg-[#0B101E] px-6 py-4">
         <div className="flex items-center gap-4">
-          <Link href="/registros" className="text-cyan-500 hover:text-cyan-400">
+          <Link
+            href="/modelos"
+            aria-label="Voltar para modelos cadastrados"
+            title="Voltar para modelos cadastrados"
+            className="text-cyan-500 hover:text-cyan-400"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -61,6 +66,17 @@ export default async function FichaEngatePage({
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(30, 41, 59, 0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 41, 59, 0.4) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
 
         <div className="relative min-h-full min-w-max p-12 flex flex-col items-center">
+          <div className="mb-8 flex w-full max-w-5xl items-start gap-3 rounded-sm border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5V6A1.5 1.5 0 014.5 4.5h5.379a1.5 1.5 0 011.06.44l.621.62a1.5 1.5 0 001.06.44H19.5A1.5 1.5 0 0121 7.5v10.5a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 18V7.5z" />
+            </svg>
+            <div>
+              <p className="text-[11px] font-bold tracking-wider text-cyan-300 uppercase">Imagens da OP organizadas por modelo</p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Pasta <span className="font-mono text-slate-200">{modelo.codigo}/</span>: a foto do engate fica em <span className="font-mono text-slate-200">modelo/</span> e cada peça em <span className="font-mono text-slate-200">pecas/</span>, identificada pelo código da peça.
+              </p>
+            </div>
+          </div>
           
           {/* NÓ MASTER (ENGATE) */}
           <div className="relative z-10 flex w-72 flex-col rounded-sm border-l-4 border-l-[#00c896] bg-[#131B2C] shadow-2xl ring-1 ring-white/5">
@@ -80,6 +96,7 @@ export default async function FichaEngatePage({
               <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
                 <ImageUploader 
                   size="sm" 
+                  label="Foto do modelo"
                   onUpload={async (formData) => {
                     "use server";
                     return uploadImagemModelo(modelo.id, formData);
@@ -142,6 +159,7 @@ export default async function FichaEngatePage({
                         <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
                           <ImageUploader 
                             size="sm" 
+                            label="Foto para OP"
                             onUpload={async (formData) => {
                               "use server";
                               return uploadImagemPeca(mp.peca.id, modelo.id, formData);
@@ -151,6 +169,9 @@ export default async function FichaEngatePage({
                             <a href={mp.peca.imagemUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
                           )}
                         </div>
+                        <p className="mt-2 truncate font-mono text-[9px] text-slate-500">
+                          {modelo.codigo}/pecas/{mp.peca.codigo}-...
+                        </p>
                       </div>
                     </div>
                   </div>

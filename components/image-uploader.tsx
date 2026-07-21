@@ -5,10 +5,12 @@ import { UploadCloud, Loader2 } from "lucide-react";
 
 export function ImageUploader({ 
   onUpload, 
-  size = "md" 
+  size = "md",
+  label = "Foto",
 }: { 
   onUpload: (formData: FormData) => Promise<{ error?: string; success?: boolean }>;
   size?: "sm" | "md";
+  label?: string;
 }) {
   const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +53,7 @@ export function ImageUploader({
         ) : (
           <UploadCloud className="h-3.5 w-3.5" />
         )}
-        {isUploading ? "Enviando..." : "Foto"}
+        {isUploading ? "Enviando..." : label}
       </button>
     </div>
   );

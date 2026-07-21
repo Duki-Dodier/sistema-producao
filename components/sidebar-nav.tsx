@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/agrupamento", label: "Agrupamento (WIP)", icon: KittingIcon },
   { href: "/solda", label: "Soldagem", icon: WeldingIcon },
   { href: "/apontamentos", label: "Apontamentos da Fábrica", icon: QualityIcon },
-  { href: "/modelos", label: "Engenharia (SKUs e Roteiros)", icon: ConfigIcon },
+  { href: "/modelos", label: "Engenharia de Produto", icon: ConfigIcon },
   { href: "/configuracoes", label: "Configurações (Funcionários, Metas)", icon: SettingsIcon },
 ];
 
