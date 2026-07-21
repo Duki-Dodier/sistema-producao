@@ -2,32 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import fs from "fs/promises";
-import path from "path";
-import crypto from "crypto";
-
-async function saveFileLocally(file: File): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-
-  const hash = crypto.randomBytes(8).toString("hex");
-  const ext = path.extname(file.name) || ".png";
-  const fileName = `${hash}${ext}`;
-  
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  const filePath = path.join(uploadDir, fileName);
-
-  await fs.writeFile(filePath, buffer);
-
-  return `/uploads/${fileName}`;
-}
+import { salvarImagem } from "@/lib/upload";
 
 export async function uploadImagemModelo(modeloId: number, formData: FormData) {
   try {
     const file = formData.get("file") as File;
     if (!file || file.size === 0) return { error: "Nenhum arquivo enviado" };
 
-    const fileUrl = await saveFileLocally(file);
+    const fileUrl = await salvarImagem(file, "modelos");
+    if (!fileUrl) return { error: "Nenhum arquivo enviado" };
 
     await prisma.modelo.update({
       where: { id: modeloId },
@@ -47,7 +30,8 @@ export async function uploadImagemPeca(pecaId: number, modeloId: number, formDat
     const file = formData.get("file") as File;
     if (!file || file.size === 0) return { error: "Nenhum arquivo enviado" };
 
-    const fileUrl = await saveFileLocally(file);
+    const fileUrl = await salvarImagem(file, "pecas");
+    if (!fileUrl) return { error: "Nenhum arquivo enviado" };
 
     await prisma.peca.update({
       where: { id: pecaId },

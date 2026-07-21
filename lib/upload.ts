@@ -1,13 +1,10 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import crypto from "node:crypto";
+import { env } from "cloudflare:workers";
 
 const TIPOS_ACEITOS = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const TAMANHO_MAXIMO_BYTES = 1024 * 1024;
 
 /**
- * Salva um arquivo de imagem enviado num `<input type="file">` em
- * `public/uploads/<pasta>/` e devolve o caminho público (ex.: "/uploads/pecas/xxx.jpg").
+ * Salva uma imagem no armazenamento persistente da hospedagem e devolve a URL pública.
  * Devolve null se nenhum arquivo válido foi enviado (input vazio é comum e não é erro).
  */
 export async function salvarImagem(
@@ -24,11 +21,10 @@ export async function salvarImagem(
 
   const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
   const nomeArquivo = `${crypto.randomUUID()}.${ext}`;
-  const dirAbsoluto = path.join(process.cwd(), "public", "uploads", pasta);
-  await mkdir(dirAbsoluto, { recursive: true });
+  const chave = `${pasta}/${nomeArquivo}`;
+  await env.UPLOADS.put(chave, await file.arrayBuffer(), {
+    httpMetadata: { contentType: file.type },
+  });
 
-  const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dirAbsoluto, nomeArquivo), bytes);
-
-  return `/uploads/${pasta}/${nomeArquivo}`;
+  return `/api/uploads/${chave}`;
 }

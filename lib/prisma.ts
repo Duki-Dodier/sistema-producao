@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaD1 } from "@prisma/adapter-d1";
+import { env } from "cloudflare:workers";
 
 // Singleton do Prisma Client.
 // Em desenvolvimento o Next recarrega os módulos a cada alteração; sem esse
@@ -10,6 +12,7 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    adapter: new PrismaD1(env.DB),
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
