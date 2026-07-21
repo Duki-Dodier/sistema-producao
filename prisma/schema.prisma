@@ -8,8 +8,11 @@
 // valores permitidos documentados em comentário e validados no código.
 
 generator client {
-  provider = "prisma-client-js"
-  engineType = "client"
+  provider     = "prisma-client"
+  output       = "../app/generated/prisma"
+  runtime      = "cloudflare"
+  moduleFormat = "esm"
+  engineType   = "client"
 }
 
 datasource db {
