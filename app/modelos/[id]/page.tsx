@@ -20,9 +20,18 @@ export default async function ModeloDetailPage({
   const [modelo, setores] = await Promise.all([
     prisma.modelo.findUnique({
       where: { id: modeloId },
-      include: { roteiro: true },
+      select: {
+        id: true,
+        codigo: true,
+        curva: true,
+        tipo: true,
+        roteiro: { select: { setorId: true, ordem: true } },
+      },
     }),
-    prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } }),
+    prisma.setor.findMany({
+      orderBy: { ordemPadrao: "asc" },
+      select: { id: true, nome: true },
+    }),
   ]);
 
   if (!modelo) notFound();

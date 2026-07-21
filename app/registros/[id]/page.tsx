@@ -18,9 +18,34 @@ export default async function FichaEngatePage({
   const [modelo, setores] = await Promise.all([
     prisma.modelo.findUnique({
       where: { id: modeloId },
-      include: { pecas: { include: { peca: { include: { setor: true } } } }, roteiro: true },
+      select: {
+        id: true,
+        codigo: true,
+        nome: true,
+        curva: true,
+        imagemUrl: true,
+        pecas: {
+          select: {
+            id: true,
+            quantidadeNecessaria: true,
+            peca: {
+              select: {
+                id: true,
+                codigo: true,
+                nome: true,
+                medida: true,
+                tipoMaterial: true,
+                imagemUrl: true,
+              },
+            },
+          },
+        },
+      },
     }),
-    prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } }),
+    prisma.setor.findMany({
+      orderBy: { ordemPadrao: "asc" },
+      select: { id: true, nome: true },
+    }),
   ]);
 
   if (!modelo) notFound();

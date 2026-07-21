@@ -13,9 +13,20 @@ export default async function OpsPage() {
   const [ops, modelos] = await Promise.all([
     prisma.oP.findMany({
       orderBy: { numeroSequencia: "asc" },
-      include: { modelo: true },
+      select: {
+        id: true,
+        numeroSequencia: true,
+        lote: true,
+        quantidade: true,
+        dataLiberacao: true,
+        status: true,
+        modelo: { select: { codigo: true, curva: true } },
+      },
     }),
-    prisma.modelo.findMany({ orderBy: { codigo: "asc" } }),
+    prisma.modelo.findMany({
+      orderBy: { codigo: "asc" },
+      select: { id: true, codigo: true, curva: true },
+    }),
   ]);
 
   return (

@@ -9,7 +9,13 @@ import { FileText, Plus, Route } from "lucide-react";
 export default async function ModelosPage() {
   const modelos = await prisma.modelo.findMany({
     orderBy: { codigo: "asc" },
-    include: { _count: { select: { roteiro: true, ops: true } } },
+    select: {
+      id: true,
+      codigo: true,
+      curva: true,
+      tipo: true,
+      _count: { select: { roteiro: true, ops: true } },
+    },
   });
 
   return (

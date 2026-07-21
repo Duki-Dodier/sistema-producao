@@ -89,7 +89,7 @@ model Peca {
   codigo    String  @unique
   nome      String
   medida    String? // texto livre p/ exibição, ex.: "200mm", "3/4mm" — NÃO usar p/ busca
-  imagemUrl String? // foto da peça, ex.: "/uploads/pecas/xxx.jpg"
+  imagemUrl String? // foto da peça, ex.: "/api/uploads/AD1001/pecas/AD1001-PL1-xxx.jpg"
   setorId   Int // onde essa peça é fabricada
 
   // Campos estruturados p/ permitir buscar/filtrar/relacionar o mesmo material
@@ -193,7 +193,7 @@ model Modelo {
   curva           String // "A" | "B" | "C"
   tipo            String // "FIXO" | "REMOVIVEL"
   tamanhoPonteira String? // ex.: "P", "M", "G", "P-16mm" — só p/ removível
-  imagemUrl       String? // foto do engate, ex.: "/uploads/modelos/xxx.jpg"
+  imagemUrl       String? // foto do engate, ex.: "/api/uploads/AD1001/modelo/AD1001-xxx.jpg"
   estoqueMinimo   Int? // regulador de estoque — alerta quando o estoque pronto cair abaixo disso
 
   roteiro ModeloRoteiro[]
