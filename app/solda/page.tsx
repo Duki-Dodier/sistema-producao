@@ -318,7 +318,7 @@ export default async function SoldaPage({
                     className="px-5 py-16 text-center text-[11px] font-semibold uppercase tracking-widest text-slate-500"
                   >
                     Nenhum envio encontrado — ajuste os filtros ou envie uma OP
-                    pelo Agrupamento.
+                    pelo Abastecimento.
                   </td>
                 </tr>
               )}

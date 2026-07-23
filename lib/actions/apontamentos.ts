@@ -7,7 +7,7 @@ import { processosDaPeca, PROCESSOS, type Processo } from "@/lib/processos";
 
 const revalidarApontamentos = () => {
   revalidatePath("/apontamentos");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
   revalidatePath("/");
   revalidatePath("/monitoramento");
 };

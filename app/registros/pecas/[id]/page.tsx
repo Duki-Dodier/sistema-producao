@@ -17,7 +17,7 @@ export default async function EditarPecaPage({
   const { id } = await params;
   const pecaId = Number(id);
 
-  const [peca, setores] = await Promise.all([
+  const [peca, setores, modeloPeca] = await Promise.all([
     prisma.peca.findUnique({
       where: { id: pecaId },
       include: {
@@ -27,6 +27,10 @@ export default async function EditarPecaPage({
       },
     }),
     prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } }),
+    prisma.modeloPeca.findFirst({
+      where: { pecaId },
+      select: { modeloId: true },
+    }),
   ]);
 
   if (!peca) notFound();
@@ -39,11 +43,24 @@ export default async function EditarPecaPage({
     roteiroAtual[indice] ?? null,
   );
 
+  const backLink = modeloPeca ? `/registros/${modeloPeca.modeloId}` : `/registros`;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title={`Editar peça ${peca.codigo}`}
         subtitle="Ajuste foto, nome, medida e setor desta peça."
+        actions={
+          <a
+            href={backLink}
+            className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/10"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Voltar
+          </a>
+        }
       />
 
       <Card className="mx-auto w-full max-w-3xl">
@@ -120,7 +137,7 @@ export default async function EditarPecaPage({
               Roteiro da peça entre setores
             </p>
             <p className="mb-3 mt-1 text-[11px] text-slate-500">
-              Preencha na ordem real. Linhas vazias são ignoradas. Toda peça deve terminar em Agrupamento.
+              Preencha na ordem real. Linhas vazias são ignoradas. Toda peça deve terminar em Abastecimento.
             </p>
             <div className="mb-5 space-y-2">
               {linhasRoteiro.map((etapa, indice) => (

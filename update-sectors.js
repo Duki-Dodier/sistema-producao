@@ -9,7 +9,7 @@ const SETORES_FINAL = [
   "Plasma Chapa",
   "Plasma Tubo",
   "Acessórios",
-  "Agrupamento",
+  "Abastecimento",
   "Solda",
   "Pintura",
   "Montagem"

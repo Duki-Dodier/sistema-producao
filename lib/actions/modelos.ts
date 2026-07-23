@@ -225,7 +225,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
     // 1. Pegar IDs únicos dos setores das peças
     const setoresPecasIds = [...new Set(pecas.map(p => p.setorId))];
     
-    // 2. Buscar setores finais (Agrupamento, Solda, Pintura, Montagem)
+    // 2. Buscar setores finais (Abastecimento, Solda, Pintura, Montagem)
     const setoresFinais = (await tx.setor.findMany()).filter((setor) =>
       ehSetorFinal(setor.nome),
     );
@@ -254,6 +254,6 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
 
   revalidatePath("/registros");
   revalidatePath("/modelos");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
   revalidatePath("/monitoramento");
 }

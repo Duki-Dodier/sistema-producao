@@ -1,7 +1,10 @@
-import { env } from "cloudflare:workers";
+import fs from "node:fs/promises";
+import path from "node:path";
+import crypto from "node:crypto";
 
 const TIPOS_ACEITOS = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const TAMANHO_MAXIMO_BYTES = 1024 * 1024;
+const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
 
 function segmentoSeguro(valor: string, fallback: string) {
   const normalizado = valor
@@ -19,36 +22,45 @@ type ImagensOrganizadas = {
   pecas: Map<string, string>;
 };
 
-/**
- * Recupera imagens organizadas que ainda existem no R2 mesmo quando uma
- * referência antiga do banco foi removida. Uma única listagem atende o modelo
- * e todas as peças, evitando várias chamadas ao armazenamento.
- */
 export async function buscarImagensOrganizadas(
   codigoModelo: string,
   codigosPecas: string[],
 ): Promise<ImagensOrganizadas> {
   const pastaModelo = segmentoSeguro(codigoModelo, "MODELO");
   const objetos: Array<{ key: string; uploaded: Date }> = [];
-  let cursor: string | undefined;
-
-  do {
-    const pagina = await env.UPLOADS.list({
-      prefix: `${codigoModelo}/`,
-      cursor,
-    });
-    objetos.push(...pagina.objects.map((objeto) => ({
-      key: objeto.key,
-      uploaded: objeto.uploaded,
-    })));
-    cursor = pagina.truncated ? pagina.cursor : undefined;
-  } while (cursor);
+  
+  const dirPath = path.join(UPLOADS_DIR, codigoModelo);
+  
+  try {
+    async function lerDiretorioRecursivamente(dir: string, baseDir: string = dir) {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await lerDiretorioRecursivamente(fullPath, baseDir);
+        } else {
+          const stats = await fs.stat(fullPath);
+          const key = fullPath.replace(path.join(UPLOADS_DIR, path.sep), "").replace(/\\/g, "/");
+          objetos.push({
+            key,
+            uploaded: stats.mtime,
+          });
+        }
+      }
+    }
+    
+    await lerDiretorioRecursivamente(dirPath);
+  } catch (error: any) {
+    if (error.code !== "ENOENT") {
+      console.error("Erro ao ler diretório de uploads:", error);
+    }
+  }
 
   const maisRecente = (prefixo: string) => {
     const encontrado = objetos
       .filter((objeto) => objeto.key.startsWith(prefixo))
       .sort((a, b) => b.uploaded.getTime() - a.uploaded.getTime())[0];
-    return encontrado ? `/api/uploads/${encontrado.key}` : null;
+    return encontrado ? `/uploads/${encontrado.key}` : null;
   };
 
   const pecas = new Map<string, string>();
@@ -64,10 +76,6 @@ export async function buscarImagensOrganizadas(
   };
 }
 
-/**
- * Salva uma imagem no armazenamento persistente da hospedagem e devolve a URL pública.
- * Devolve null se nenhum arquivo válido foi enviado (input vazio é comum e não é erro).
- */
 export async function salvarImagem(
   file: FormDataEntryValue | null,
   pasta: string,
@@ -84,9 +92,11 @@ export async function salvarImagem(
   const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
   const nomeArquivo = `${segmentoSeguro(nomeBase, "IMAGEM")}-${crypto.randomUUID()}.${ext}`;
   const chave = `${pasta}/${nomeArquivo}`;
-  await env.UPLOADS.put(chave, await file.arrayBuffer(), {
-    httpMetadata: { contentType: file.type },
-  });
+  const absolutePath = path.join(UPLOADS_DIR, chave);
+  
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(absolutePath, buffer);
 
-  return `/api/uploads/${chave}`;
+  return `/uploads/${chave}`;
 }

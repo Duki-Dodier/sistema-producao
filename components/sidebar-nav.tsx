@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Painel Geral", icon: DashboardIcon },
   { href: "/monitoramento", label: "Monitoramento (Produção Geral)", icon: MonitorIcon },
   { href: "/ops", label: "Ordens de Produção", icon: OrdersIcon },
-  { href: "/agrupamento", label: "Agrupamento (WIP)", icon: KittingIcon },
+  { href: "/abastecimento", label: "Abastecimento (WIP)", icon: KittingIcon },
   { href: "/solda", label: "Soldagem", icon: WeldingIcon },
   { href: "/apontamentos", label: "Apontamentos da Fábrica", icon: QualityIcon },
   { href: "/modelos", label: "Engenharia de Produto", icon: ConfigIcon },

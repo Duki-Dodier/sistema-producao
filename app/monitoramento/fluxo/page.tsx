@@ -159,7 +159,7 @@ async function FluxoFabricaAnterior({
       };
     });
 
-  const finais = ["Agrupamento", "Solda", "Pintura", "Montagem"].map((nome) => {
+  const finais = ["Abastecimento", "Solda", "Pintura", "Montagem"].map((nome) => {
     const setor = setores.find((item) => ehSetor(item.nome, nome));
     const etapas = progresso.flatMap((item) => item.setores.filter((etapa) => ehSetor(etapa.setorNome, nome)));
     return {

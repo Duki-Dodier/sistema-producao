@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 function revalidarTudo() {
   revalidatePath("/");
   revalidatePath("/apontamentos");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
   revalidatePath("/solda");
   revalidatePath("/monitoramento");
 }

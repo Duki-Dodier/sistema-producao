@@ -15,7 +15,8 @@ export const TIPO_MATERIAL_LABEL: Record<string, string> = {
   CHAPA: "Chapa",
   CANTONEIRA: "Cantoneira",
   REFORCO: "Reforço",
-  PONTEIRA: "Ponteira",
+  PONTEIRA_FIXA: "Ponteira Fixa",
+  PONTEIRA_REM: "Ponteira Removível",
   PLASMA: "Plasma",
   OUTRO: "Outro",
 };
@@ -26,7 +27,8 @@ export const SUFIXO_MATERIAL: Record<string, string> = {
   CHAPA: "CH",
   CANTONEIRA: "CT",
   REFORCO: "RF",
-  PONTEIRA: "PT",
+  PONTEIRA_FIXA: "PF",
+  PONTEIRA_REM: "PR",
   PLASMA: "PL",
   OUTRO: "OT",
 };

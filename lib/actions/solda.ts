@@ -6,7 +6,7 @@ import { ehSetor } from "@/lib/setores";
 
 function revalidarSolda() {
   revalidatePath("/solda");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
   revalidatePath("/");
   revalidatePath("/monitoramento");
 }

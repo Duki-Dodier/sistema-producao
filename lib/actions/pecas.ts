@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { salvarImagem } from "@/lib/upload";
 import { SUFIXO_MATERIAL } from "@/lib/labels";
 import { PROCESSOS, processosDoForm } from "@/lib/processos";
@@ -99,9 +100,9 @@ export async function updatePeca(id: number, formData: FormData) {
       setores,
     );
   }
-  const agrupamento = setores.find((setor) => ehSetor(setor.nome, "Agrupamento"));
-  if (agrupamento && etapas.at(-1)?.processo !== "AGRUPAR") {
-    etapas.push({ setorId: agrupamento.id, processo: "AGRUPAR", ordem: etapas.length + 1 });
+  const abastecimento = setores.find((setor) => ehSetor(setor.nome, "Abastecimento"));
+  if (abastecimento && etapas.at(-1)?.processo !== "AGRUPAR") {
+    etapas.push({ setorId: abastecimento.id, processo: "AGRUPAR", ordem: etapas.length + 1 });
   }
   etapas = etapas.map((etapa, indice) => ({ ...etapa, ordem: indice + 1 }));
   const processosSetorPrincipal = etapas
@@ -156,6 +157,17 @@ export async function updatePeca(id: number, formData: FormData) {
   revalidatePath(`/registros/pecas/${id}`);
   revalidatePath("/apontamentos");
   revalidatePath("/monitoramento");
+  
+  const modeloVinculado = await prisma.modeloPeca.findFirst({
+    where: { pecaId: id },
+    select: { modeloId: true },
+  });
+
+  if (modeloVinculado) {
+    redirect(`/registros/${modeloVinculado.modeloId}`);
+  } else {
+    redirect("/registros");
+  }
 }
 
 export async function deletePeca(id: number) {
@@ -196,7 +208,7 @@ export async function updateBOM(modeloId: number, formData: FormData) {
 
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath("/registros");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
   revalidatePath("/");
   revalidatePath("/monitoramento");
 }
@@ -204,11 +216,12 @@ export async function updateBOM(modeloId: number, formData: FormData) {
 export async function addPecaToEngate(modeloId: number, formData: FormData) {
   const setorId = Number(formData.get("setorId"));
   const tipoMaterial = String(formData.get("tipoMaterial") ?? "").trim();
+  const nome = String(formData.get("nome") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();
   const quantidade = Number(formData.get("quantidade") ?? 1);
 
-  if (!setorId || !tipoMaterial) {
-    throw new Error("Preencha setor e tipo de material.");
+  if (!setorId || !tipoMaterial || !nome) {
+    throw new Error("Preencha setor, tipo de material e nome.");
   }
 
   const modelo = await prisma.modelo.findUnique({
@@ -228,7 +241,7 @@ export async function addPecaToEngate(modeloId: number, formData: FormData) {
     const peca = await tx.peca.create({
       data: {
         codigo: codigoGerado,
-        nome: `${tipoMaterial} ${medida}`.trim(),
+        nome,
         medida: medida || null,
         setorId,
         tipoMaterial,
@@ -264,7 +277,7 @@ export async function addPecaToEngate(modeloId: number, formData: FormData) {
 
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath("/registros");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
   revalidatePath("/");
   revalidatePath("/monitoramento");
 }

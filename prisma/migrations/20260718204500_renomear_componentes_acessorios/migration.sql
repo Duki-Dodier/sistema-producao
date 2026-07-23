@@ -1,3 +1,0 @@
-UPDATE "Setor"
-SET "nome" = 'COMPONENTES E ACESSÓRIOS'
-WHERE "nome" = 'ACESSORIOS';

@@ -1,8 +1,8 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/app/generated/prisma/client";
 import { ehSetor } from "@/lib/setores";
 import { processosDaPeca } from "@/lib/processos";
 
-export const opComProgressoArgs = Prisma.validator<Prisma.OPDefaultArgs>()({
+export const opComProgressoArgs = {
   include: {
     modelo: {
       include: {
@@ -20,7 +20,7 @@ export const opComProgressoArgs = Prisma.validator<Prisma.OPDefaultArgs>()({
     },
     apontamentos: true,
   },
-});
+} satisfies Prisma.OPDefaultArgs;
 export type OPComDados = Prisma.OPGetPayload<typeof opComProgressoArgs>;
 
 export type PecaProgresso = {
@@ -104,7 +104,7 @@ export function calcularProgressoOPs(ops: OPComDados[]): OPProgresso[] {
                 ...mp.peca,
                 setor: { nome: r.setor.nome },
               }).at(-1);
-          const produzida = apontamentosDoSetor
+          const produzidaEspecifica = apontamentosDoSetor
             .filter(
               (a) =>
                 a.pecaId === mp.pecaId &&
@@ -115,12 +115,19 @@ export function calcularProgressoOPs(ops: OPComDados[]): OPProgresso[] {
                     : a.processo === processoFinal)),
             )
             .reduce((sum, a) => sum + a.quantidadeBoa, 0);
+          
+          const produzidaGenerica = apontamentosDoSetor
+            .filter((a) => a.pecaId === null)
+            .reduce((sum, a) => sum + a.quantidadeBoa, 0);
+            
+          const produzida = produzidaEspecifica + produzidaGenerica;
           const faltaPeca = Math.max(necessaria - produzida, 0);
           return {
             pecaId: mp.pecaId,
             codigo: mp.peca.codigo,
             nome: mp.peca.nome,
             medida: mp.peca.medida,
+            imagemUrl: mp.peca.imagemUrl,
             necessaria,
             produzida,
             falta: faltaPeca,
@@ -164,8 +171,8 @@ export function calcularProgressoOPs(ops: OPComDados[]): OPProgresso[] {
     const soldaOrdem = setores.find((s) => ehSetor(s.setorNome, "Solda"))?.ordem;
     const setoresPreSolda =
       soldaOrdem !== undefined
-        ? setores.filter((s) => s.ordem < soldaOrdem && !ehSetor(s.setorNome, "Agrupamento"))
-        : setores.filter((s) => !ehSetor(s.setorNome, "Agrupamento"));
+        ? setores.filter((s) => s.ordem < soldaOrdem && !ehSetor(s.setorNome, "Abastecimento"))
+        : setores.filter((s) => !ehSetor(s.setorNome, "Abastecimento"));
     const prontoParaSolda =
       setoresPreSolda.length > 0 && setoresPreSolda.every((s) => s.completo);
 
@@ -205,7 +212,7 @@ export function calcularProgressoOPs(ops: OPComDados[]): OPProgresso[] {
 /**
  * União das etapas pré-Solda usadas pelas OPs informadas, ordenada pela
  * ordem global do setor — usada como cabeçalho de colunas na tela de
- * Agrupamento (cada modelo pode ter um roteiro diferente).
+ * Abastecimento (cada modelo pode ter um roteiro diferente).
  */
 /**
  * União de TODAS as etapas dos roteiros das OPs informadas (inclui Solda,
@@ -218,9 +225,9 @@ export function colunasRoteiro(
   const porId = new Map<number, { setorId: number; setorNome: string; ordemPadrao: number }>();
   for (const p of progresso) {
     for (const s of p.setores) {
-      // "Agrupamento" é um checkpoint (kit completo), não etapa produtiva —
+      // "Abastecimento" é um checkpoint (kit completo), não etapa produtiva —
       // a matriz mostra essa informação na coluna Situação, não como coluna própria.
-      if (ehSetor(s.setorNome, "Agrupamento")) continue;
+      if (ehSetor(s.setorNome, "Abastecimento")) continue;
       if (!porId.has(s.setorId)) {
         porId.set(s.setorId, {
           setorId: s.setorId,

@@ -38,7 +38,7 @@ export function roteiroPadraoDaPeca(
   peca: PecaBasica,
   setores: SetorBasico[],
 ): EtapaRoteiroPeca[] {
-  const agrupamento = setorPorNome(setores, "Agrupamento");
+  const abastecimento = setorPorNome(setores, "Abastecimento");
   const componente = setorPorNome(setores, "Componentes e Acessórios") ?? setorPorNome(setores, "Componente");
   const plasmaTubo = setorPorNome(setores, "Plasma Tubo");
   const ponteira = setorPorNome(setores, "Ponteira");
@@ -92,7 +92,7 @@ export function roteiroPadraoDaPeca(
     }
   }
 
-  adicionar(agrupamento?.id, "AGRUPAR");
+  adicionar(abastecimento?.id, "AGRUPAR");
   return etapas.map((etapa, indice) => ({ ...etapa, ordem: indice + 1 }));
 }
 

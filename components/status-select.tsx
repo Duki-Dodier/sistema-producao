@@ -20,7 +20,7 @@ export function StatusSelect({
         name="status"
         defaultValue={status}
         onChange={() => formRef.current?.requestSubmit()}
-        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="rounded-md border border-white/5 bg-[#1A222C] px-2 py-1 text-xs font-medium text-slate-200 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
       >
         {Object.entries(STATUS_OP_LABEL).map(([value, label]) => (
           <option key={value} value={value}>

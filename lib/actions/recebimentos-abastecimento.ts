@@ -14,7 +14,7 @@ export async function salvarRecebimentoAgrupamento(formData: FormData) {
   if (!Number.isInteger(opId) || !Number.isInteger(setorOrigemId)) {
     throw new Error("OP ou setor inválido.");
   }
-  if (!/^(SETOR:\d+|PONTEIRA|REFORCO)$/.test(categoria)) {
+  if (!/^(SETOR:\d+|PONTEIRA|PONTEIRA_FIXA|PONTEIRA_REM|REFORCO)$/.test(categoria)) {
     throw new Error("Categoria de recebimento inválida.");
   }
   if (!recebidoPor) {
@@ -45,18 +45,23 @@ export async function salvarRecebimentoAgrupamento(formData: FormData) {
     if (op.status !== "ABERTA") {
       throw new Error("Só é possível receber peças de uma OP aberta.");
     }
-    if (!op.modelo.roteiro.some((etapa) => etapa.setorId === setorOrigemId)) {
-      throw new Error("O setor informado não faz parte do roteiro desta OP.");
-    }
     if (pecaIds.length === 0 || pecaIds.some((pecaId) => !op.modelo.pecas.some((item) => item.pecaId === pecaId))) {
       throw new Error("As peças informadas não pertencem a esta OP.");
     }
 
-    const producao = await tx.apontamento.aggregate({
+    // Check for piece-level production OR sector-level production
+    const producaoPecas = await tx.apontamento.aggregate({
       where: { opId, pecaId: { in: pecaIds } },
       _sum: { quantidadeBoa: true },
     });
-    if ((producao._sum.quantidadeBoa ?? 0) <= 0) {
+    
+    // Also check if the sector itself produced something at the OP level (pecaId = null)
+    const producaoSetor = await tx.apontamento.aggregate({
+      where: { opId, setorId: setorOrigemId },
+      _sum: { quantidadeBoa: true },
+    });
+
+    if ((producaoPecas._sum.quantidadeBoa ?? 0) <= 0 && (producaoSetor._sum.quantidadeBoa ?? 0) <= 0) {
       throw new Error("Ainda não há peças produzidas por este setor para receber.");
     }
 
@@ -67,5 +72,5 @@ export async function salvarRecebimentoAgrupamento(formData: FormData) {
     });
   });
 
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
 }

@@ -10,13 +10,10 @@
 generator client {
   provider     = "prisma-client"
   output       = "../app/generated/prisma"
-  runtime      = "cloudflare"
-  moduleFormat = "esm"
-  engineType   = "client"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

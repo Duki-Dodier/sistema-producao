@@ -148,7 +148,7 @@ async function CockpitSetor({
       where: {
         setorId: setor.id,
         dataHora: { gte: inicioMes, lt: fimMes },
-        // Envios do Agrupamento possuem `soldador` preenchido e representam
+        // Envios do Abastecimento possuem `soldador` preenchido e representam
         // apenas abastecimento. Na grade de Solda entram somente os lançamentos
         // de produção feitos no Monitoramento (`soldador` nulo).
         ...(monitorandoSolda ? { soldador: null } : {}),
@@ -913,7 +913,7 @@ async function RastreamentoOPs({
     return true;
   });
   const setoresProdutivos = setores.filter(
-    (setor) => !["AGRUPAMENTO", "SOLDA", "PINTURA", "MONTAGEM"].includes(setor.nome.toUpperCase()),
+    (setor) => !["ABASTECIMENTO", "SOLDA", "PINTURA", "MONTAGEM"].includes(setor.nome.toUpperCase()),
   );
   const totalKits = rastreamentoTotal.reduce((soma, item) => soma + item.kitsCompletos, 0);
   const totalPlanejado = rastreamentoTotal.reduce((soma, item) => soma + item.op.quantidade, 0);

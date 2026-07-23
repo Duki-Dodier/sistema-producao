@@ -6,7 +6,7 @@ import { PecasModal } from "./pecas-modal";
 import { EnvioSoldaModal } from "./envio-solda-modal";
 import { ehSetor, ehSetorFinal } from "@/lib/setores";
 
-export type ColunaAgrupamento = {
+export type ColunaAbastecimento = {
   chave: string;
   setorId: number;
   setorNome: string;
@@ -33,28 +33,40 @@ function categoriaDaPeca(
 ) {
   const nome = normalizar(peca.nome);
   if (peca.tipoMaterial === "REFORCO" || nome.includes("REFORCO")) return "REFORCO";
-  const etapaFinal = etapaFinalDaPeca(peca);
+  
   if (
+    peca.tipoMaterial === "PONTEIRA_FIXA" ||
+    nome.includes("PONTEIRA FIXA") ||
+    nome.includes("CABECA FIXA")
+  ) {
+    return "PONTEIRA_FIXA";
+  }
+
+  const etapaFinal = etapaFinalDaPeca(peca);
+
+  if (
+    peca.tipoMaterial === "PONTEIRA_REM" ||
+    nome.includes("PONTEIRA REMOVIVEL") ||
+    nome.includes("CABECA REMOVIVEL") ||
     peca.tipoMaterial === "PONTEIRA" ||
     nome.includes("PONTEIRA") ||
-    nome.includes("CABECA REMOVIVEL") ||
     (etapaFinal && ehSetor(etapaFinal.setor.nome, "Ponteira"))
   ) {
-    return "PONTEIRA";
+    return "PONTEIRA_REM";
   }
-  return `SETOR:${etapaFinal?.setorId ?? peca.setorId}`;
+
+  return `SETOR:${peca.setorId}`;
 }
 
-function progressoDaColuna(p: OPProgresso, coluna: ColunaAgrupamento): SetorProgresso | null {
+function progressoDaColuna(p: OPProgresso, coluna: ColunaAbastecimento): SetorProgresso | null {
   const itens = p.op.modelo.pecas.filter(
     (modeloPeca) => categoriaDaPeca(modeloPeca.peca) === coluna.chave,
   );
   if (itens.length === 0) return null;
 
   const pecas = itens.map((modeloPeca) => {
-    const etapaFinal = etapaFinalDaPeca(modeloPeca.peca);
-    const setorFinalId = etapaFinal?.setorId ?? modeloPeca.peca.setorId;
-    const progressoSetor = p.setoresPreSolda.find((setor) => setor.setorId === setorFinalId);
+    const targetSetorId = coluna.setorId ?? modeloPeca.peca.setorId;
+    const progressoSetor = p.setoresPreSolda.find((setor) => setor.setorId === targetSetorId);
     const progressoPeca = progressoSetor?.pecas.find(
       (peca) => peca.pecaId === modeloPeca.pecaId,
     );
@@ -64,6 +76,7 @@ function progressoDaColuna(p: OPProgresso, coluna: ColunaAgrupamento): SetorProg
       codigo: modeloPeca.peca.codigo,
       nome: modeloPeca.peca.nome,
       medida: modeloPeca.peca.medida,
+      imagemUrl: modeloPeca.peca.imagemUrl,
       necessaria,
       produzida: 0,
       falta: necessaria,
@@ -73,11 +86,11 @@ function progressoDaColuna(p: OPProgresso, coluna: ColunaAgrupamento): SetorProg
   const completo = pecas.every((peca) => peca.completo);
   const datasConclusao = itens
     .map((modeloPeca) => {
-      const setorId = etapaFinalDaPeca(modeloPeca.peca)?.setorId ?? modeloPeca.peca.setorId;
+      const setorId = coluna.setorId ?? modeloPeca.peca.setorId;
       return p.setoresPreSolda.find((setor) => setor.setorId === setorId)?.concluidoEm ?? null;
     })
     .filter((data): data is Date => data !== null);
-  const setorRepresentante = etapaFinalDaPeca(itens[0].peca)?.setorId ?? coluna.setorId;
+  const setorRepresentante = coluna.setorId;
 
   return {
     setorId: setorRepresentante,
@@ -179,7 +192,7 @@ export type RecebimentoDaCelula = {
   dataHora: Date | string;
 };
 
-export function AgrupamentoRow({
+export function AbastecimentoRow({
   p,
   colunas,
   index,
@@ -187,7 +200,7 @@ export function AgrupamentoRow({
   recebimentos,
 }: {
   p: OPProgresso;
-  colunas: ColunaAgrupamento[];
+  colunas: ColunaAbastecimento[];
   index: number;
   sugestoes: SugestoesEnvio;
   recebimentos: RecebimentoDaCelula[];
@@ -202,7 +215,7 @@ export function AgrupamentoRow({
 
   // Progresso de envio p/ Solda (soma dos envios já feitos)
   const setorSolda = p.setores.find(s => ehSetor(s.setorNome, "Solda"));
-  // Abastecimento vindo do Agrupamento tem `soldador` preenchido. Um
+  // Abastecimento vindo do Abastecimento tem `soldador` preenchido. Um
   // apontamento com `soldador` nulo é quantidade já soldada, não novo envio.
   const enviado = setorSolda
     ? p.op.apontamentos
@@ -214,7 +227,7 @@ export function AgrupamentoRow({
     : 0;
   const saldoAProduzir = p.op.quantidade - enviado;
 
-  const openModal = (coluna: ColunaAgrupamento) => {
+  const openModal = (coluna: ColunaAbastecimento) => {
      const setorObj = progressoDaColuna(p, coluna);
      if (setorObj) {
         setSetorSelecionado(setorObj);
@@ -249,7 +262,10 @@ export function AgrupamentoRow({
         
         {colunas.map((c) => {
           const s = progressoDaColuna(p, c);
-          const recebimento = recebimentos.find((item) => item.categoria === c.chave);
+          const recebimento = recebimentos.find((item) => 
+            item.categoria === c.chave || 
+            (item.categoria === "PONTEIRA" && (c.chave === "PONTEIRA_FIXA" || c.chave === "PONTEIRA_REM"))
+          );
           
           if (!s) {
             return (

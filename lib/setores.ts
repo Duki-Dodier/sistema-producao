@@ -10,7 +10,7 @@ export function ehSetor(nome: string, esperado: string): boolean {
   return normalizarNomeSetor(nome) === normalizarNomeSetor(esperado);
 }
 
-export const SETORES_FINAIS = ["Agrupamento", "Solda", "Pintura", "Montagem"] as const;
+export const SETORES_FINAIS = ["Abastecimento", "Solda", "Pintura", "Montagem"] as const;
 
 export function ehSetorFinal(nome: string): boolean {
   return SETORES_FINAIS.some((setor) => ehSetor(nome, setor));

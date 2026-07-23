@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { calcularProgressoOPs } from "@/lib/pcp";
-import { AgrupamentoRow } from "@/components/agrupamento-row";
+import { AbastecimentoRow } from "@/components/abastecimento-row";
 import { ehSetor, ehSetorFinal } from "@/lib/setores";
 
-export default async function AgrupamentoPage({
+export default async function AbastecimentoPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
@@ -88,21 +88,32 @@ export default async function AgrupamentoPage({
         (setor) =>
           !ehSetorFinal(setor.nome) &&
           !ehSetor(setor.nome, "Plasma Tubo") &&
-          !ehSetor(setor.nome, "Ponteira"),
+          !ehSetor(setor.nome, "Ponteira") &&
+          !ehSetor(setor.nome, "Componente Reforço") &&
+          !ehSetor(setor.nome, "PCP") &&
+          !ehSetor(setor.nome, "Abastecimento")
       )
       .map((setor) => ({
         chave: `SETOR:${setor.id}`,
         setorId: setor.id,
-        setorNome: setor.nome,
+        setorNome: setor.nome.toUpperCase(),
         ordemPadrao: setor.ordemPadrao,
       })),
     ...(setorPonteira
-      ? [{
-          chave: "PONTEIRA",
-          setorId: setorPonteira.id,
-          setorNome: "PONTEIRA",
-          ordemPadrao: setorPonteira.ordemPadrao,
-        }]
+      ? [
+          {
+            chave: "PONTEIRA_FIXA",
+            setorId: setorPonteira.id,
+            setorNome: "PONTEIRA FIXA",
+            ordemPadrao: setorPonteira.ordemPadrao,
+          },
+          {
+            chave: "PONTEIRA_REM",
+            setorId: setorPonteira.id,
+            setorNome: "PONTEIRA REM.",
+            ordemPadrao: setorPonteira.ordemPadrao + 0.1,
+          },
+        ]
       : []),
     ...(setorComponentes || setorPonteira
       ? [{
@@ -218,7 +229,7 @@ export default async function AgrupamentoPage({
           </thead>
           <tbody className="divide-y divide-white/5">
             {progresso.map((p, index) => (
-              <AgrupamentoRow
+              <AbastecimentoRow
                 key={p.op.id}
                 p={p}
                 colunas={colunas}

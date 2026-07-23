@@ -1,4 +1,4 @@
-import type { Setor } from "@prisma/client";
+import type { Setor } from "@/app/generated/prisma/client";
 import type { FlowFinal, FlowOP, FlowSector } from "@/components/production-flow-map";
 import type { OPComDados } from "@/lib/pcp";
 import { calcularProgressoOPs } from "@/lib/pcp";
@@ -58,8 +58,8 @@ export function montarFluxoProducao(ops: OPComDados[], setores: Setor[]) {
       };
     });
 
-  const flowFinal: FlowFinal[] = ["Agrupamento", "Solda", "Pintura", "Montagem"].map((nome) => {
-    if (nome === "Agrupamento") {
+  const flowFinal: FlowFinal[] = ["Abastecimento", "Solda", "Pintura", "Montagem"].map((nome) => {
+    if (nome === "Abastecimento") {
       const quantidade = rastreamento.reduce(
         (soma, item) => soma + Math.min(item.kitsCompletos, item.op.quantidade),
         0,

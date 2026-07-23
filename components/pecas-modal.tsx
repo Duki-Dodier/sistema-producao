@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import type { SetorProgresso } from "@/lib/pcp";
-import { salvarRecebimentoAgrupamento } from "@/lib/actions/recebimentos-agrupamento";
+import { salvarRecebimentoAgrupamento } from "@/lib/actions/recebimentos-abastecimento";
 
 type Recebimento = {
   id: number;
@@ -131,9 +131,13 @@ export function PecasModal({
             <div className="flex w-full shrink-0 flex-col gap-4 md:w-72">
               <div>
                 <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Referência visual do engate
+                  Referência visual
                 </div>
-                {imagemUrl ? (
+                {setor.pecas[0]?.imagemUrl ? (
+                  <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-white/5 bg-white/5">
+                    <Image src={setor.pecas[0].imagemUrl} alt={`Peça ${setor.pecas[0].nome}`} fill sizes="288px" className="object-contain p-2" />
+                  </div>
+                ) : imagemUrl ? (
                   <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-white/5 bg-white/5">
                     <Image src={imagemUrl} alt={`Engate ${modeloCodigo}`} fill sizes="288px" className="object-contain p-2" />
                   </div>
@@ -169,7 +173,7 @@ export function PecasModal({
                 <div className={`rounded-lg border p-4 ${temMaterial ? "border-amber-400/50 bg-amber-500/10" : "border-slate-600 bg-slate-800/40"}`}>
                   <p className={`text-xs font-semibold ${temMaterial ? "text-amber-300" : "text-slate-400"}`}>
                     {temMaterial
-                      ? "Aguardando o Agrupamento confirmar o recebimento."
+                      ? "Aguardando o Abastecimento confirmar o recebimento."
                       : "Ainda não há peças produzidas para receber nesta célula."}
                   </p>
                 </div>

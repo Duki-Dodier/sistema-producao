@@ -18,7 +18,7 @@ export async function createFuncionario(formData: FormData) {
   }
 
   revalidatePath("/configuracoes");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
   revalidatePath("/monitoramento");
 }
 
@@ -55,11 +55,11 @@ export async function toggleFuncionario(id: number) {
   });
 
   revalidatePath("/configuracoes");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
 }
 
 export async function deleteFuncionario(id: number) {
   await prisma.funcionario.delete({ where: { id } });
   revalidatePath("/configuracoes");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
 }

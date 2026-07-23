@@ -23,7 +23,7 @@ function revalidarOPs() {
   revalidatePath("/");
   revalidatePath("/monitoramento");
   revalidatePath("/apontamentos");
-  revalidatePath("/agrupamento");
+  revalidatePath("/abastecimento");
 }
 
 export async function createOP(formData: FormData) {

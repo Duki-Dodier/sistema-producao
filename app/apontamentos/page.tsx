@@ -17,7 +17,13 @@ export default async function ApontamentosPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
+  let setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
+  
+  // Ocultar PCP e Abastecimento do Kiosk, pois não há apontamento produtivo neles
+  setores = setores.filter(
+    (s) => !ehSetor(s.nome, "PCP") && !ehSetor(s.nome, "Abastecimento")
+  );
+
   const setorId = sp.setor ? Number(sp.setor) : setores[0]?.id;
   const setor = setores.find((item) => item.id === setorId) ?? setores[0];
 

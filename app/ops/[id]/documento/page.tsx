@@ -222,81 +222,83 @@ export default async function DocumentoOPPage({
         </table>
       </section>
 
-      {/* ============ UMA FOLHA POR PEÇA (AGRUPADA POR SETOR) ============ */}
-      {rastreio.setores
-        .filter((s) => !ehSetor(s.setorNome, "Agrupamento"))
-        .map((setor) =>
-          setor.pecas.map((peca, idx) => {
-            const mp = op.modelo.pecas.find((x) => x.pecaId === peca.id);
-            const dadosPeca = mp?.peca;
-            const imagemPeca = dadosPeca?.imagemUrl ?? imagensOrganizadas.pecas.get(peca.codigo);
-            const info = modoBranco
-              ? { nomes: [], ultima: null, aprovadas: 0 }
-              : operadoresDaPeca(peca.id, setor.setorId);
-            
-            return (
-              <section
-                key={peca.chave}
-                className="folha-op mx-auto mb-6 max-w-4xl rounded bg-white p-8 font-sans text-slate-900 shadow-lg print:mb-0 print:max-w-none print:rounded-none print:shadow-none print:break-before-page"
-              >
-                <CabecalhoOP
-                  op={op}
-                  inicioReal={modoBranco ? null : inicioReal}
-                  fimReal={modoBranco ? null : fimReal}
-                />
-                
-                <div className="mb-2 mt-6 flex items-center justify-between border-b-2 border-slate-800 pb-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wide">
-                    Roteiro de produção — {setor.setorNome}
-                  </h2>
-                  <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white print:border-2 print:border-slate-800 print:bg-white print:text-black">
-                    ITEM {idx + 1} DE {setor.pecas.length}
-                  </span>
-                </div>
+      {/* ============ UMA FOLHA POR PEÇA ============ */}
+      {op.modelo.pecas.map((mp, idx) => {
+        const dadosPeca = mp.peca;
+        const imagemPeca = dadosPeca.imagemUrl ?? imagensOrganizadas.pecas.get(dadosPeca.codigo);
+        const partesRastreadas = rastreio.pecas.filter((p) => p.id === dadosPeca.id);
+        if (partesRastreadas.length === 0) return null;
 
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className={TH}>Código</th>
-                      <th className={TH}>Item</th>
-                      <th className={`${TH} text-right`}>Qtd</th>
-                      <th className={`${TH} text-right`}>Qtd total</th>
-                      <th className={TH}>Processo / apontamento</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className={`${TD} font-mono font-bold`}>{peca.codigo}</td>
-                      <td className={TD}>{peca.nome}</td>
-                      <td className={`${TD} text-right`}>{peca.porEngate}</td>
-                      <td className={`${TD} text-right font-bold`}>{peca.necessaria}</td>
-                      <td className={`${TD} p-0`}>
-                        {peca.processos.map((proc) => (
-                          <div
-                            key={proc.codigo}
-                            className="flex items-center justify-between border-b border-slate-200 px-2 py-1 text-[12px] last:border-0"
+        const peca = partesRastreadas[0]; // Dados base da peça
+        
+        // Agrupa os processos de todos os setores que a peça passa
+        const todosProcessos = partesRastreadas.flatMap((p) =>
+          p.processos.map((proc) => ({ ...proc, setorNome: p.setorNome }))
+        );
+
+        return (
+          <section
+            key={dadosPeca.id}
+            className="folha-op mx-auto mb-6 max-w-4xl rounded bg-white p-8 font-sans text-slate-900 shadow-lg print:mb-0 print:max-w-none print:rounded-none print:shadow-none print:break-before-page"
+          >
+            <CabecalhoOP
+              op={op}
+              inicioReal={modoBranco ? null : inicioReal}
+              fimReal={modoBranco ? null : fimReal}
+            />
+            
+            <div className="mb-2 mt-6 flex items-center justify-between border-b-2 border-slate-800 pb-1">
+              <h2 className="text-sm font-bold uppercase tracking-wide">
+                Roteiro de produção da peça
+              </h2>
+              <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white print:border-2 print:border-slate-800 print:bg-white print:text-black">
+                ITEM {idx + 1} DE {op.modelo.pecas.length}
+              </span>
+            </div>
+
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={TH}>Código</th>
+                  <th className={TH}>Item</th>
+                  <th className={`${TH} text-right`}>Qtd</th>
+                  <th className={`${TH} text-right`}>Qtd total</th>
+                  <th className={TH}>Processo / apontamento</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className={`${TD} font-mono font-bold`}>{peca.codigo}</td>
+                  <td className={TD}>{peca.nome}</td>
+                  <td className={`${TD} text-right`}>{peca.porEngate}</td>
+                  <td className={`${TD} text-right font-bold`}>{peca.necessaria}</td>
+                  <td className={`${TD} p-0`}>
+                    {todosProcessos.map((proc, pIdx) => (
+                      <div
+                        key={`${proc.codigo}-${proc.setorNome}-${pIdx}`}
+                        className="flex items-center justify-between border-b border-slate-200 px-2 py-1 text-[12px] last:border-0"
+                      >
+                        <span className="font-semibold">{proc.setorNome} - {proc.nome}</span>
+                        {modoBranco ? (
+                          <span className="text-[11px] text-slate-500">
+                            Qtd: <CampoManual largura="w-12" /> Horário: <CampoManual largura="w-16" />
+                          </span>
+                        ) : (
+                          <span
+                            className={`text-[11px] font-semibold ${
+                              proc.estado === "concluido" ? "text-emerald-700" : "text-amber-700"
+                            }`}
                           >
-                            <span className="font-semibold">{proc.nome}</span>
-                            {modoBranco ? (
-                              <span className="text-[11px] text-slate-500">
-                                Qtd: <CampoManual largura="w-12" /> Horário: <CampoManual largura="w-16" />
-                              </span>
-                            ) : (
-                              <span
-                                className={`text-[11px] font-semibold ${
-                                  proc.estado === "concluido" ? "text-emerald-700" : "text-amber-700"
-                                }`}
-                              >
-                                {proc.quantidade}/{proc.necessaria}
-                                {proc.estado === "concluido" ? " ✓" : ""}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                            {proc.quantidade}/{proc.necessaria}
+                            {proc.estado === "concluido" ? " ✓" : ""}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
                 {dadosPeca && (
                   <table className="mt-2 w-full border-collapse">
@@ -371,17 +373,17 @@ export default async function DocumentoOPPage({
                     <tr>
                       <td className={`${TD} font-mono font-bold`}>{peca.codigo}</td>
                       <td className={`${TD} text-right`}>
-                        {modoBranco ? <CampoManual largura="w-14" /> : info.aprovadas}
+                        {modoBranco ? <CampoManual largura="w-14" /> : <CampoManual largura="w-14" />}
                       </td>
                       <td className={`${TD} text-right`}>
                         <CampoManual largura="w-14" />
                       </td>
                       <td className={`${TD} text-right font-bold`}>{peca.necessaria}</td>
                       <td className={TD}>
-                        {modoBranco ? <CampoManual largura="w-28" /> : info.nomes.join(", ") || <CampoManual largura="w-28" />}
+                        {modoBranco ? <CampoManual largura="w-28" /> : <CampoManual largura="w-28" />}
                       </td>
                       <td className={TD}>
-                        {!modoBranco && info.ultima ? fDataHora(info.ultima) : <CampoManual largura="w-24" />}
+                        <CampoManual largura="w-24" />
                       </td>
                     </tr>
                   </tbody>
@@ -396,11 +398,11 @@ export default async function DocumentoOPPage({
                   />
                 )}
 
-                <div className="mt-3 flex items-center gap-4 border border-slate-300 px-3 py-2">
+                <div className="mt-3 flex items-center gap-4 border border-slate-300 px-3 py-2 flex-wrap">
                   <span className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Check</span>
-                  {peca.processos.map((proc) => (
-                    <span key={proc.codigo} className="text-[11px]">
-                      {!modoBranco && proc.estado === "concluido" ? "☑" : "☐"} {proc.nome}
+                  {todosProcessos.map((proc, pIdx) => (
+                    <span key={`${proc.codigo}-${proc.setorNome}-${pIdx}`} className="text-[11px]">
+                      {!modoBranco && proc.estado === "concluido" ? "☑" : "☐"} {proc.setorNome} - {proc.nome}
                     </span>
                   ))}
                   <span className="text-[11px]">
@@ -408,15 +410,14 @@ export default async function DocumentoOPPage({
                   </span>
                   <span className="text-[11px]">
                     {(() => {
-                      const rec = modoBranco ? null : recebimentoDoSetor(setor.setorId);
+                      const rec = modoBranco ? null : recebimentoDoSetor(peca.setorId);
                       return rec ? `☑ Prateleira: ${rec.localizacao}` : "☐ Prateleira";
                     })()}
                   </span>
                 </div>
               </section>
             );
-          })
-        )}
+          })}
 
       {/* ============ FOLHA FINAL — MONTAGEM ============ */}
       <section className="folha-op mx-auto max-w-4xl rounded bg-white p-8 font-sans text-slate-900 shadow-lg print:max-w-none print:rounded-none print:shadow-none print:break-before-page">

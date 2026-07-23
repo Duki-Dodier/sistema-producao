@@ -4,14 +4,27 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: file:/data/mes-engates.db
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mes_engates?schema=public
       # Popula a demonstração apenas quando o banco é criado pela primeira vez.
       SEED_DATABASE: "true"
     volumes:
-      - mes-engates-data:/data
       - mes-engates-uploads:/app/public/uploads
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mes_engates
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
 
 volumes:
-  mes-engates-data:
+  postgres-data:
   mes-engates-uploads:

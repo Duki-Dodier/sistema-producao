@@ -13,10 +13,10 @@ async function executar() {
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
   const plasmaTubo = setores.find((setor) => normalizar(setor.nome) === "PLASMA TUBO");
   const ponteira = setores.find((setor) => normalizar(setor.nome) === "PONTEIRA");
-  const agrupamento = setores.find((setor) => normalizar(setor.nome) === "AGRUPAMENTO");
+  const abastecimento = setores.find((setor) => normalizar(setor.nome) === "ABASTECIMENTO");
 
-  if (!plasmaTubo || !ponteira || !agrupamento) {
-    throw new Error("Setores Plasma Tubo, Ponteira e Agrupamento precisam estar cadastrados.");
+  if (!plasmaTubo || !ponteira || !abastecimento) {
+    throw new Error("Setores Plasma Tubo, Ponteira e Abastecimento precisam estar cadastrados.");
   }
 
   const candidatas = await prisma.peca.findMany({
@@ -103,7 +103,7 @@ async function executar() {
           { setorId: plasmaTubo.id, processo: "CORTE" },
           { setorId: ponteira.id, processo: "LIXAR" },
           { setorId: ponteira.id, processo: "SOLDAGEM" },
-          { setorId: agrupamento.id, processo: "AGRUPAR" },
+          { setorId: abastecimento.id, processo: "AGRUPAR" },
         ],
         plasmaTubo.id,
       );
@@ -117,7 +117,7 @@ async function executar() {
           { setorId: ponteira.id, processo: "BATIDA" },
           { setorId: ponteira.id, processo: "LIXAR" },
           { setorId: ponteira.id, processo: "SOLDAGEM" },
-          { setorId: agrupamento.id, processo: "AGRUPAR" },
+          { setorId: abastecimento.id, processo: "AGRUPAR" },
         ],
         ponteira.id,
       );

@@ -111,9 +111,9 @@ export function ProductionFlowMap({
     const convergencia = setoresVisiveis
       .filter((setor) => setoresAtivos.has(setor.id))
       .map((setor) => ({
-        id: `setor-${setor.id}-agrupamento`,
+        id: `setor-${setor.id}-abastecimento`,
         from: `setor-${setor.id}`,
-        to: "final-agrupamento",
+        to: "final-abastecimento",
         quantidade: opSelecionada
           ? opsNoFluxo.flatMap((op) => op.demandas).filter((demanda) => demanda.setorId === setor.id).reduce((soma, demanda) => soma + demanda.pronta, 0)
           : setor.pronta,
@@ -147,7 +147,7 @@ export function ProductionFlowMap({
         if (!origem || !destino) return [];
         const a = origem.getBoundingClientRect();
         const b = destino.getBoundingClientRect();
-        const vertical = edge.tipo === "final" && edge.from !== "final-agrupamento";
+        const vertical = edge.tipo === "final" && edge.from !== "final-abastecimento";
         return [{
           ...edge,
           x1: vertical ? a.left + a.width / 2 - base.left : a.right - base.left,
@@ -358,7 +358,7 @@ function FinalNode({ etapa, nodeRef, primary = false }: { etapa: FlowFinal; node
 
 function EtapaIcon({ nome }: { nome: string }) {
   const etapa = slug(nome);
-  if (etapa === "agrupamento") {
+  if (etapa === "abastecimento") {
     return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4.5 w-4.5" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h5l3 5"/><path d="M3 19h5l3-5"/><path d="M3 12h8"/><path d="M11 8h10v8H11z"/><path d="m14 11 2 2 3-4"/></svg>;
   }
   if (etapa === "solda") {
