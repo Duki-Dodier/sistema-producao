@@ -2,15 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardHeader } from "@/components/card";
-import { formatDateTime } from "@/lib/format";
 import { ehSetor } from "@/lib/setores";
 import { processosDaPeca, PROCESSO_LABEL, PROCESSOS } from "@/lib/processos";
 import {
   OperadorApontamentoKiosk,
   type ItemApontamentoOperador,
 } from "@/components/operador-apontamento-kiosk";
-import { AjustarApontamentoBotao } from "@/components/ajustar-apontamento-botao";
+import { HistoricoApontamentos } from "@/components/historico-apontamentos";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 
 export default async function ApontamentosPage({
@@ -23,6 +21,11 @@ export default async function ApontamentosPage({
   const setorId = sp.setor ? Number(sp.setor) : setores[0]?.id;
   const setor = setores.find((item) => item.id === setorId) ?? setores[0];
   const opIdFiltro = sp.op ? Number(sp.op) : null;
+  const pecaIdFiltro = sp.peca ? Number(sp.peca) : null;
+  const quantidadeInicial = sp.quantidade ? Number(sp.quantidade) : null;
+  const quantidadeInicialValida = typeof quantidadeInicial === "number" && Number.isInteger(quantidadeInicial) && quantidadeInicial > 0
+    ? quantidadeInicial
+    : null;
 
   if (!setor) {
     return (
@@ -34,7 +37,12 @@ export default async function ApontamentosPage({
 
   const operadorLogado = await buscarOperadorLogado();
   if (Number.isInteger(opIdFiltro) && !operadorLogado) {
-    const destino = `/apontamentos?op=${opIdFiltro}&setor=${setor.id}`;
+    const destinoParams = new URLSearchParams({ op: String(opIdFiltro), setor: String(setor.id) });
+    if (Number.isInteger(pecaIdFiltro)) destinoParams.set("peca", String(pecaIdFiltro));
+    if (quantidadeInicialValida !== null) {
+      destinoParams.set("quantidade", String(quantidadeInicialValida));
+    }
+    const destino = `/apontamentos?${destinoParams.toString()}`;
     redirect(`/login?redirect=${encodeURIComponent(destino)}`);
   }
   if (
@@ -165,7 +173,7 @@ export default async function ApontamentosPage({
     prisma.apontamento.findMany({
       where: { setorId: setor.id },
       orderBy: { dataHora: "desc" },
-      take: 20,
+      take: 100,
       include: {
         op: { include: { modelo: true } },
         setor: true,
@@ -290,9 +298,39 @@ export default async function ApontamentosPage({
       });
     },
   );
-  const itensVisiveis = Number.isInteger(opIdFiltro)
-    ? itens.filter((item) => item.opId === opIdFiltro)
-    : itens;
+  const itensVisiveis = itens.filter((item) =>
+    (!Number.isInteger(opIdFiltro) || item.opId === opIdFiltro) &&
+    (!Number.isInteger(pecaIdFiltro) || item.pecaId === pecaIdFiltro),
+  );
+
+  const historico = recentes.map((apontamento) => {
+    const processoLabel = apontamento.processo
+      ? PROCESSO_LABEL[apontamento.processo as keyof typeof PROCESSO_LABEL] ?? apontamento.processo
+      : "Finalização";
+    const ultimoAjuste = apontamento.ajustes[0] ?? null;
+    return {
+      id: apontamento.id,
+      dataHora: apontamento.dataHora.toISOString(),
+      opNumero: apontamento.op.numeroSequencia,
+      modeloCodigo: apontamento.op.modelo.codigo,
+      pecaCodigo: apontamento.peca?.codigo ?? null,
+      pecaNome: apontamento.peca?.nome ?? null,
+      processo: apontamento.processo,
+      processoLabel,
+      usuario: apontamento.usuario,
+      quantidadeBoa: apontamento.quantidadeBoa,
+      setorId: apontamento.setorId,
+      setorNome: apontamento.setor.nome,
+      ultimoAjuste: ultimoAjuste
+        ? {
+            valorAnterior: ultimoAjuste.valorAnterior,
+            valorNovo: ultimoAjuste.valorNovo,
+            autorizadoPor: ultimoAjuste.autorizadoPor.nome,
+            motivo: ultimoAjuste.motivo,
+          }
+        : null,
+    };
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -340,78 +378,16 @@ export default async function ApontamentosPage({
             : [...PROCESSOS],
         } : undefined}
         itens={itensVisiveis}
+        opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
+        pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}
+        quantidadeInicial={quantidadeInicialValida}
       />
 
-      <Card>
-        <CardHeader title={`Últimos apontamentos · ${setor.nome}`} />
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="border-b border-white/5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                <th className="px-5 py-3">Data/hora</th>
-                <th className="px-5 py-3">OP</th>
-                <th className="px-5 py-3">Peça</th>
-                <th className="px-5 py-3">Processo</th>
-                <th className="px-5 py-3">Operador</th>
-                <th className="px-5 py-3 text-right">Quantidade</th>
-                <th className="px-5 py-3 text-right">Correção</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {recentes.map((apontamento) => {
-                const processoLabel = apontamento.processo
-                  ? PROCESSO_LABEL[apontamento.processo as keyof typeof PROCESSO_LABEL] ?? apontamento.processo
-                  : "Finalização";
-                const ultimoAjuste = apontamento.ajustes[0] ?? null;
-                return (
-                  <tr key={apontamento.id} className="hover:bg-[#2C3645]">
-                    <td className="px-5 py-3 text-slate-500">{formatDateTime(apontamento.dataHora)}</td>
-                    <td className="px-5 py-3 font-mono text-slate-300">
-                      OP {apontamento.op.numeroSequencia} · {apontamento.op.modelo.codigo}
-                    </td>
-                    <td className="px-5 py-3 text-slate-300">
-                      {apontamento.peca ? `${apontamento.peca.codigo} · ${apontamento.peca.nome}` : "Produção do setor"}
-                    </td>
-                    <td className="px-5 py-3 text-slate-400">{processoLabel}</td>
-                    <td className="px-5 py-3 text-slate-400">{apontamento.usuario}</td>
-                    <td className="px-5 py-3 text-right font-bold text-emerald-400">
-                      {apontamento.quantidadeBoa}
-                      {ultimoAjuste && (
-                        <span
-                          className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400"
-                          title={`Ajustado de ${ultimoAjuste.valorAnterior} para ${ultimoAjuste.valorNovo} por ${ultimoAjuste.autorizadoPor.nome} — ${ultimoAjuste.motivo}`}
-                        >
-                          ajustado
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <AjustarApontamentoBotao
-                        apontamento={{
-                          id: apontamento.id,
-                          descricao: `OP ${apontamento.op.numeroSequencia} · ${apontamento.op.modelo.codigo} · ${apontamento.peca ? apontamento.peca.codigo : "Produção"} · ${processoLabel}`,
-                          setorId: apontamento.setorId,
-                          setorNome: apontamento.setor.nome,
-                          quantidadeAtual: apontamento.quantidadeBoa,
-                          usuario: apontamento.usuario,
-                        }}
-                        autorizadores={listaAutorizadores}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-              {recentes.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
-                    Nenhum apontamento neste setor ainda.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <HistoricoApontamentos
+        setorNome={setor.nome}
+        apontamentos={historico}
+        autorizadores={listaAutorizadores}
+      />
     </div>
   );
 }

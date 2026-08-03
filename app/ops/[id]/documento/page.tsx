@@ -262,7 +262,7 @@ export default async function DocumentoOPPage({
                   </h2>
                   <div className="flex items-center gap-2">
                     <div className="h-20 w-20 shrink-0 rounded bg-white p-1 print:border print:border-slate-400">
-                      <QrCode value={`${appOrigin}/apontamentos?op=${op.id}&setor=${setor.setorId}`} />
+                      <QrCode value={`${appOrigin}/apontamentos?op=${op.id}&setor=${setor.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`} />
                     </div>
                     <div className="text-right">
                       <span className="block rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white print:border-2 print:border-slate-800 print:bg-white print:text-black">

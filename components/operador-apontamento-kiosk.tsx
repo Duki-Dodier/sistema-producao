@@ -39,23 +39,36 @@ export function OperadorApontamentoKiosk({
   operadores,
   sessao,
   itens,
+  opIdInicial,
+  pecaIdInicial,
+  quantidadeInicial,
 }: {
   setorId: number;
   setorNome: string;
   operadores: OperadorKiosk[];
   sessao?: OperadorKiosk;
   itens: ItemApontamentoOperador[];
+  opIdInicial?: number | null;
+  pecaIdInicial?: number | null;
+  quantidadeInicial?: number | null;
 }) {
+  const itemInicial = itens.find((item) =>
+    !item.concluido &&
+    (!Number.isInteger(opIdInicial) || item.opId === opIdInicial) &&
+    (!Number.isInteger(pecaIdInicial) || item.pecaId === pecaIdInicial) &&
+    (!sessao || sessao.processosPermitidos.includes(item.proximoProcesso ?? "PRODUCAO")),
+  ) ?? null;
   const [busca, setBusca] = useState("");
   const [operador, setOperador] = useState(String(sessao?.id ?? ""));
   const [pin, setPin] = useState("");
   const [selecionado, setSelecionado] = useState<string | null>(
-    itens.find((item) =>
-      !item.concluido &&
-      (!sessao || sessao.processosPermitidos.includes(item.proximoProcesso ?? "PRODUCAO")),
-    )?.chave ?? null,
+    itemInicial?.chave ?? null,
   );
-  const [quantidade, setQuantidade] = useState("");
+  const [quantidade, setQuantidade] = useState(
+    itemInicial && typeof quantidadeInicial === "number" && Number.isInteger(quantidadeInicial) && quantidadeInicial > 0
+      ? String(Math.min(quantidadeInicial, itemInicial.restante))
+      : "",
+  );
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -282,6 +295,11 @@ export function OperadorApontamentoKiosk({
             <input type="hidden" name="quantidadeBoa" value={quantidade} />
 
             <div className="rounded-lg border border-[#2d3449] bg-[#0b1326] p-4">
+              {Number.isInteger(opIdInicial) && (
+                <div className="mb-3 inline-flex rounded bg-[#4cd7f6]/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-[#4cd7f6]">
+                  OP carregada pelo QR Code
+                </div>
+              )}
               <div className="font-mono text-xs font-bold text-[#4cd7f6]">
                 OP {item.numeroSequencia} · {item.modeloCodigo}
               </div>
