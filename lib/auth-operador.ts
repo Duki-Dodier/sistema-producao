@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "mes_operador_session";
 const DURACAO_SESSAO_SEGUNDOS = 12 * 60 * 60;
-const ITERACOES_SENHA = 120_000;
+// Cloudflare Workers limita PBKDF2 a 100.000 iteracoes.
+const ITERACOES_SENHA = 100_000;
 
 export type OperadorLogado = {
   id: number;
@@ -85,6 +86,7 @@ async function verificarSenha(senha: string, senhaHash: string | null) {
     !salt ||
     !Number.isInteger(iteracoes) ||
     iteracoes < 10_000 ||
+    iteracoes > ITERACOES_SENHA ||
     !/^[0-9a-f]{64}$/i.test(hashEsperado ?? "")
   ) {
     return false;
