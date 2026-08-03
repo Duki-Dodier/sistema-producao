@@ -7,6 +7,7 @@ import { SUFIXO_MATERIAL } from "@/lib/labels";
 import { PROCESSOS, processosDoForm } from "@/lib/processos";
 import { etapasDoFormulario, roteiroPadraoDaPeca } from "@/lib/roteiro-peca";
 import { ehSetor } from "@/lib/setores";
+import { exigirAdministrador } from "@/lib/auth-operador";
 function numeroOuNulo(formData: FormData, campo: string): number | null {
   const raw = String(formData.get(campo) ?? "").trim();
   if (!raw) return null;
@@ -15,6 +16,7 @@ function numeroOuNulo(formData: FormData, campo: string): number | null {
 }
 
 export async function createPeca(formData: FormData) {
+  await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();
@@ -70,6 +72,7 @@ export async function createPeca(formData: FormData) {
 }
 
 export async function updatePeca(id: number, formData: FormData) {
+  await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();
@@ -159,6 +162,7 @@ export async function updatePeca(id: number, formData: FormData) {
 }
 
 export async function deletePeca(id: number) {
+  await exigirAdministrador();
   try {
     await prisma.peca.delete({ where: { id } });
   } catch {
@@ -174,6 +178,7 @@ export async function deletePeca(id: number) {
  * Cada peça tem um input `qtd-<pecaId>` — vazio ou 0 = fora da BOM.
  */
 export async function updateBOM(modeloId: number, formData: FormData) {
+  await exigirAdministrador();
   const pecas = await prisma.peca.findMany({ select: { id: true } });
 
   const linhas = pecas
@@ -202,6 +207,7 @@ export async function updateBOM(modeloId: number, formData: FormData) {
 }
 
 export async function addPecaToEngate(modeloId: number, formData: FormData) {
+  await exigirAdministrador();
   const setorId = Number(formData.get("setorId"));
   const tipoMaterial = String(formData.get("tipoMaterial") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();

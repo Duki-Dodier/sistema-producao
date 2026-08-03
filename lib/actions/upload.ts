@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { salvarImagem } from "@/lib/upload";
+import { exigirAdministrador } from "@/lib/auth-operador";
 
 export async function uploadImagemModelo(modeloId: number, formData: FormData) {
+  await exigirAdministrador();
   try {
     const file = formData.get("file") as File;
     if (!file || file.size === 0) return { error: "Nenhum arquivo enviado" };
@@ -32,6 +34,7 @@ export async function uploadImagemModelo(modeloId: number, formData: FormData) {
 }
 
 export async function uploadImagemPeca(pecaId: number, modeloId: number, formData: FormData) {
+  await exigirAdministrador();
   try {
     const file = formData.get("file") as File;
     if (!file || file.size === 0) return { error: "Nenhum arquivo enviado" };

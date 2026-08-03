@@ -2,8 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { exigirUsuarioLogado } from "@/lib/auth-operador";
 
 export async function salvarRecebimentoAgrupamento(formData: FormData) {
+  await exigirUsuarioLogado();
   const opId = Number(formData.get("opId"));
   const setorOrigemId = Number(formData.get("setorOrigemId"));
   const categoria = String(formData.get("categoria") ?? "").trim();

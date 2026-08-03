@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ehSetor } from "@/lib/setores";
+import { exigirUsuarioLogado } from "@/lib/auth-operador";
 
 function revalidarSolda() {
   revalidatePath("/solda");
@@ -12,6 +13,7 @@ function revalidarSolda() {
 }
 
 export async function createApontamentoSolda(formData: FormData) {
+  await exigirUsuarioLogado();
   const opId = Number(formData.get("opId"));
   const soldador = String(formData.get("soldador") ?? "").trim();
   const bancada = String(formData.get("bancada") ?? "").trim();
@@ -62,6 +64,7 @@ export async function createApontamentoSolda(formData: FormData) {
 }
 
 export async function updateQuantidadeSoldada(envioId: number, formData: FormData) {
+  await exigirUsuarioLogado();
   const quantidadeSoldada = Number(formData.get("quantidadeSoldada") ?? 0);
   if (!Number.isInteger(envioId) || !Number.isInteger(quantidadeSoldada) || quantidadeSoldada < 0) {
     throw new Error("Quantidade soldada invalida.");

@@ -1,6 +1,7 @@
 import { normalizarNomeSetor } from "@/lib/setores";
 
 export const PROCESSOS = [
+  "PRODUCAO",
   "CORTE",
   "BATIDA",
   "FURACAO",
@@ -14,6 +15,7 @@ export const PROCESSOS = [
 export type Processo = (typeof PROCESSOS)[number];
 
 export const PROCESSO_LABEL: Record<Processo, string> = {
+  PRODUCAO: "Produção",
   CORTE: "Corte",
   BATIDA: "Batida",
   FURACAO: "Furação",

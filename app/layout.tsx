@@ -1,17 +1,36 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import "./globals.css";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { sairSistema } from "@/lib/actions/auth";
+import { buscarOperadorLogado, destinoInicial, podeAcessarRota } from "@/lib/auth-operador";
 
 export const metadata: Metadata = {
   title: "MES – Fábrica de Engates",
   description: "Sistema de execução de manufatura – Torre de Controle do PCP",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const requestHeaders = await headers();
+  const pathname = requestHeaders.get("x-mes-pathname") ?? "/";
+
+  if (pathname === "/login") {
+    return (
+      <html lang="pt-BR" className="h-full antialiased">
+        <body className="min-h-full bg-[#07101f] text-slate-200">{children}</body>
+      </html>
+    );
+  }
+
+  const usuario = await buscarOperadorLogado();
+  if (!usuario) redirect(`/login?redirect=${encodeURIComponent(pathname)}`);
+  if (!podeAcessarRota(usuario, pathname)) redirect(destinoInicial(usuario));
+
   return (
     <html
       lang="pt-BR"
@@ -31,7 +50,7 @@ export default function RootLayout({
               </svg>
             </div>
             
-            <SidebarNav />
+            <SidebarNav administrador={usuario.administrador} papel={usuario.papel} />
             
             <div className="mt-auto flex h-14 items-center justify-center border-t border-white/5">
               <div className="group relative flex cursor-pointer items-center justify-center">
@@ -67,9 +86,20 @@ export default function RootLayout({
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
                     </span>
                  </button>
-                 <button className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-slate-300 ring-2 ring-[#202A36] hover:ring-slate-500 transition-all" title="Seu Perfil">
-                    A
-                 </button>
+                 <div className="hidden text-right sm:block">
+                   <div className="text-xs font-semibold text-slate-200">{usuario.nome}</div>
+                   <div className="font-mono text-[9px] uppercase tracking-wider text-slate-500">
+                     {usuario.administrador ? "Administrador" : `${usuario.papel} · ${usuario.setorNome}`}
+                   </div>
+                 </div>
+                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/15 text-[11px] font-bold text-cyan-300 ring-1 ring-cyan-400/30" title={usuario.nome}>
+                    {usuario.nome.charAt(0).toUpperCase()}
+                 </div>
+                 <form action={sairSistema}>
+                   <button type="submit" className="rounded border border-slate-700 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400 transition hover:border-slate-500 hover:text-white">
+                     Sair
+                   </button>
+                 </form>
               </div>
             </header>
 

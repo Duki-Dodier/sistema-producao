@@ -2,8 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { exigirAdministrador } from "@/lib/auth-operador";
 
 export async function createSetor(formData: FormData) {
+  await exigirAdministrador();
   const nome = String(formData.get("nome") ?? "").trim();
   const ordemPadrao = Number(formData.get("ordemPadrao") ?? 0);
 
@@ -15,6 +17,7 @@ export async function createSetor(formData: FormData) {
 
 /** Configuração do setor: meta mensal, líder e dias úteis do mês. */
 export async function updateSetorConfig(id: number, formData: FormData) {
+  await exigirAdministrador();
   const metaRaw = String(formData.get("metaMensal") ?? "").trim();
   const lider = String(formData.get("lider") ?? "").trim();
   const diasRaw = String(formData.get("diasUteisMes") ?? "").trim();
@@ -34,6 +37,7 @@ export async function updateSetorConfig(id: number, formData: FormData) {
 }
 
 export async function deleteSetor(id: number) {
+  await exigirAdministrador();
   try {
     await prisma.setor.delete({ where: { id } });
   } catch {

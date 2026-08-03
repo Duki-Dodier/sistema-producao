@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { calcularRastreamento } from "@/lib/rastreamento";
 import { opComProgressoArgs } from "@/lib/pcp";
 import { ehSetor } from "@/lib/setores";
 import { TIPO_LABEL } from "@/lib/labels";
 import { BotaoImprimir } from "@/components/botao-imprimir";
+import { QrCode } from "@/components/qr-code";
 import { buscarImagensOrganizadas } from "@/lib/upload";
 
 function fData(d: Date | null | undefined) {
@@ -63,6 +65,15 @@ export default async function DocumentoOPPage({
     },
   });
   if (!op) notFound();
+
+  const requestHeaders = await headers();
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const forwardedHost = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+  const forwardedProto = requestHeaders.get("x-forwarded-proto");
+  const requestOrigin = forwardedHost
+    ? `${forwardedProto ?? (forwardedHost.startsWith("localhost") ? "http" : "https")}://${forwardedHost}`
+    : "http://localhost:3000";
+  const appOrigin = configuredOrigin || requestOrigin;
 
   const imagensOrganizadas = await buscarImagensOrganizadas(
     op.modelo.codigo,
@@ -249,9 +260,19 @@ export default async function DocumentoOPPage({
                   <h2 className="text-sm font-bold uppercase tracking-wide">
                     Roteiro de produção — {setor.setorNome}
                   </h2>
-                  <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white print:border-2 print:border-slate-800 print:bg-white print:text-black">
-                    ITEM {idx + 1} DE {setor.pecas.length}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="h-20 w-20 shrink-0 rounded bg-white p-1 print:border print:border-slate-400">
+                      <QrCode value={`${appOrigin}/apontamentos?op=${op.id}&setor=${setor.setorId}`} />
+                    </div>
+                    <div className="text-right">
+                      <span className="block rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white print:border-2 print:border-slate-800 print:bg-white print:text-black">
+                        ITEM {idx + 1} DE {setor.pecas.length}
+                      </span>
+                      <span className="mt-1 block text-[8px] font-bold uppercase tracking-wide text-slate-500">
+                        Escaneie para apontar
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <table className="w-full border-collapse">

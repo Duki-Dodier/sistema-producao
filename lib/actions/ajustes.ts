@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { exigirUsuarioLogado } from "@/lib/auth-operador";
 
 function revalidarTudo() {
   revalidatePath("/");
@@ -20,6 +21,7 @@ function revalidarTudo() {
  *    `AjusteApontamento` (valor anterior, valor novo, motivo, quem, quando).
  */
 export async function ajustarApontamento(formData: FormData) {
+  await exigirUsuarioLogado();
   const apontamentoId = Number(formData.get("apontamentoId"));
   const quantidadeCorreta = Number(formData.get("quantidadeCorreta"));
   const motivo = String(formData.get("motivo") ?? "").trim();

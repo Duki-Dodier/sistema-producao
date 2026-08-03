@@ -1,12 +1,14 @@
 import { formatDate } from "@/lib/format";
 import { gerarPdfRelatorio } from "@/lib/pdf-relatorio";
 import { periodoRelatorio, relatorioGeralSolda } from "@/lib/solda-relatorios";
+import { buscarOperadorLogado } from "@/lib/auth-operador";
 
 export const runtime = "nodejs";
 
 const numero = (valor: number, casas = 0) => valor.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
 
 export async function GET(request: Request) {
+  if (!(await buscarOperadorLogado())) return new Response("Nao autorizado", { status: 401 });
   const url = new URL(request.url);
   const periodo = periodoRelatorio(url.searchParams.get("inicio") ?? undefined, url.searchParams.get("fim") ?? undefined);
   const dados = await relatorioGeralSolda(periodo);

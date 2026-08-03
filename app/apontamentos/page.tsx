@@ -1,15 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardHeader } from "@/components/card";
 import { formatDateTime } from "@/lib/format";
 import { ehSetor } from "@/lib/setores";
-import { processosDaPeca, PROCESSO_LABEL } from "@/lib/processos";
+import { processosDaPeca, PROCESSO_LABEL, PROCESSOS } from "@/lib/processos";
 import {
   OperadorApontamentoKiosk,
   type ItemApontamentoOperador,
 } from "@/components/operador-apontamento-kiosk";
 import { AjustarApontamentoBotao } from "@/components/ajustar-apontamento-botao";
+import { buscarOperadorLogado } from "@/lib/auth-operador";
 
 export default async function ApontamentosPage({
   searchParams,
@@ -20,6 +22,7 @@ export default async function ApontamentosPage({
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
   const setorId = sp.setor ? Number(sp.setor) : setores[0]?.id;
   const setor = setores.find((item) => item.id === setorId) ?? setores[0];
+  const opIdFiltro = sp.op ? Number(sp.op) : null;
 
   if (!setor) {
     return (
@@ -29,11 +32,54 @@ export default async function ApontamentosPage({
     );
   }
 
+  const operadorLogado = await buscarOperadorLogado();
+  if (Number.isInteger(opIdFiltro) && !operadorLogado) {
+    const destino = `/apontamentos?op=${opIdFiltro}&setor=${setor.id}`;
+    redirect(`/login?redirect=${encodeURIComponent(destino)}`);
+  }
+  if (
+    operadorLogado &&
+    operadorLogado.papel !== "PCP" &&
+    operadorLogado.setorId !== setor.id
+  ) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Setor não autorizado"
+          subtitle={`Você está conectado como ${operadorLogado.nome} · ${operadorLogado.setorNome}.`}
+        />
+        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-5 text-amber-100">
+          Este usuário só pode apontar processos do próprio setor. Volte pelo QR Code da OP ou selecione o posto correto.
+          <div className="mt-4">
+            <Link
+              href={`/apontamentos?setor=${operadorLogado.setorId}`}
+              className="inline-flex rounded-lg border border-amber-300/40 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-amber-200"
+            >
+              Ir para {operadorLogado.setorNome}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const setorSolda = ehSetor(setor.nome, "Solda");
   const [funcionarios, autorizadores, opsAbertas, recentes] = await Promise.all([
     prisma.funcionario.findMany({
-      where: { setorId: setor.id, ativo: true },
-      select: { id: true, nome: true, pin: true },
+      where: {
+        setorId: setor.id,
+        ativo: true,
+        ...(operadorLogado && operadorLogado.papel !== "PCP"
+          ? { id: operadorLogado.id }
+          : {}),
+      },
+      select: {
+        id: true,
+        nome: true,
+        pin: true,
+        papel: true,
+        processosPermitidos: { select: { processo: true } },
+      },
       orderBy: { nome: "asc" },
     }),
     prisma.funcionario.findMany({
@@ -244,6 +290,9 @@ export default async function ApontamentosPage({
       });
     },
   );
+  const itensVisiveis = Number.isInteger(opIdFiltro)
+    ? itens.filter((item) => item.opId === opIdFiltro)
+    : itens;
 
   return (
     <div className="flex flex-col gap-6">
@@ -278,8 +327,19 @@ export default async function ApontamentosPage({
           id: f.id,
           nome: f.nome,
           temPin: Boolean(f.pin),
+          processosPermitidos: f.papel === "OPERADOR"
+            ? f.processosPermitidos.map((item) => item.processo)
+          : [...PROCESSOS],
         }))}
-        itens={itens}
+        sessao={operadorLogado ? {
+          id: operadorLogado.id,
+          nome: operadorLogado.nome,
+          temPin: operadorLogado.temPin,
+          processosPermitidos: operadorLogado.papel === "OPERADOR"
+            ? operadorLogado.processosPermitidos
+            : [...PROCESSOS],
+        } : undefined}
+        itens={itensVisiveis}
       />
 
       <Card>

@@ -51,16 +51,46 @@ model Funcionario {
   setorId Int
   ativo   Boolean @default(true)
   pin     String? // PIN de 4 dígitos p/ apontar no kiosk e autorizar ajustes
-  papel   String  @default("OPERADOR") // OPERADOR | LIDER | PCP
+  papel         String  @default("OPERADOR") // OPERADOR | LIDER | PCP
+  usuario       String? @unique
+  senhaHash     String?
+  administrador Boolean @default(false)
 
-  setor              Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  ajustesAutorizados AjusteApontamento[]
+  setor                Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  processosPermitidos FuncionarioProcesso[]
+  apontamentos         Apontamento[]
+  sessoes              OperadorSessao[]
+  ajustesAutorizados   AjusteApontamento[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([nome, setorId])
   @@index([setorId])
+}
+
+model FuncionarioProcesso {
+  id            Int    @id @default(autoincrement())
+  funcionarioId Int
+  processo      String
+
+  funcionario Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@unique([funcionarioId, processo])
+  @@index([processo])
+}
+
+model OperadorSessao {
+  id            Int      @id @default(autoincrement())
+  funcionarioId Int
+  tokenHash     String   @unique
+  expiraEm      DateTime
+  createdAt     DateTime @default(now())
+
+  funcionario Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@index([funcionarioId])
+  @@index([expiraEm])
 }
 
 /// Correção auditada de um apontamento: o valor original é atualizado no
@@ -249,6 +279,7 @@ model Apontamento {
   id                Int      @id @default(autoincrement())
   opId              Int
   setorId           Int
+  funcionarioId     Int?
   usuario           String // líder do setor que lançou
   quantidadeBoa     Int      @default(0)
   quantidadeRefugo  Int      @default(0)
@@ -264,12 +295,14 @@ model Apontamento {
 
   op           OP           @relation(fields: [opId], references: [id], onDelete: Cascade)
   setor        Setor        @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  funcionario  Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
   peca         Peca?        @relation(fields: [pecaId], references: [id], onDelete: SetNull)
   roteiroEtapa PecaRoteiro? @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
   ajustes      AjusteApontamento[]
 
   @@index([opId])
   @@index([setorId])
+  @@index([funcionarioId])
   @@index([pecaId])
   @@index([roteiroEtapaId])
   @@index([setorId, dataHora, origem])

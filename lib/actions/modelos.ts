@@ -8,6 +8,7 @@ import { TIPO_MATERIAL_LABEL } from "@/lib/labels";
 import { ehSetorFinal } from "@/lib/setores";
 import { roteiroPadraoDaPeca } from "@/lib/roteiro-peca";
 import type { Processo } from "@/lib/processos";
+import { exigirAdministrador } from "@/lib/auth-operador";
 
 const CURVAS_VALIDAS = new Set(["A", "B", "C"]);
 const TIPOS_VALIDOS = new Set(["FIXO", "REMOVIVEL"]);
@@ -19,6 +20,7 @@ function validarClassificacao(curva: string, tipo: string) {
 }
 
 export async function createModelo(formData: FormData) {
+  await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const curva = String(formData.get("curva") ?? "A");
@@ -50,6 +52,7 @@ export async function createModelo(formData: FormData) {
 
 /** Atualiza os dados de cadastro do engate (ficha técnica), incluindo a foto. */
 export async function updateModeloFicha(modeloId: number, formData: FormData) {
+  await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const curva = String(formData.get("curva") ?? "A");
@@ -84,6 +87,7 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
 }
 
 export async function deleteModelo(id: number) {
+  await exigirAdministrador();
   try {
     await prisma.modelo.delete({ where: { id } });
   } catch {
@@ -101,6 +105,7 @@ export async function deleteModelo(id: number) {
  * Cada setor tem um input `ordem-<setorId>` — vazio ou 0 = fora do roteiro.
  */
 export async function updateRoteiro(modeloId: number, formData: FormData) {
+  await exigirAdministrador();
   const setores = await prisma.setor.findMany({ select: { id: true } });
 
   const linhas = setores
@@ -135,6 +140,7 @@ export type PecaInput = {
 };
 
 export async function createModeloComPecas(engate: FormData, pecas: PecaInput[]) {
+  await exigirAdministrador();
   const codigo = String(engate.get("codigo") ?? "").trim();
   const nome = String(engate.get("nome") ?? "").trim();
   const curva = String(engate.get("curva") ?? "A");

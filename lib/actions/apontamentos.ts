@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ehSetor } from "@/lib/setores";
 import { processosDaPeca, PROCESSOS, type Processo } from "@/lib/processos";
+import { exigirUsuarioLogado } from "@/lib/auth-operador";
 
 const revalidarApontamentos = () => {
   revalidatePath("/apontamentos");
@@ -13,6 +14,7 @@ const revalidarApontamentos = () => {
 };
 
 export async function createApontamento(formData: FormData) {
+  const usuarioAutenticado = await exigirUsuarioLogado();
   const opId = Number(formData.get("opId"));
   const setorId = Number(formData.get("setorId"));
   const pecaIdRaw = String(formData.get("pecaId") ?? "").trim();
@@ -27,14 +29,34 @@ export async function createApontamento(formData: FormData) {
   // livre (`usuario`) segue aceito como legado p/ formulários do PCP.
   const funcionarioIdRaw = String(formData.get("funcionarioId") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
+  const usarSessao = String(formData.get("usarSessao") ?? "") === "1";
   let usuario = String(formData.get("usuario") ?? "").trim();
+  let funcionarioIdRegistrado: number | null = null;
 
-  if (funcionarioIdRaw) {
+  if (usarSessao) {
+    const sessao = usuarioAutenticado;
+    if (sessao.papel !== "PCP" && sessao.setorId !== setorId) {
+      throw new Error("Este funcionario so pode apontar no proprio setor.");
+    }
+    const processoPermitido = processo ?? "PRODUCAO";
+    if (sessao.papel === "OPERADOR" && !sessao.processosPermitidos.includes(processoPermitido)) {
+      throw new Error("Este operador nao esta autorizado para este processo.");
+    }
+    usuario = sessao.nome;
+    funcionarioIdRegistrado = sessao.id;
+  } else if (funcionarioIdRaw) {
     const funcionarioId = Number(funcionarioIdRaw);
     if (!Number.isInteger(funcionarioId)) throw new Error("Operador inválido.");
     const funcionario = await prisma.funcionario.findUnique({
       where: { id: funcionarioId },
-      select: { nome: true, ativo: true, pin: true },
+      select: {
+        nome: true,
+        ativo: true,
+        pin: true,
+        papel: true,
+        setorId: true,
+        processosPermitidos: { select: { processo: true } },
+      },
     });
     if (!funcionario || !funcionario.ativo) {
       throw new Error("Operador não encontrado ou inativo.");
@@ -42,7 +64,18 @@ export async function createApontamento(formData: FormData) {
     if (funcionario.pin && funcionario.pin !== pin) {
       throw new Error("PIN incorreto.");
     }
+    if (funcionario.papel !== "PCP" && funcionario.setorId !== setorId) {
+      throw new Error("Este funcionário só pode apontar no próprio setor.");
+    }
+    const processoPermitido = processo ?? "PRODUCAO";
+    if (
+      funcionario.papel === "OPERADOR" &&
+      !funcionario.processosPermitidos.some((item) => item.processo === processoPermitido)
+    ) {
+      throw new Error("Este operador não está autorizado para este processo.");
+    }
     usuario = funcionario.nome;
+    funcionarioIdRegistrado = funcionarioId;
   }
 
   if (!Number.isInteger(opId) || !Number.isInteger(setorId) || !usuario) {
@@ -174,6 +207,7 @@ export async function createApontamento(formData: FormData) {
         data: {
           opId,
           setorId,
+          funcionarioId: funcionarioIdRegistrado,
           usuario,
           quantidadeBoa,
           pecaId,
@@ -254,7 +288,16 @@ export async function createApontamento(formData: FormData) {
     }
 
     await tx.apontamento.create({
-      data: { opId, setorId, usuario, quantidadeBoa, pecaId, processo, origem: "OPERADOR" },
+      data: {
+        opId,
+        setorId,
+        funcionarioId: funcionarioIdRegistrado,
+        usuario,
+        quantidadeBoa,
+        pecaId,
+        processo,
+        origem: "OPERADOR",
+      },
     });
   });
 

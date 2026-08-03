@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { exigirAdministrador } from "@/lib/auth-operador";
 
 const STATUS_OP = new Set(["ABERTA", "CONCLUIDA", "CANCELADA"]);
 
@@ -27,6 +28,7 @@ function revalidarOPs() {
 }
 
 export async function createOP(formData: FormData) {
+  await exigirAdministrador();
   const sequenciaInformada = String(formData.get("numeroSequencia") ?? "").trim();
   const modeloId = Number(formData.get("modeloId"));
   const quantidade = Number(formData.get("quantidade"));
@@ -67,6 +69,7 @@ export async function createOP(formData: FormData) {
 }
 
 export async function updateStatusOP(formData: FormData) {
+  await exigirAdministrador();
   const id = Number(formData.get("id"));
   const status = String(formData.get("status"));
   if (!Number.isInteger(id) || !STATUS_OP.has(status)) throw new Error("Status da OP invalido.");
@@ -75,6 +78,7 @@ export async function updateStatusOP(formData: FormData) {
 }
 
 export async function updateOP(id: number, formData: FormData) {
+  await exigirAdministrador();
   const numeroSequencia = Number(formData.get("numeroSequencia"));
   const modeloId = Number(formData.get("modeloId"));
   const quantidade = Number(formData.get("quantidade"));
@@ -112,6 +116,7 @@ export async function updateOP(id: number, formData: FormData) {
 }
 
 export async function deleteOP(id: number) {
+  await exigirAdministrador();
   if (!Number.isInteger(id)) throw new Error("OP invalida.");
   const apontamentos = await prisma.apontamento.count({ where: { opId: id } });
   if (apontamentos > 0) throw new Error("Nao e possivel excluir: esta OP ja tem apontamentos lancados.");

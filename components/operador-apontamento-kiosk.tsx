@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createApontamento } from "@/lib/actions/apontamentos";
+import { sairSistema } from "@/lib/actions/auth";
 
 export type ItemApontamentoOperador = {
   chave: string;
@@ -25,43 +26,60 @@ export type ItemApontamentoOperador = {
   concluido: boolean;
 };
 
+type OperadorKiosk = {
+  id: number;
+  nome: string;
+  temPin: boolean;
+  processosPermitidos: string[];
+};
+
 export function OperadorApontamentoKiosk({
   setorId,
   setorNome,
   operadores,
+  sessao,
   itens,
 }: {
   setorId: number;
   setorNome: string;
-  operadores: { id: number; nome: string; temPin: boolean }[];
+  operadores: OperadorKiosk[];
+  sessao?: OperadorKiosk;
   itens: ItemApontamentoOperador[];
 }) {
   const [busca, setBusca] = useState("");
-  const [operador, setOperador] = useState("");
+  const [operador, setOperador] = useState(String(sessao?.id ?? ""));
   const [pin, setPin] = useState("");
   const [selecionado, setSelecionado] = useState<string | null>(
-    itens.find((item) => !item.concluido)?.chave ?? itens[0]?.chave ?? null,
+    itens.find((item) =>
+      !item.concluido &&
+      (!sessao || sessao.processosPermitidos.includes(item.proximoProcesso ?? "PRODUCAO")),
+    )?.chave ?? null,
   );
   const [quantidade, setQuantidade] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  const operadorSelecionado = sessao ??
+    operadores.find((opcao) => String(opcao.id) === operador) ?? null;
+  const pinPendente = !sessao && Boolean(operadorSelecionado?.temPin) && pin.length !== 4;
+  const itensPermitidos = useMemo(() => {
+    if (!operadorSelecionado) return itens;
+    const permitidos = new Set(operadorSelecionado.processosPermitidos);
+    return itens.filter((opcao) => permitidos.has(opcao.proximoProcesso ?? "PRODUCAO"));
+  }, [itens, operadorSelecionado]);
   const itensFiltrados = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase("pt-BR");
-    if (!termo) return itens;
-    return itens.filter((item) =>
+    if (!termo) return itensPermitidos;
+    return itensPermitidos.filter((item) =>
       [item.numeroSequencia, item.modeloCodigo, item.pecaCodigo, item.pecaNome]
         .join(" ")
         .toLocaleLowerCase("pt-BR")
         .includes(termo),
     );
-  }, [busca, itens]);
+  }, [busca, itensPermitidos]);
 
-  const item = itens.find((opcao) => opcao.chave === selecionado) ?? null;
-  const operadorSelecionado =
-    operadores.find((opcao) => String(opcao.id) === operador) ?? null;
-  const pinPendente = Boolean(operadorSelecionado?.temPin) && pin.length !== 4;
+  const item = itensPermitidos.find((opcao) => opcao.chave === selecionado) ?? null;
 
   const digitar = (valor: string) => {
     setQuantidade((atual) => {
@@ -87,7 +105,7 @@ export function OperadorApontamentoKiosk({
     }
   };
 
-  if (operadores.length === 0) {
+  if (operadores.length === 0 && !sessao) {
     return (
       <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-6 text-amber-100">
         Cadastre ao menos um funcionário ativo em {setorNome} antes de usar o apontamento do operador.
@@ -99,6 +117,22 @@ export function OperadorApontamentoKiosk({
     <div className="grid gap-5 xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
       <section className="rounded-xl border border-[#2d3449] bg-[#131b2e] p-4">
         <div className="mb-4 flex flex-wrap items-end gap-3">
+          {sessao ? (
+            <div className="flex min-w-48 flex-1 items-center justify-between gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-3">
+              <div>
+                <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                  Operador conectado
+                </div>
+                <div className="mt-1 text-base font-semibold text-white">{sessao.nome}</div>
+              </div>
+              <form action={sairSistema}>
+                <button type="submit" className="rounded border border-emerald-300/30 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-200 hover:bg-emerald-300/10">
+                  Sair
+                </button>
+              </form>
+            </div>
+          ) : (
+            <>
           <div className="min-w-48 flex-1">
             <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Quem está apontando
@@ -106,8 +140,17 @@ export function OperadorApontamentoKiosk({
             <select
               value={operador}
               onChange={(event) => {
+                const proximoOperador = operadores.find((opcao) => String(opcao.id) === event.target.value);
+                const permitidos = new Set(proximoOperador?.processosPermitidos ?? []);
+                const primeiroItem = itens.find(
+                  (opcao) => !opcao.concluido && permitidos.has(opcao.proximoProcesso ?? "PRODUCAO"),
+                );
                 setOperador(event.target.value);
                 setPin("");
+                setSelecionado(primeiroItem?.chave ?? null);
+                setQuantidade("");
+                setErro(null);
+                setSucesso(null);
               }}
               className="w-full rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-3 text-base text-white outline-none focus:border-[#4cd7f6]"
             >
@@ -130,6 +173,8 @@ export function OperadorApontamentoKiosk({
               className="w-full rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-3 text-center font-mono text-base tracking-[0.4em] text-white outline-none placeholder:text-slate-600 focus:border-[#4cd7f6]"
             />
           </div>
+            </>
+          )}
           <div className="min-w-52 flex-1">
             <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Buscar OP, engate ou peça
@@ -143,6 +188,11 @@ export function OperadorApontamentoKiosk({
           </div>
         </div>
 
+        {operadorSelecionado && operadorSelecionado.processosPermitidos.length === 0 && (
+          <p className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+            Nenhum processo foi autorizado para este operador. Cadastre as permissões em Configurações.
+          </p>
+        )}
         <div className="max-h-[610px] space-y-2 overflow-y-auto pr-1">
           {itensFiltrados.map((opcao) => {
             const ativo = opcao.chave === selecionado;
@@ -228,6 +278,7 @@ export function OperadorApontamentoKiosk({
             <input type="hidden" name="processo" value={item.proximoProcesso ?? ""} />
             <input type="hidden" name="funcionarioId" value={operador} />
             <input type="hidden" name="pin" value={pin} />
+            <input type="hidden" name="usarSessao" value={sessao ? "1" : ""} />
             <input type="hidden" name="quantidadeBoa" value={quantidade} />
 
             <div className="rounded-lg border border-[#2d3449] bg-[#0b1326] p-4">

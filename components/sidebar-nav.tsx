@@ -14,12 +14,27 @@ const NAV_ITEMS = [
   { href: "/configuracoes", label: "Configurações (Funcionários, Metas)", icon: SettingsIcon },
 ];
 
-export function SidebarNav() {
+export function SidebarNav({
+  administrador,
+  papel,
+}: {
+  administrador: boolean;
+  papel: string;
+}) {
   const pathname = usePathname();
+  const itensVisiveis = administrador
+    ? NAV_ITEMS
+    : papel === "OPERADOR"
+      ? NAV_ITEMS.filter((item) => item.href === "/apontamentos")
+      : papel === "LIDER"
+        ? NAV_ITEMS.filter((item) =>
+            ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos"].includes(item.href),
+          )
+        : NAV_ITEMS.filter((item) => item.href !== "/configuracoes");
 
   return (
     <nav className="flex flex-1 flex-col items-center gap-4 py-4 w-full">
-      {NAV_ITEMS.map((item) => {
+      {itensVisiveis.map((item) => {
         const active =
           item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         const Icon = item.icon;

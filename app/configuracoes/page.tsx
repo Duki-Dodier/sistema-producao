@@ -7,6 +7,7 @@ import {
   deleteFuncionario,
   updateFuncionarioAcesso,
 } from "@/lib/actions/funcionarios";
+import { PROCESSOS, PROCESSO_LABEL } from "@/lib/processos";
 
 const INPUT_CLS =
   "rounded border border-slate-700 bg-[#1A222C] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none transition-colors";
@@ -15,7 +16,10 @@ export default async function ConfiguracoesPage() {
   const setores = await prisma.setor.findMany({
     orderBy: { ordemPadrao: "asc" },
     include: {
-      funcionarios: { orderBy: { nome: "asc" } },
+      funcionarios: {
+        orderBy: { nome: "asc" },
+        include: { processosPermitidos: { orderBy: { processo: "asc" } } },
+      },
     },
   });
 
@@ -169,6 +173,7 @@ export default async function ConfiguracoesPage() {
                   const boundToggle = toggleFuncionario.bind(null, f.id);
                   const boundDelete = deleteFuncionario.bind(null, f.id);
                   const boundAcesso = updateFuncionarioAcesso.bind(null, f.id);
+                  const processosAtuais = new Set(f.processosPermitidos.map((item) => item.processo));
                   return (
                     <li
                       key={f.id}
@@ -180,6 +185,14 @@ export default async function ConfiguracoesPage() {
                         }`}
                       >
                         {f.nome}
+                        <span className="ml-2 font-mono text-[9px] text-cyan-400">
+                          @{f.usuario ?? "sem-usuario"}
+                        </span>
+                        {f.administrador && (
+                          <span className="ml-2 rounded bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-300">
+                            administrador
+                          </span>
+                        )}
                         {f.ativo && !f.pin && (
                           <span
                             className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400"
@@ -212,6 +225,23 @@ export default async function ConfiguracoesPage() {
                             className="w-16 rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-center font-mono text-[11px] tracking-[0.2em] text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none"
                             title="PIN de 4 dígitos (vazio = sem PIN)"
                           />
+                          <div className="flex min-w-full flex-wrap gap-x-2 gap-y-1 rounded border border-slate-700/70 bg-[#151C26] px-2 py-1.5">
+                            <span className="w-full text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                              Processos permitidos
+                            </span>
+                            {PROCESSOS.map((processo) => (
+                              <label key={processo} className="flex items-center gap-1 text-[10px] text-slate-300">
+                                <input
+                                  type="checkbox"
+                                  name="processos"
+                                  value={processo}
+                                  defaultChecked={processosAtuais.has(processo)}
+                                  className="accent-blue-500"
+                                />
+                                {PROCESSO_LABEL[processo]}
+                              </label>
+                            ))}
+                          </div>
                           <button
                             type="submit"
                             className="rounded bg-[#3B82F6]/20 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-300 transition-colors hover:bg-[#3B82F6]/35"
