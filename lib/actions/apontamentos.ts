@@ -94,7 +94,11 @@ export async function createApontamento(formData: FormData) {
     throw new Error("Processo inválido.");
   }
 
-  await prisma.$transaction(async (tx) => {
+  // O adaptador Prisma do Cloudflare D1 não oferece transações interativas.
+  // Este fluxo faz várias leituras de validação, mas somente uma gravação; por
+  // isso, executamos as consultas diretamente e preservamos a mesma sequência.
+  const registrarApontamento = async () => {
+    const tx = prisma;
     const op = await tx.oP.findUnique({
       where: { id: opId },
       select: {
@@ -299,7 +303,9 @@ export async function createApontamento(formData: FormData) {
         origem: "OPERADOR",
       },
     });
-  });
+  };
+
+  await registrarApontamento();
 
   revalidarApontamentos();
 }
