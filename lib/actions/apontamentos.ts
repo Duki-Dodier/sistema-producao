@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { ehSetor } from "@/lib/setores";
 import { processosDaPeca, PROCESSOS, type Processo } from "@/lib/processos";
 import { exigirUsuarioLogado } from "@/lib/auth-operador";
@@ -308,4 +308,5 @@ export async function createApontamento(formData: FormData) {
   await registrarApontamento();
 
   revalidarApontamentos();
+  refresh();
 }

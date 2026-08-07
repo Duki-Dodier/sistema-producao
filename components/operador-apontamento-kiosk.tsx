@@ -42,6 +42,7 @@ export function OperadorApontamentoKiosk({
   opIdInicial,
   pecaIdInicial,
   quantidadeInicial,
+  modoQr = false,
 }: {
   setorId: number;
   setorNome: string;
@@ -51,6 +52,7 @@ export function OperadorApontamentoKiosk({
   opIdInicial?: number | null;
   pecaIdInicial?: number | null;
   quantidadeInicial?: number | null;
+  modoQr?: boolean;
 }) {
   const itemInicial = itens.find((item) =>
     !item.concluido &&
@@ -127,8 +129,8 @@ export function OperadorApontamentoKiosk({
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
-      <section className="rounded-xl border border-[#2d3449] bg-[#131b2e] p-4">
+    <div className="grid gap-3 sm:gap-5 xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
+      <section className={`rounded-xl border border-[#2d3449] bg-[#131b2e] p-4 ${modoQr ? "hidden lg:block" : ""}`}>
         <div className="mb-4 flex flex-wrap items-end gap-3">
           {sessao ? (
             <div className="flex min-w-48 flex-1 items-center justify-between gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-3">
@@ -269,10 +271,10 @@ export function OperadorApontamentoKiosk({
         </div>
       </section>
 
-      <section className="rounded-xl border border-[#2d3449] bg-[#131b2e] p-5">
+      <section className={`rounded-xl border border-[#2d3449] bg-[#131b2e] p-3 sm:p-5 ${modoQr ? "order-first lg:order-none" : ""}`}>
         {!item ? (
           <div className="flex min-h-96 items-center justify-center text-slate-500">
-            Selecione uma OP para apontar.
+            {modoQr ? "Nenhum processo disponível para este operador neste QR Code." : "Selecione uma OP para apontar."}
           </div>
         ) : item.concluido ? (
           <div className="flex min-h-96 flex-col items-center justify-center text-center">
@@ -294,7 +296,7 @@ export function OperadorApontamentoKiosk({
             <input type="hidden" name="usarSessao" value={sessao ? "1" : ""} />
             <input type="hidden" name="quantidadeBoa" value={quantidade} />
 
-            <div className="rounded-lg border border-[#2d3449] bg-[#0b1326] p-4">
+            <div className="rounded-lg border border-[#2d3449] bg-[#0b1326] p-3 sm:p-4">
               {Number.isInteger(opIdInicial) && (
                 <div className="mb-3 inline-flex rounded bg-[#4cd7f6]/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-[#4cd7f6]">
                   OP carregada pelo QR Code
@@ -303,7 +305,10 @@ export function OperadorApontamentoKiosk({
               <div className="font-mono text-xs font-bold text-[#4cd7f6]">
                 OP {item.numeroSequencia} · {item.modeloCodigo}
               </div>
-              <h2 className="mt-1 text-xl font-bold text-white">{item.pecaNome}</h2>
+              <h2 className="mt-1 text-lg font-bold text-white sm:text-xl">{item.pecaNome}</h2>
+              {modoQr && sessao && (
+                <p className="mt-2 text-xs text-emerald-300">Operador: {sessao.nome}</p>
+              )}
               <div className="mt-4 flex items-center justify-between gap-4">
                 <div>
                   <div className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Processo a apontar</div>
@@ -316,7 +321,7 @@ export function OperadorApontamentoKiosk({
               </div>
             </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-[1fr_280px]">
+            <div className="mt-4 grid gap-3 sm:mt-5 sm:gap-4 md:grid-cols-[1fr_280px]">
               <div>
                 <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Quantidade executada
@@ -326,7 +331,7 @@ export function OperadorApontamentoKiosk({
                   value={quantidade}
                   onChange={(event) => setQuantidade(event.target.value.replace(/\D/g, "").slice(0, 7))}
                   placeholder="0"
-                  className="mt-2 w-full rounded-xl border border-[#3d494c] bg-[#060e20] px-5 py-6 text-center font-mono text-5xl font-bold text-white outline-none focus:border-[#4cd7f6]"
+                  className="mt-2 w-full rounded-xl border border-[#3d494c] bg-[#060e20] px-5 py-4 text-center font-mono text-4xl font-bold text-white outline-none focus:border-[#4cd7f6] sm:py-6 sm:text-5xl"
                 />
                 <button
                   type="button"
@@ -345,13 +350,13 @@ export function OperadorApontamentoKiosk({
                     key={numero}
                     type="button"
                     onClick={() => digitar(numero)}
-                    className="rounded-lg border border-[#2d3449] bg-[#1b2940] py-4 font-mono text-xl font-bold text-white hover:border-[#4cd7f6] hover:bg-[#243650]"
+                    className="rounded-lg border border-[#2d3449] bg-[#1b2940] py-3 font-mono text-xl font-bold text-white hover:border-[#4cd7f6] hover:bg-[#243650] sm:py-4"
                   >
                     {numero}
                   </button>
                 ))}
                 <button type="button" onClick={() => setQuantidade("")} className="rounded-lg border border-red-400/20 bg-red-400/10 font-mono text-[10px] font-bold uppercase text-red-300">Limpar</button>
-                <button type="button" onClick={() => digitar("0")} className="rounded-lg border border-[#2d3449] bg-[#1b2940] py-4 font-mono text-xl font-bold text-white hover:border-[#4cd7f6]">0</button>
+                <button type="button" onClick={() => digitar("0")} className="rounded-lg border border-[#2d3449] bg-[#1b2940] py-3 font-mono text-xl font-bold text-white hover:border-[#4cd7f6] sm:py-4">0</button>
                 <button type="button" onClick={() => setQuantidade((valor) => valor.slice(0, -1))} className="rounded-lg border border-[#2d3449] bg-[#1b2940] font-mono text-lg text-slate-300">⌫</button>
               </div>
             </div>
@@ -359,7 +364,7 @@ export function OperadorApontamentoKiosk({
             <button
               type="submit"
               disabled={!operador || pinPendente || !quantidade || enviando}
-              className="mt-5 w-full rounded-xl bg-[#0ea5c9] py-4 font-mono text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[0_0_18px_rgba(14,165,201,0.25)] transition hover:bg-[#0891b2] disabled:cursor-not-allowed disabled:opacity-40"
+              className={`mt-5 w-full rounded-xl bg-[#0ea5c9] py-4 font-mono text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[0_0_18px_rgba(14,165,201,0.25)] transition hover:bg-[#0891b2] disabled:cursor-not-allowed disabled:opacity-40 ${modoQr ? "sticky bottom-3 z-10" : ""}`}
             >
               {enviando
                 ? "Salvando..."

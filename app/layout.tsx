@@ -18,6 +18,7 @@ export default async function RootLayout({
 }>) {
   const requestHeaders = await headers();
   const pathname = requestHeaders.get("x-mes-pathname") ?? "/";
+  const paginaApontamento = pathname.startsWith("/apontamentos");
 
   if (pathname === "/login") {
     return (
@@ -40,7 +41,7 @@ export default async function RootLayout({
         <div className="flex h-full print:h-auto print:block">
           
           {/* SIDEBAR COLAPSADA */}
-          <aside className="flex w-16 shrink-0 flex-col bg-[#1A222C] border-r border-white/5 shadow-xl z-20 print:hidden">
+          <aside className={`${paginaApontamento ? "hidden sm:flex" : "flex"} w-16 shrink-0 flex-col bg-[#1A222C] border-r border-white/5 shadow-xl z-20 print:hidden`}>
             {/* Top Logo / App Icon */}
             <div className="flex h-14 items-center justify-center bg-[#3B82F6] shadow-md shadow-blue-500/20">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5 text-white" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -69,17 +70,17 @@ export default async function RootLayout({
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible print:block">
             
             {/* TOPBAR (HEADER) */}
-            <header className="flex h-14 shrink-0 items-center justify-between bg-[#202A36] px-6 shadow-sm shadow-black/20 z-10 border-b border-white/5 print:hidden">
+            <header className="flex h-14 shrink-0 items-center justify-between bg-[#202A36] px-3 shadow-sm shadow-black/20 z-10 border-b border-white/5 sm:px-6 print:hidden">
               <div className="flex items-center gap-4">
-                 <h1 className="text-sm font-semibold tracking-wide text-slate-100">Painel de Manufatura MES</h1>
+                 <h1 className={`text-sm font-semibold tracking-wide text-slate-100 ${paginaApontamento ? "hidden sm:block" : ""}`}>Painel de Manufatura MES</h1>
                  <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-400 border border-slate-700">v2</span>
               </div>
               
               <div className="flex items-center gap-4">
-                 <button className="text-slate-400 hover:text-white transition-colors" title="Ajuda">
+                 <button className={`text-slate-400 hover:text-white transition-colors ${paginaApontamento ? "hidden sm:block" : ""}`} title="Ajuda">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" strokeWidth={2}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
                  </button>
-                 <button className="relative text-slate-400 hover:text-white transition-colors" title="Notificações">
+                 <button className={`relative text-slate-400 hover:text-white transition-colors ${paginaApontamento ? "hidden sm:block" : ""}`} title="Notificações">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" strokeWidth={2}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                     <span className="absolute 0 right-0 top-0 flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>

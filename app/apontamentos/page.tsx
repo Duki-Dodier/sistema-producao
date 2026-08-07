@@ -333,29 +333,35 @@ export default async function ApontamentosPage({
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 p-3 sm:gap-6 sm:p-6">
       <PageHeader
         title="Apontamentos da Fábrica"
         subtitle="Tela simples do operador · OP, peça, processo atual e quantidade executada."
       />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-700 bg-[#131b2e] p-3">
+      <div className="flex items-center gap-2 overflow-x-auto rounded-lg border border-slate-700 bg-[#131b2e] p-3">
         <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Posto / setor
+          {Number.isInteger(opIdFiltro) ? "Setor do QR" : "Posto / setor"}
         </span>
-        {setores.map((opcao) => (
-          <Link
-            key={opcao.id}
-            href={`/apontamentos?setor=${opcao.id}`}
-            className={`rounded px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition ${
-              opcao.id === setor.id
-                ? "border border-[#4cd7f6] bg-[#4cd7f6]/10 text-[#4cd7f6]"
-                : "border border-slate-700 bg-[#060e20] text-slate-400 hover:text-white"
-            }`}
-          >
-            {opcao.nome}
-          </Link>
-        ))}
+        {Number.isInteger(opIdFiltro) ? (
+          <span className="whitespace-nowrap rounded border border-[#4cd7f6] bg-[#4cd7f6]/10 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-[#4cd7f6]">
+            {setor.nome}
+          </span>
+        ) : (
+          setores.map((opcao) => (
+            <Link
+              key={opcao.id}
+              href={`/apontamentos?setor=${opcao.id}`}
+              className={`whitespace-nowrap rounded px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition ${
+                opcao.id === setor.id
+                  ? "border border-[#4cd7f6] bg-[#4cd7f6]/10 text-[#4cd7f6]"
+                  : "border border-slate-700 bg-[#060e20] text-slate-400 hover:text-white"
+              }`}
+            >
+              {opcao.nome}
+            </Link>
+          ))
+        )}
       </div>
 
       <OperadorApontamentoKiosk
@@ -381,6 +387,7 @@ export default async function ApontamentosPage({
         opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
         pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}
         quantidadeInicial={quantidadeInicialValida}
+        modoQr={Number.isInteger(opIdFiltro)}
       />
 
       <HistoricoApontamentos

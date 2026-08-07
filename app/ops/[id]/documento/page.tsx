@@ -98,15 +98,19 @@ export default async function DocumentoOPPage({
   const recebimentoDoSetor = (setorId: number) =>
     op.recebimentosAgrupamento.find((r) => r.setorOrigemId === setorId) ?? null;
 
-  const operadoresDaPeca = (pecaId: number, setorId: number) => {
-    const doSetor = producao.filter((a) => a.pecaId === pecaId && a.setorId === setorId);
-    const nomes = [...new Set(doSetor.map((a) => a.usuario))];
-    const ultima = doSetor.length
-      ? doSetor.reduce((m, a) => (a.dataHora > m ? a.dataHora : m), doSetor[0].dataHora)
+  const operadoresDaPeca = (pecaId: number) => {
+    const daPeca = producao.filter((a) => a.pecaId === pecaId);
+    const nomes = [...new Set(daPeca.map((a) => a.usuario))];
+    const ultima = daPeca.length
+      ? daPeca.reduce((m, a) => (a.dataHora > m ? a.dataHora : m), daPeca[0].dataHora)
       : null;
-    const aprovadas = doSetor.reduce((s, a) => s + a.quantidadeBoa, 0);
-    return { nomes, ultima, aprovadas };
+    return { nomes, ultima };
   };
+
+  const paginasPecas = op.modelo.pecas.flatMap((modeloPeca) => {
+    const setoresDaPeca = rastreio.pecas.filter((peca) => peca.id === modeloPeca.pecaId);
+    return setoresDaPeca.length > 0 ? [{ modeloPeca, setoresDaPeca }] : [];
+  });
 
   return (
     <div className="min-h-full w-full bg-slate-200 p-6 print:bg-white print:p-0">
@@ -233,21 +237,28 @@ export default async function DocumentoOPPage({
         </table>
       </section>
 
-      {/* ============ UMA FOLHA POR PEÇA (AGRUPADA POR SETOR) ============ */}
-      {rastreio.setores
-        .filter((s) => !ehSetor(s.setorNome, "Agrupamento"))
-        .map((setor) =>
-          setor.pecas.map((peca, idx) => {
-            const mp = op.modelo.pecas.find((x) => x.pecaId === peca.id);
-            const dadosPeca = mp?.peca;
+      {/* ============ UMA FOLHA POR PEÇA, COM TODOS OS SETORES DA ROTA ============ */}
+      {paginasPecas.map(({ modeloPeca: mp, setoresDaPeca }, idx) => {
+            const peca = setoresDaPeca[0];
+            const dadosPeca = mp.peca;
+            const processosDaPagina = setoresDaPeca.flatMap((setorDaPeca) =>
+              setorDaPeca.processos.map((processo) => ({
+                ...processo,
+                setorId: setorDaPeca.setorId,
+                setorNome: setorDaPeca.setorNome,
+              })),
+            );
             const imagemPeca = dadosPeca?.imagemUrl ?? imagensOrganizadas.pecas.get(peca.codigo);
             const info = modoBranco
               ? { nomes: [], ultima: null, aprovadas: 0 }
-              : operadoresDaPeca(peca.id, setor.setorId);
+              : {
+                  ...operadoresDaPeca(peca.id),
+                  aprovadas: processosDaPagina.at(-1)?.quantidade ?? 0,
+                };
             
             return (
               <section
-                key={peca.chave}
+              key={mp.id}
                 className="folha-op mx-auto mb-6 max-w-4xl rounded bg-white p-8 font-sans text-slate-900 shadow-lg print:mb-0 print:max-w-none print:rounded-none print:shadow-none print:break-before-page"
               >
                 <CabecalhoOP
@@ -258,15 +269,22 @@ export default async function DocumentoOPPage({
                 
                 <div className="mb-2 mt-6 flex items-center justify-between border-b-2 border-slate-800 pb-1">
                   <h2 className="text-sm font-bold uppercase tracking-wide">
-                    Roteiro de produção — {setor.setorNome}
+                    Roteiro de produção — {peca.codigo}
                   </h2>
-                  <div className="flex items-center gap-2">
-                    <div className="h-20 w-20 shrink-0 rounded bg-white p-1 print:border print:border-slate-400">
-                      <QrCode value={`${appOrigin}/apontamentos?op=${op.id}&setor=${setor.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`} />
-                    </div>
+                  <div className="flex items-start gap-2">
+                    {setoresDaPeca.map((setorDaPeca) => (
+                      <div key={setorDaPeca.setorId} className="w-20 text-center">
+                        <div className="mx-auto h-16 w-16 rounded bg-white p-1 print:border print:border-slate-400">
+                          <QrCode value={`${appOrigin}/apontamentos?op=${op.id}&setor=${setorDaPeca.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`} />
+                        </div>
+                        <span className="mt-1 block text-[7px] font-bold uppercase leading-tight text-slate-600">
+                          {setorDaPeca.setorNome}
+                        </span>
+                      </div>
+                    ))}
                     <div className="text-right">
                       <span className="block rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white print:border-2 print:border-slate-800 print:bg-white print:text-black">
-                        ITEM {idx + 1} DE {setor.pecas.length}
+                        ITEM {idx + 1} DE {paginasPecas.length}
                       </span>
                       <span className="mt-1 block text-[8px] font-bold uppercase tracking-wide text-slate-500">
                         Escaneie para apontar
@@ -292,12 +310,17 @@ export default async function DocumentoOPPage({
                       <td className={`${TD} text-right`}>{peca.porEngate}</td>
                       <td className={`${TD} text-right font-bold`}>{peca.necessaria}</td>
                       <td className={`${TD} p-0`}>
-                        {peca.processos.map((proc) => (
+                        {processosDaPagina.map((proc) => (
                           <div
-                            key={proc.codigo}
+                            key={`${proc.setorId}-${proc.codigo}`}
                             className="flex items-center justify-between border-b border-slate-200 px-2 py-1 text-[12px] last:border-0"
                           >
-                            <span className="font-semibold">{proc.nome}</span>
+                            <span>
+                              <span className="block text-[8px] font-bold uppercase tracking-wide text-slate-500">
+                                {proc.setorNome}
+                              </span>
+                              <span className="font-semibold">{proc.nome}</span>
+                            </span>
                             {modoBranco ? (
                               <span className="text-[11px] text-slate-500">
                                 Qtd: <CampoManual largura="w-12" /> Horário: <CampoManual largura="w-16" />
@@ -417,27 +440,29 @@ export default async function DocumentoOPPage({
                   />
                 )}
 
-                <div className="mt-3 flex items-center gap-4 border border-slate-300 px-3 py-2">
+                <div className="mt-3 flex flex-wrap items-center gap-4 border border-slate-300 px-3 py-2">
                   <span className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Check</span>
-                  {peca.processos.map((proc) => (
-                    <span key={proc.codigo} className="text-[11px]">
+                  {processosDaPagina.map((proc) => (
+                    <span key={`${proc.setorId}-${proc.codigo}`} className="text-[11px]">
                       {!modoBranco && proc.estado === "concluido" ? "☑" : "☐"} {proc.nome}
+                      <span className="ml-1 text-[8px] uppercase text-slate-500">({proc.setorNome})</span>
                     </span>
                   ))}
                   <span className="text-[11px]">
                     {!modoBranco && totalEnviado > 0 ? "☑" : "☐"} Abast
                   </span>
-                  <span className="text-[11px]">
-                    {(() => {
-                      const rec = modoBranco ? null : recebimentoDoSetor(setor.setorId);
-                      return rec ? `☑ Prateleira: ${rec.localizacao}` : "☐ Prateleira";
-                    })()}
-                  </span>
+                  {setoresDaPeca.map((setorDaPeca) => {
+                    const rec = modoBranco ? null : recebimentoDoSetor(setorDaPeca.setorId);
+                    return (
+                      <span key={setorDaPeca.setorId} className="text-[11px]">
+                        {rec ? `☑ ${setorDaPeca.setorNome}: ${rec.localizacao}` : `☐ Prateleira ${setorDaPeca.setorNome}`}
+                      </span>
+                    );
+                  })}
                 </div>
               </section>
             );
-          })
-        )}
+          })}
 
       {/* ============ FOLHA FINAL — MONTAGEM ============ */}
       <section className="folha-op mx-auto max-w-4xl rounded bg-white p-8 font-sans text-slate-900 shadow-lg print:max-w-none print:rounded-none print:shadow-none print:break-before-page">
