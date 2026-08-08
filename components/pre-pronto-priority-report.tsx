@@ -54,8 +54,11 @@ export function PreProntoPriorityReport({
         <div className="flex flex-wrap items-end gap-2 print:hidden">
           <form method="get" className="flex flex-wrap items-end gap-2">
             <input type="hidden" name="visao" value="ops" />
-            {busca && <input type="hidden" name="busca" value={busca} />}
             {setorFiltro && <input type="hidden" name="setor" value={setorFiltro} />}
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Buscar OP ou modelo</span>
+              <input name="busca" defaultValue={busca} placeholder="Ex.: 6 ou AD1001" className="w-36 rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-xs text-white placeholder:text-slate-600" />
+            </label>
             <label className="flex flex-col gap-1">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Setor do relatório</span>
               <select name="prioridadeSetor" defaultValue={setorId ? String(setorId) : ""} className="rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-xs text-white">
