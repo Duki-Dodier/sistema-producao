@@ -165,6 +165,12 @@ export default async function FichaEngatePage({
                 const iconColor = pending ? 'text-[#FF9100]' : 'text-cyan-400';
                 const imagemPeca = mp.peca.imagemUrl ?? imagensOrganizadas.pecas.get(mp.peca.codigo);
                 const boundUpdatePecaMedidas = updatePecaMedidas.bind(null, mp.peca.id, modelo.id);
+                const dimensoes = [
+                  mp.peca.medidaA !== null ? `A ${mp.peca.medidaA.toLocaleString("pt-BR")} mm` : null,
+                  mp.peca.medidaB !== null ? `B ${mp.peca.medidaB.toLocaleString("pt-BR")} mm` : null,
+                  mp.peca.espessuraMm !== null ? `esp. ${mp.peca.espessuraMm.toLocaleString("pt-BR")} mm` : null,
+                  mp.peca.comprimentoMm !== null ? `comp. ${mp.peca.comprimentoMm.toLocaleString("pt-BR")} mm` : null,
+                ].filter((valor): valor is string => Boolean(valor)).join(" · ");
 
                 return (
                   <div key={mp.id} className="relative flex flex-col items-center">
@@ -184,6 +190,21 @@ export default async function FichaEngatePage({
                       <div className="p-4">
                         <span className="block text-sm font-semibold text-white truncate">{mp.peca.nome}</span>
                         <span className="mt-1 block text-[10px] text-slate-500">{TIPO_MATERIAL_LABEL[mp.peca.tipoMaterial!] ?? mp.peca.tipoMaterial}</span>
+
+                        <div className="mt-4 space-y-2 border-t border-white/5 pt-3 text-[10px]">
+                          <div>
+                            <span className="block uppercase tracking-wide text-slate-500">Medida</span>
+                            <span className={`mt-0.5 block font-medium ${mp.peca.medida ? "text-slate-100" : "text-[#FFB454]"}`}>
+                              {mp.peca.medida || "Não informada"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block uppercase tracking-wide text-slate-500">Dimensões estruturadas</span>
+                            <span className={`mt-0.5 block font-medium ${dimensoes ? "text-slate-300" : "text-slate-600"}`}>
+                              {dimensoes || "Não informadas"}
+                            </span>
+                          </div>
+                        </div>
                         
                         <div className="mt-5 flex border-t border-white/5 pt-3 text-[10px]">
                           <div className="flex w-1/2 flex-col gap-1 pr-2">
@@ -211,8 +232,11 @@ export default async function FichaEngatePage({
                             <a href={imagemPeca} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
                           )}
                         </div>
-                        {pending && (
-                          <form action={boundUpdatePecaMedidas} className="mt-3 border-t border-[#FF9100]/20 pt-3">
+                        <details open={pending} className="mt-3 border-t border-white/5 pt-3">
+                          <summary className="cursor-pointer list-none text-[9px] font-bold uppercase tracking-wider text-cyan-400 hover:text-cyan-300">
+                            {pending ? "Cadastrar medidas" : "Alterar medidas"}
+                          </summary>
+                          <form action={boundUpdatePecaMedidas} className="mt-2 border-t border-[#FF9100]/20 pt-3">
                             <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#FFB454]">
                               Completar medidas da peça
                             </p>
@@ -263,7 +287,7 @@ export default async function FichaEngatePage({
                               Salvar medidas
                             </SubmitButton>
                           </form>
-                        )}
+                        </details>
                         <p className="mt-2 truncate font-mono text-[9px] text-slate-500">
                           {modelo.codigo}/pecas/{mp.peca.codigo}-...
                         </p>
