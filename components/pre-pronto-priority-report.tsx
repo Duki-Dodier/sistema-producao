@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { BotaoImprimir } from "@/components/botao-imprimir";
 import type { PrioridadePrePronto } from "@/lib/prioridades-pre-pronto";
 
@@ -11,10 +10,6 @@ const CLASSIFICACAO = {
     label: "Quase concluída",
     classe: "border-amber-400/40 bg-amber-400/15 text-amber-200 print:border-amber-700 print:bg-amber-100 print:text-amber-800",
   },
-  PLANEJAR: {
-    label: "Planejar produção",
-    classe: "border-cyan-400/30 bg-cyan-400/10 text-cyan-200 print:border-cyan-700 print:bg-cyan-100 print:text-cyan-800",
-  },
 } as const;
 
 export function PreProntoPriorityReport({
@@ -22,13 +17,11 @@ export function PreProntoPriorityReport({
   setorId,
   setores,
   busca,
-  setorFiltro,
 }: {
   itens: PrioridadePrePronto[];
   setorId: number | null;
   setores: { id: number; nome: string }[];
   busca: string;
-  setorFiltro: string;
 }) {
   const setor = setores.find((item) => item.id === setorId);
   const fechar = itens.filter((item) => item.classificacao === "FECHAR_PRE_PRONTO").length;
@@ -46,15 +39,13 @@ export function PreProntoPriorityReport({
               {setor?.nome ?? "Selecione um setor"}
             </span>
           </div>
-          <p className="mt-1 max-w-3xl text-xs text-slate-400 print:text-slate-700">
-            Fila sugerida: primeiro a OP que pode fechar o pré-pronto; em empate, a sequência da OP e depois o menor saldo restante.
+            <p className="mt-1 max-w-3xl text-xs text-slate-400 print:text-slate-700">
+            Relatório para entregar ao líder: mostra somente a última peça pendente da OP ou peças com até 10% restante.
           </p>
         </div>
 
         <div className="flex flex-wrap items-end gap-2 print:hidden">
           <form method="get" className="flex flex-wrap items-end gap-2">
-            <input type="hidden" name="visao" value="ops" />
-            {setorFiltro && <input type="hidden" name="setor" value={setorFiltro} />}
             <label className="flex flex-col gap-1">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Buscar OP ou modelo</span>
               <input name="busca" defaultValue={busca} placeholder="Ex.: 6 ou AD1001" className="w-36 rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-xs text-white placeholder:text-slate-600" />
@@ -74,7 +65,7 @@ export function PreProntoPriorityReport({
       </div>
 
       <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4 print:grid-cols-4 print:p-3">
-        <Resumo label="Pendências do setor" valor={String(itens.length)} cor="text-white" />
+        <Resumo label="Itens de atenção" valor={String(itens.length)} cor="text-white" />
         <Resumo label="Fecham pré-pronto" valor={String(fechar)} cor="text-emerald-300" />
         <Resumo label="Quase concluídas" valor={String(quase)} cor="text-amber-300" />
         <Resumo label="OPs na fila" valor={String(new Set(itens.map((item) => item.opId)).size)} cor="text-cyan-300" />
@@ -82,7 +73,7 @@ export function PreProntoPriorityReport({
 
       {itens.length === 0 ? (
         <p className="border-t border-white/10 px-4 py-10 text-center text-sm text-slate-500 print:border-slate-300 print:text-slate-700">
-          Não há pendências deste setor nas OPs abertas com o filtro atual.
+          Não há peças em atenção neste setor nas OPs abertas com o filtro atual.
         </p>
       ) : (
         <div className="overflow-x-auto border-t border-white/10 print:border-slate-300">
@@ -97,7 +88,6 @@ export function PreProntoPriorityReport({
                 <th className="px-3 py-2 text-right">Pronto</th>
                 <th className="px-3 py-2 text-right">Falta</th>
                 <th className="px-3 py-2">Pré-pronto</th>
-                <th className="px-3 py-2 print:hidden">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[.07] print:divide-slate-300">
@@ -129,11 +119,6 @@ export function PreProntoPriorityReport({
                     <td className="min-w-36 px-3 py-3 print:py-2">
                       <div className="flex items-center justify-between gap-2 font-mono text-[10px] text-slate-400 print:text-slate-700"><span>{item.pecasCompletas}/{item.pecasTotal} peças</span><span>{item.preProntoPercentual}%</span></div>
                       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800 print:bg-slate-200"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${item.preProntoPercentual}%` }} /></div>
-                    </td>
-                    <td className="px-3 py-3 print:hidden">
-                      <Link href={`/apontamentos?op=${item.opId}&setor=${item.setorId}&peca=${item.pecaId}&quantidade=${item.restante}`} className="whitespace-nowrap rounded border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300 hover:bg-cyan-400/20">
-                        Abrir apontamento
-                      </Link>
                     </td>
                   </tr>
                 );

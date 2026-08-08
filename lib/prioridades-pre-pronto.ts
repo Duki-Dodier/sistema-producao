@@ -4,8 +4,7 @@ import { ehSetorFinal } from "@/lib/setores";
 
 export type ClassificacaoPrioridade =
   | "FECHAR_PRE_PRONTO"
-  | "QUASE_CONCLUIDA"
-  | "PLANEJAR";
+  | "QUASE_CONCLUIDA";
 
 export type PrioridadePrePronto = {
   chave: string;
@@ -71,17 +70,12 @@ export function calcularPrioridadesPrePronto(
         : 0;
       const limiteQuaseConcluida = Math.max(1, Math.ceil(peca.necessaria * 0.1));
       const fechaPrePronto = pecasPendentes === 1;
-      const quaseConcluida = peca.falta <= limiteQuaseConcluida || percentual >= 90;
+      const quaseConcluida = peca.pronta > 0 && (peca.falta <= limiteQuaseConcluida || percentual >= 90);
+      if (!fechaPrePronto && !quaseConcluida) continue;
       const classificacao: ClassificacaoPrioridade = fechaPrePronto
         ? "FECHAR_PRE_PRONTO"
-        : quaseConcluida
-          ? "QUASE_CONCLUIDA"
-          : "PLANEJAR";
-      const prioridade = classificacao === "FECHAR_PRE_PRONTO"
-        ? 1
-        : classificacao === "QUASE_CONCLUIDA"
-          ? 2
-          : 3;
+        : "QUASE_CONCLUIDA";
+      const prioridade = classificacao === "FECHAR_PRE_PRONTO" ? 1 : 2;
 
       prioridades.push({
         chave: `${item.op.id}-${setorId}-${peca.id}`,
@@ -108,9 +102,7 @@ export function calcularPrioridadesPrePronto(
         preProntoPercentual,
         motivo: fechaPrePronto
           ? "Última peça pendente para fechar o pré-pronto desta OP."
-          : quaseConcluida
-            ? `Restam ${peca.falta.toLocaleString("pt-BR")} unidade(s) neste setor.`
-            : `${pecasCompletas} de ${pecasTotal} peças do pré-pronto já estão completas.`,
+          : `Restam ${peca.falta.toLocaleString("pt-BR")} unidade(s) neste setor.`,
       });
     }
   }

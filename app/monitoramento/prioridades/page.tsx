@@ -56,7 +56,7 @@ export default async function PrioridadesPreProntoPage({
       <div className="print:hidden">
         <PageHeader
           title="Prioridades para fechar pré-pronto"
-          subtitle="Fila recomendada por setor para concluir as peças que destravam o Agrupamento."
+          subtitle="Relatório prático para imprimir e entregar aos líderes dos setores."
           actions={
             <Link
               href="/monitoramento"
@@ -73,7 +73,6 @@ export default async function PrioridadesPreProntoPage({
         setorId={setorId}
         setores={setoresProdutivos.map((setor) => ({ id: setor.id, nome: setor.nome }))}
         busca={sp.busca ?? ""}
-        setorFiltro=""
       />
     </div>
   );
