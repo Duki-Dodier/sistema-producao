@@ -12,10 +12,12 @@ import { SubmitButton } from "@/components/submit-button";
 import { CURVA_VARIANT } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import { MonitorApontamentoForm } from "@/components/monitor-apontamento-form";
-import { ehSetor } from "@/lib/setores";
+import { ehSetor, ehSetorFinal } from "@/lib/setores";
 import { calcularRastreamento } from "@/lib/rastreamento";
 import { OPTrackingBoard } from "@/components/op-tracking-board";
 import { processosDaPeca } from "@/lib/processos";
+import { calcularPrioridadesPrePronto } from "@/lib/prioridades-pre-pronto";
+import { PreProntoPriorityReport } from "@/components/pre-pronto-priority-report";
 
 // Paleta "Cyber-Industrial" (DESIGN.md): fundo deep slate, ciano neon p/ dados
 // vivos, laranja p/ atenção, esmeralda p/ concluído. Números sempre em mono.
@@ -41,9 +43,9 @@ export default async function MonitoramentoPage({
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
 
   return (
-    <div className="flex min-h-full w-full flex-col gap-5 p-6" style={{ background: C.bg }}>
+    <div className="flex min-h-full w-full flex-col gap-5 bg-[#0b1326] p-6 print:bg-white">
       {/* Cabeçalho + troca de visão */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#dae2fd]">
             Monitoramento
@@ -913,8 +915,21 @@ async function RastreamentoOPs({
     return true;
   });
   const setoresProdutivos = setores.filter(
-    (setor) => !["AGRUPAMENTO", "SOLDA", "PINTURA", "MONTAGEM"].includes(setor.nome.toUpperCase()),
+    (setor) => !ehSetorFinal(setor.nome),
   );
+  const prioridadeSetorInformado = sp.prioridadeSetor ? Number(sp.prioridadeSetor) : null;
+  const prioridadeSetorId = Number.isInteger(prioridadeSetorInformado) && setoresProdutivos.some((setor) => setor.id === prioridadeSetorInformado)
+    ? prioridadeSetorInformado
+    : Number.isInteger(setorId) && setoresProdutivos.some((setor) => setor.id === setorId)
+      ? setorId
+      : setoresProdutivos[0]?.id ?? null;
+  const rastreamentoParaRelatorio = rastreamentoTotal.filter((item) => {
+    const alvo = `${item.op.numeroSequencia} ${item.op.lote ?? ""} ${item.op.modelo.codigo} ${item.op.modelo.nome ?? ""}`.toLowerCase();
+    return !busca || alvo.includes(busca);
+  });
+  const prioridadesPrePronto = prioridadeSetorId
+    ? calcularPrioridadesPrePronto(rastreamentoParaRelatorio, prioridadeSetorId)
+    : [];
   const totalKits = rastreamentoTotal.reduce((soma, item) => soma + item.kitsCompletos, 0);
   const totalPlanejado = rastreamentoTotal.reduce((soma, item) => soma + item.op.quantidade, 0);
   const faltas = rastreamentoTotal.reduce(
@@ -927,15 +942,16 @@ async function RastreamentoOPs({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 print:hidden">
         <Kpi label="OPs em fabricação" value={String(rastreamentoTotal.length)} tone="cyan" />
         <Kpi label="Progresso médio" value={`${medias}%`} tone="neutral" />
         <Kpi label="Kits liberáveis" value={`${totalKits}/${totalPlanejado}`} tone="emerald" />
         <Kpi label="Peças pendentes" value={faltas.toLocaleString("pt-BR")} tone={faltas > 0 ? "orange" : "neutral"} />
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-[#111a2c]">
+      <div className="rounded-xl border border-white/10 bg-[#111a2c] print:hidden">
         <form className="flex flex-wrap items-end gap-3 p-4" method="get">
+          {sp.prioridadeSetor && <input type="hidden" name="prioridadeSetor" value={sp.prioridadeSetor} />}
           <div className="flex min-w-64 flex-1 flex-col gap-1.5">
             <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Buscar OP ou código do engate
@@ -960,7 +976,7 @@ async function RastreamentoOPs({
         </form>
       </div>
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
         <div>
           <h2 className="font-mono text-sm font-bold uppercase tracking-wider text-slate-100">
             Ordens em fabricação
@@ -974,7 +990,17 @@ async function RastreamentoOPs({
         </Link>
       </div>
 
-      <OPTrackingBoard itens={rastreamento} />
+      <PreProntoPriorityReport
+        itens={prioridadesPrePronto}
+        setorId={prioridadeSetorId}
+        setores={setoresProdutivos.map((setor) => ({ id: setor.id, nome: setor.nome }))}
+        busca={sp.busca ?? ""}
+        setorFiltro={sp.setor ?? ""}
+      />
+
+      <div className="print:hidden">
+        <OPTrackingBoard itens={rastreamento} />
+      </div>
     </>
   );
 }
