@@ -101,8 +101,8 @@ async function executar() {
         peca,
         [
           { setorId: plasmaTubo.id, processo: "CORTE" },
-          { setorId: ponteira.id, processo: "LIXAR" },
           { setorId: ponteira.id, processo: "SOLDAGEM" },
+          { setorId: ponteira.id, processo: "LIXAR" },
           { setorId: agrupamento.id, processo: "AGRUPAR" },
         ],
         plasmaTubo.id,

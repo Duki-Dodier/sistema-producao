@@ -69,8 +69,8 @@ export function roteiroPadraoDaPeca(
 
   if (ponteiraRemovivel) {
     adicionar(plasmaTubo?.id, "CORTE");
-    adicionar(ponteira?.id, "LIXAR");
     adicionar(ponteira?.id, "SOLDAGEM");
+    adicionar(ponteira?.id, "LIXAR");
   } else if (ponteiraFixa) {
     adicionar(ponteira?.id, "CORTE");
     adicionar(ponteira?.id, "BATIDA");

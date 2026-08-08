@@ -28,12 +28,26 @@ export const PROCESSO_LABEL: Record<Processo, string> = {
 };
 
 type PecaComRoteiro = {
+  nome?: string | null;
   processos?: string | null;
   tipoMaterial?: string | null;
   setor?: { nome: string } | null;
 };
 
+function nomeNormalizado(nome: string | null | undefined) {
+  return (nome ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleUpperCase("pt-BR");
+}
+
 export function processosDaPeca(peca: PecaComRoteiro): Processo[] {
+  const nome = nomeNormalizado(peca.nome);
+  const ponteiraRemovivel =
+    peca.tipoMaterial === "PONTEIRA" &&
+    (nome.includes("PONTEIRA REM") || nome.includes("CABECA REMOVIVEL"));
+  if (ponteiraRemovivel) return ["CORTE", "SOLDAGEM", "LIXAR"];
+
   const configurados = (peca.processos ?? "")
     .split(",")
     .map((item) => item.trim() as Processo)
@@ -46,7 +60,9 @@ export function processosDaPeca(peca: PecaComRoteiro): Processo[] {
   if (setor === "TUBO" || material === "TUBO") {
     return ["CORTE"];
   }
-  if (setor === "PONTEIRA") return ["CORTE", "BATIDA", "LIXAR", "SOLDAGEM"];
+  if (setor === "PONTEIRA") {
+    return ["CORTE", "BATIDA", "LIXAR", "SOLDAGEM"];
+  }
   if (material === "BARRA_CHATA") return ["CORTE", "FURACAO", "DOBRA"];
   return ["CORTE", "FURACAO", "DOBRA"];
 }
