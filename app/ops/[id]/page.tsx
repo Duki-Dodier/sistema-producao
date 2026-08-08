@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { updateOP, deleteOP } from "@/lib/actions/ops";
+import { updateOP } from "@/lib/actions/ops";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardHeader } from "@/components/card";
 import { SubmitButton } from "@/components/submit-button";
 import { STATUS_OP_LABEL } from "@/lib/labels";
+import { DeleteOPForm } from "@/components/delete-op-form";
 
 export default async function OPDetailPage({
   params,
@@ -14,15 +15,15 @@ export default async function OPDetailPage({
   const { id } = await params;
   const opId = Number(id);
 
-  const [op, modelos] = await Promise.all([
+  const [op, modelos, totalApontamentos] = await Promise.all([
     prisma.oP.findUnique({ where: { id: opId } }),
     prisma.modelo.findMany({ orderBy: { codigo: "asc" } }),
+    prisma.apontamento.count({ where: { opId } }),
   ]);
 
   if (!op) notFound();
 
   const boundUpdate = updateOP.bind(null, op.id);
-  const boundDelete = deleteOP.bind(null, op.id);
   const dataISO = op.dataLiberacao.toISOString().slice(0, 10);
   const previsaoISO = op.previsaoEntrega ? op.previsaoEntrega.toISOString().slice(0, 10) : "";
 
@@ -130,16 +131,7 @@ export default async function OPDetailPage({
         </form>
       </Card>
 
-      <div className="flex justify-end">
-        <form action={boundDelete}>
-          <button
-            type="submit"
-            className="text-xs font-medium text-red-600 hover:text-red-800"
-          >
-            Excluir OP
-          </button>
-        </form>
-      </div>
+      <DeleteOPForm opId={op.id} temApontamentos={totalApontamentos > 0} />
     </div>
   );
 }

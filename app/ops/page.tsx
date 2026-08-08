@@ -30,10 +30,10 @@ export default async function OpsPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full">
+    <div className="flex w-full flex-col gap-6 p-3 sm:p-6">
       <PageHeader
         title="Ordens de Produção"
-        subtitle="A sequência (0–1000) é a prioridade de liberação — vale em todos os setores."
+        subtitle="Aberta libera apontamentos. Finalizada ou cancelada bloqueia a produção e preserva o histórico."
       />
 
       <Card>
@@ -133,8 +133,9 @@ export default async function OpsPage() {
       </Card>
 
       <Card>
-        <CardHeader title={`OPs (${ops.length})`} />
-        <table className="w-full text-sm">
+        <CardHeader title={`OPs (${ops.length})`} subtitle="Altere o status conforme a situação real da ordem." />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px] text-sm">
           <thead>
             <tr className="border-b border-white/5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-5 py-3">Seq.</th>
@@ -180,15 +181,15 @@ export default async function OpsPage() {
                   <div className="flex items-center justify-end gap-3">
                     <Link
                       href={`/ops/${op.id}/documento`}
-                      className="text-xs font-medium text-emerald-500 hover:text-emerald-400"
+                      className="rounded-md border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-bold text-emerald-200 transition hover:border-emerald-200/60 hover:bg-emerald-400/20"
                     >
-                      Documento
+                      Ficha OP
                     </Link>
                     <Link
                       href={`/ops/${op.id}`}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                      className="rounded-md border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-bold text-cyan-200 transition hover:border-cyan-200/60 hover:bg-cyan-400/20"
                     >
-                      Editar
+                      Abrir OP
                     </Link>
                   </div>
                 </td>
@@ -202,7 +203,8 @@ export default async function OpsPage() {
               </tr>
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </Card>
     </div>
   );

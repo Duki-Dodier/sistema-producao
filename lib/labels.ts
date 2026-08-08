@@ -33,7 +33,7 @@ export const SUFIXO_MATERIAL: Record<string, string> = {
 
 export const STATUS_OP_LABEL: Record<string, string> = {
   ABERTA: "Aberta",
-  CONCLUIDA: "Concluída",
+  CONCLUIDA: "Finalizada",
   CANCELADA: "Cancelada",
 };
 
