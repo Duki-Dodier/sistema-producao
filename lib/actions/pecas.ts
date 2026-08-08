@@ -161,6 +161,41 @@ export async function updatePeca(id: number, formData: FormData) {
   revalidatePath("/monitoramento");
 }
 
+/** Atualiza somente as medidas exibidas na ficha técnica do modelo. */
+export async function updatePecaMedidas(
+  pecaId: number,
+  modeloId: number,
+  formData: FormData,
+) {
+  await exigirAdministrador();
+
+  const medida = String(formData.get("medida") ?? "").trim();
+  const medidaA = numeroOuNulo(formData, "medidaA");
+  const medidaB = numeroOuNulo(formData, "medidaB");
+  const espessuraMm = numeroOuNulo(formData, "espessuraMm");
+  const comprimentoMm = numeroOuNulo(formData, "comprimentoMm");
+
+  if (!medida && medidaA === null && medidaB === null && espessuraMm === null && comprimentoMm === null) {
+    throw new Error("Informe pelo menos uma medida da peça.");
+  }
+
+  await prisma.peca.update({
+    where: { id: pecaId },
+    data: {
+      medida: medida || null,
+      medidaA,
+      medidaB,
+      espessuraMm,
+      comprimentoMm,
+    },
+  });
+
+  revalidatePath(`/registros/${modeloId}`);
+  revalidatePath(`/registros/pecas/${pecaId}`);
+  revalidatePath("/monitoramento");
+  revalidatePath("/apontamentos");
+}
+
 export async function deletePeca(id: number) {
   await exigirAdministrador();
   try {

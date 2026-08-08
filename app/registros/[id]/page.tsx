@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { deleteModelo } from "@/lib/actions/modelos";
-import { addPecaToEngate } from "@/lib/actions/pecas";
+import { addPecaToEngate, updatePecaMedidas } from "@/lib/actions/pecas";
 import { TIPO_MATERIAL_LABEL } from "@/lib/labels";
 import Link from "next/link";
 import { ImageUploader } from "@/components/image-uploader";
 import { uploadImagemModelo, uploadImagemPeca } from "@/lib/actions/upload";
 import { buscarImagensOrganizadas } from "@/lib/upload";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function FichaEngatePage({
   params,
@@ -35,6 +36,10 @@ export default async function FichaEngatePage({
                 codigo: true,
                 nome: true,
                 medida: true,
+                medidaA: true,
+                medidaB: true,
+                espessuraMm: true,
+                comprimentoMm: true,
                 tipoMaterial: true,
                 imagemUrl: true,
               },
@@ -152,10 +157,14 @@ export default async function FichaEngatePage({
             <div className="relative z-10 flex gap-[60px] pt-8">
               
               {modelo.pecas.map((mp) => {
-                const pending = !mp.peca.medida;
+                const possuiMedida = Boolean(mp.peca.medida?.trim()) ||
+                  [mp.peca.medidaA, mp.peca.medidaB, mp.peca.espessuraMm, mp.peca.comprimentoMm]
+                    .some((valor) => valor !== null);
+                const pending = !possuiMedida;
                 const borderColor = pending ? 'border-l-[#FF9100]' : 'border-l-[#00E5FF]';
                 const iconColor = pending ? 'text-[#FF9100]' : 'text-cyan-400';
                 const imagemPeca = mp.peca.imagemUrl ?? imagensOrganizadas.pecas.get(mp.peca.codigo);
+                const boundUpdatePecaMedidas = updatePecaMedidas.bind(null, mp.peca.id, modelo.id);
 
                 return (
                   <div key={mp.id} className="relative flex flex-col items-center">
@@ -202,6 +211,59 @@ export default async function FichaEngatePage({
                             <a href={imagemPeca} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
                           )}
                         </div>
+                        {pending && (
+                          <form action={boundUpdatePecaMedidas} className="mt-3 border-t border-[#FF9100]/20 pt-3">
+                            <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#FFB454]">
+                              Completar medidas da peça
+                            </p>
+                            <input
+                              name="medida"
+                              defaultValue={mp.peca.medida ?? ""}
+                              placeholder="Ex.: 6,35 mm"
+                              className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-600 focus:border-[#FF9100] focus:outline-none"
+                            />
+                            <div className="mt-2 grid grid-cols-2 gap-1.5">
+                              <input
+                                name="medidaA"
+                                type="number"
+                                step="0.1"
+                                defaultValue={mp.peca.medidaA ?? ""}
+                                placeholder="Larg./diâm."
+                                className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-600 focus:border-[#FF9100] focus:outline-none"
+                              />
+                              <input
+                                name="medidaB"
+                                type="number"
+                                step="0.1"
+                                defaultValue={mp.peca.medidaB ?? ""}
+                                placeholder="Altura"
+                                className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-600 focus:border-[#FF9100] focus:outline-none"
+                              />
+                              <input
+                                name="espessuraMm"
+                                type="number"
+                                step="0.1"
+                                defaultValue={mp.peca.espessuraMm ?? ""}
+                                placeholder="Espessura"
+                                className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-600 focus:border-[#FF9100] focus:outline-none"
+                              />
+                              <input
+                                name="comprimentoMm"
+                                type="number"
+                                step="0.1"
+                                defaultValue={mp.peca.comprimentoMm ?? ""}
+                                placeholder="Comprimento"
+                                className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[10px] text-slate-200 placeholder-slate-600 focus:border-[#FF9100] focus:outline-none"
+                              />
+                            </div>
+                            <SubmitButton
+                              pendingText="Salvando..."
+                              className="mt-2 w-full rounded-sm border border-[#FF9100]/50 bg-[#FF9100]/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFB454] hover:bg-[#FF9100]/20"
+                            >
+                              Salvar medidas
+                            </SubmitButton>
+                          </form>
+                        )}
                         <p className="mt-2 truncate font-mono text-[9px] text-slate-500">
                           {modelo.codigo}/pecas/{mp.peca.codigo}-...
                         </p>
