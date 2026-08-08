@@ -2,13 +2,16 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Os setores do fluxo de produção, na ordem típica.
+// Estrutura oficial: primeiro os setores que preparam as peças (pré-pronto),
+// depois o Agrupamento e a linha final.
 const SETORES = [
   "Tubo",
-  "Plasma Tubo",
   "Plasma Chapa",
+  "Plasma Tubo",
+  "Componente Barra Chata e Cantoneira",
+  "Componente Reforço",
   "Ponteira",
-  "Componentes e Acessórios",
+  "Acessórios",
   "Agrupamento",
   "Solda",
   "Pintura",
@@ -25,7 +28,9 @@ const MODELOS = [
     tamanhoPonteira: null,
     roteiro: [
       "Tubo",
-      "Componentes e Acessórios",
+      "Plasma Chapa",
+      "Componente Barra Chata e Cantoneira",
+      "Componente Reforço",
       "Ponteira",
       "Agrupamento",
       "Solda",

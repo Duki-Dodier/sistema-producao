@@ -8,6 +8,7 @@ import {
   updateFuncionarioAcesso,
 } from "@/lib/actions/funcionarios";
 import { PROCESSOS, PROCESSO_LABEL } from "@/lib/processos";
+import { definicaoSetor } from "@/lib/setores";
 
 const INPUT_CLS =
   "rounded border border-slate-700 bg-[#1A222C] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none transition-colors";
@@ -36,7 +37,7 @@ export default async function ConfiguracoesPage() {
             Configurações
           </h1>
           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-400">
-            Funcionários por setor · líderes · metas · dias trabalhados
+            Funcionários por setor · processos permitidos · líderes · metas · dias trabalhados
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -108,9 +109,19 @@ export default async function ConfiguracoesPage() {
               className="flex flex-col rounded-lg border border-white/5 bg-[#202A36]"
             >
               <div className="flex items-center justify-between rounded-t-lg border-b border-white/5 bg-[#1A222C] px-5 py-3">
-                <h2 className="text-sm font-semibold text-slate-100">
-                  {setor.nome}
-                </h2>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-slate-100">{setor.nome}</h2>
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                      definicaoSetor(setor.nome)?.grupo === "FLUXO_FINAL"
+                        ? "bg-amber-400/10 text-amber-200"
+                        : "bg-cyan-400/10 text-cyan-200"
+                    }`}>
+                      {definicaoSetor(setor.nome)?.grupo === "FLUXO_FINAL" ? "fluxo final" : "preparação"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-500">{definicaoSetor(setor.nome)?.descricao}</p>
+                </div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   {setor.funcionarios.filter((f) => f.ativo).length} ativo(s)
                 </span>
@@ -204,6 +215,18 @@ export default async function ConfiguracoesPage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <form action={boundAcesso} className="flex items-center gap-2">
+                          <select
+                            name="setorId"
+                            defaultValue={f.setorId}
+                            className="max-w-48 rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-[10px] text-slate-200 focus:border-[#3B82F6] focus:outline-none"
+                            title="Setor atual do funcionário"
+                          >
+                            {setores.map((opcao) => (
+                              <option key={opcao.id} value={opcao.id}>
+                                {opcao.nome}
+                              </option>
+                            ))}
+                          </select>
                           <select
                             key={`papel-${f.id}-${f.papel}`}
                             name="papel"

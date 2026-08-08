@@ -8,6 +8,7 @@ import { Badge } from "@/components/badge";
 import { StatusSelect } from "@/components/status-select";
 import { CURVA_VARIANT } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
+import { ehSetor } from "@/lib/setores";
 
 export default async function OpsPage() {
   const [ops, modelos] = await Promise.all([
@@ -20,7 +21,16 @@ export default async function OpsPage() {
         quantidade: true,
         dataLiberacao: true,
         status: true,
-        modelo: { select: { codigo: true, curva: true } },
+        modelo: {
+          select: {
+            codigo: true,
+            curva: true,
+            roteiro: {
+              orderBy: { ordem: "asc" },
+              select: { ordem: true, setor: { select: { nome: true } } },
+            },
+          },
+        },
       },
     }),
     prisma.modelo.findMany({
@@ -33,7 +43,7 @@ export default async function OpsPage() {
     <div className="flex w-full flex-col gap-6 p-3 sm:p-6">
       <PageHeader
         title="Ordens de Produção"
-        subtitle="Aberta libera apontamentos. Finalizada ou cancelada bloqueia a produção e preserva o histórico."
+        subtitle="A OP percorre os setores de preparação, passa pelo Agrupamento e segue para Solda, Pintura e Montagem."
       />
 
       <Card>
@@ -125,6 +135,9 @@ export default async function OpsPage() {
           Deixe a sequência em branco para usar automaticamente a próxima
           (última + 1). Deixe a data em branco para usar hoje.
         </p>
+        <p className="border-t border-white/5 px-5 py-3 text-xs text-cyan-200/80">
+          O roteiro exibido na tabela vem da ficha técnica do modelo. Para alterar os setores desta OP, ajuste o roteiro do modelo antes de liberar uma nova ordem.
+        </p>
         {modelos.length === 0 && (
           <p className="px-5 pb-4 text-xs text-amber-700">
             Cadastre ao menos um modelo antes de liberar uma OP.
@@ -135,12 +148,13 @@ export default async function OpsPage() {
       <Card>
         <CardHeader title={`OPs (${ops.length})`} subtitle="Altere o status conforme a situação real da ordem." />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[1180px] text-sm">
           <thead>
             <tr className="border-b border-white/5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-5 py-3">Seq.</th>
               <th className="px-5 py-3">Lote</th>
               <th className="px-5 py-3">Modelo</th>
+              <th className="px-5 py-3">Fluxo da OP</th>
               <th className="px-5 py-3">Curva</th>
               <th className="px-5 py-3">Quantidade</th>
               <th className="px-5 py-3">Liberada em</th>
@@ -159,6 +173,24 @@ export default async function OpsPage() {
                 </td>
                 <td className="px-5 py-3 font-mono text-slate-300">
                   {op.modelo.codigo}
+                </td>
+                <td className="max-w-[360px] px-5 py-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {op.modelo.roteiro.map((etapa) => (
+                      <span
+                        key={`${op.id}-${etapa.ordem}-${etapa.setor.nome}`}
+                        className={`rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                          ehSetor(etapa.setor.nome, "Agrupamento")
+                            ? "border-amber-300/30 bg-amber-400/10 text-amber-200"
+                            : ["Solda", "Pintura", "Montagem"].some((nome) => ehSetor(etapa.setor.nome, nome))
+                              ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
+                              : "border-cyan-300/20 bg-cyan-400/5 text-cyan-200"
+                        }`}
+                      >
+                        {etapa.ordem}. {etapa.setor.nome}
+                      </span>
+                    ))}
+                  </div>
                 </td>
                 <td className="px-5 py-3">
                   <Badge
@@ -197,7 +229,7 @@ export default async function OpsPage() {
             ))}
             {ops.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
+                <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                   Nenhuma OP liberada ainda.
                 </td>
               </tr>

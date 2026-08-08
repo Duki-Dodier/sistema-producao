@@ -1,5 +1,5 @@
 import { processosDaPeca, type Processo } from "@/lib/processos";
-import { normalizarNomeSetor } from "@/lib/setores";
+import { normalizarNomeSetor, setorComponentePorMaterial } from "@/lib/setores";
 
 export type EtapaRoteiroPeca = {
   id?: number | null;
@@ -39,10 +39,13 @@ export function roteiroPadraoDaPeca(
   setores: SetorBasico[],
 ): EtapaRoteiroPeca[] {
   const agrupamento = setorPorNome(setores, "Agrupamento");
-  const componente = setorPorNome(setores, "Componentes e Acessórios") ?? setorPorNome(setores, "Componente");
+  const componente = setorPorNome(setores, "Componente Barra Chata e Cantoneira");
+  const reforco = setorPorNome(setores, "Componente Reforço");
+  const acessorios = setorPorNome(setores, "Acessórios");
   const plasmaTubo = setorPorNome(setores, "Plasma Tubo");
   const ponteira = setorPorNome(setores, "Ponteira");
   const principal = setores.find((setor) => setor.id === peca.setorId);
+  const setorComponente = setorPorNome(setores, setorComponentePorMaterial(peca.tipoMaterial));
   const etapas: Omit<EtapaRoteiroPeca, "ordem">[] = [];
   const adicionar = (setorId: number | undefined, processo: Processo) => {
     if (setorId) etapas.push({ setorId, processo });
@@ -75,17 +78,19 @@ export function roteiroPadraoDaPeca(
     adicionar(ponteira?.id, "SOLDAGEM");
   } else if (reforco75x3) {
     adicionar(ponteira?.id, "CORTE");
-    adicionar(componente?.id, "DOBRA");
+    adicionar(reforco?.id ?? setorComponente?.id, "DOBRA");
   } else if (anelPlasmaTubo) {
     adicionar(principal?.id, "CORTE");
     adicionar(ponteira?.id, "LIXAR");
     adicionar(ponteira?.id, "SOLDAGEM");
   } else if (peca.tipoMaterial === "CANTONEIRA") {
-    adicionar(componente?.id ?? principal?.id, "CORTE");
+    adicionar(componente?.id ?? setorComponente?.id ?? principal?.id, "CORTE");
     adicionar(ponteira?.id, "DOBRA");
   } else if (peca.tipoMaterial === "PLASMA") {
     adicionar(principal?.id, "CORTE");
-    if (processosDaPeca(peca).includes("DOBRA")) adicionar(componente?.id, "DOBRA");
+    if (processosDaPeca(peca).includes("DOBRA")) {
+      adicionar(componente?.id ?? acessorios?.id ?? setorComponente?.id, "DOBRA");
+    }
   } else {
     for (const processo of processosDaPeca({ ...peca, setor: principal })) {
       adicionar(principal?.id, processo);

@@ -6,6 +6,7 @@ import { Card, CardHeader } from "@/components/card";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/badge";
 import { CURVA_VARIANT } from "@/lib/labels";
+import { definicaoSetor } from "@/lib/setores";
 
 export default async function SetorDetailPage({
   params,
@@ -61,7 +62,7 @@ export default async function SetorDetailPage({
     <div className="flex flex-col gap-6">
       <PageHeader
         title={setor.nome}
-        subtitle={`Ordem ${setor.ordemPadrao} no fluxo de produção.`}
+        subtitle={`${definicaoSetor(setor.nome)?.descricao ?? "Setor de produção"} Ordem ${setor.ordemPadrao} no fluxo.`}
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

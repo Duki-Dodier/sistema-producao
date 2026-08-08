@@ -4,6 +4,7 @@ import { createSetor, deleteSetor } from "@/lib/actions/setores";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardHeader } from "@/components/card";
 import { SubmitButton } from "@/components/submit-button";
+import { definicaoSetor } from "@/lib/setores";
 
 export default async function SetoresPage() {
   const setores = await prisma.setor.findMany({
@@ -17,8 +18,19 @@ export default async function SetoresPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Setores"
-        subtitle="Os setores fixos do fluxo de produção. A ordem define a exibição no roteiro e no painel."
+        subtitle="A fábrica está dividida em preparação de peças, Agrupamento e linha final. A ordem define o fluxo mostrado nas OPs e no monitoramento."
       />
+
+      <div className="grid gap-3 rounded-xl border border-cyan-300/15 bg-cyan-400/5 p-4 text-xs text-slate-300 md:grid-cols-2">
+        <div>
+          <p className="font-bold uppercase tracking-wide text-cyan-200">Preparação / pré-pronto</p>
+          <p className="mt-1 text-slate-400">Tubo, Plasma Chapa, Plasma Tubo, componentes, Ponteira e Acessórios.</p>
+        </div>
+        <div>
+          <p className="font-bold uppercase tracking-wide text-amber-200">Fluxo final</p>
+          <p className="mt-1 text-slate-400">Agrupamento recebe e guarda as peças antes de Solda, Pintura e Montagem.</p>
+        </div>
+      </div>
 
       <Card>
         <CardHeader title="Novo setor" />
@@ -64,6 +76,7 @@ export default async function SetoresPage() {
           </thead>
           <tbody className="divide-y divide-white/5">
             {setores.map((s) => {
+              const definicao = definicaoSetor(s.nome);
               const emUso =
                 s._count.roteiros + s._count.apontamentos + s._count.pecas > 0;
               const remove = deleteSetor.bind(null, s.id);
@@ -76,6 +89,16 @@ export default async function SetoresPage() {
                     <Link href={`/setores/${s.id}`} className="hover:text-blue-600 hover:underline">
                       {s.nome}
                     </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
+                      <span className={`rounded px-1.5 py-0.5 font-bold uppercase tracking-wide ${
+                        definicao?.grupo === "FLUXO_FINAL"
+                          ? "bg-amber-400/10 text-amber-200"
+                          : "bg-cyan-400/10 text-cyan-200"
+                      }`}>
+                        {definicao?.grupo === "FLUXO_FINAL" ? "Fluxo final" : "Preparação"}
+                      </span>
+                      <span className="font-normal text-slate-500">{definicao?.descricao ?? "Setor configurável"}</span>
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-slate-500">
                     {emUso

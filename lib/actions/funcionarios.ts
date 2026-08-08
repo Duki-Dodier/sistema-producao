@@ -42,13 +42,14 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   const acesso = await exigirUsuarioLogado();
   if (!acesso.administrador) throw new Error("Apenas o administrador pode alterar acessos.");
   const papel = String(formData.get("papel") ?? "OPERADOR");
+  const setorId = Number(formData.get("setorId"));
   const pinRaw = String(formData.get("pin") ?? "").trim();
   const processos = PROCESSOS.filter((processo) =>
     formData.getAll("processos").map(String).includes(processo),
   );
 
-  if (!PAPEIS.includes(papel as (typeof PAPEIS)[number])) {
-    throw new Error("Papel inválido.");
+  if (!PAPEIS.includes(papel as (typeof PAPEIS)[number]) || !Number.isInteger(setorId) || setorId <= 0) {
+    throw new Error("Papel ou setor inválido.");
   }
   if (pinRaw && !/^\d{4}$/.test(pinRaw)) {
     throw new Error("O PIN deve ter exatamente 4 dígitos.");
@@ -60,7 +61,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   await prisma.$transaction(async (tx) => {
     await tx.funcionario.update({
       where: { id },
-      data: { papel, pin: pinRaw || null },
+      data: { papel, setorId, pin: pinRaw || null },
     });
     await tx.funcionarioProcesso.deleteMany({ where: { funcionarioId: id } });
     if (processos.length > 0) {
@@ -72,6 +73,9 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
 
   revalidatePath("/configuracoes");
   revalidatePath("/apontamentos");
+  revalidatePath("/setores");
+  revalidatePath("/monitoramento");
+  revalidatePath("/agrupamento");
 }
 
 export async function toggleFuncionario(id: number) {

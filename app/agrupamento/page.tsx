@@ -13,8 +13,6 @@ export default async function AgrupamentoPage({
 
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
   const setorSolda = setores.find((setor) => ehSetor(setor.nome, "Solda"));
-  const setorPonteira = setores.find((setor) => ehSetor(setor.nome, "Ponteira"));
-  const setorComponentes = setores.find((setor) => ehSetor(setor.nome, "Componentes e Acessórios"));
 
   const [ops, enviosSolda, soldadoresCadastrados, recebimentos] = await Promise.all([
     prisma.oP.findMany({
@@ -82,37 +80,19 @@ export default async function AgrupamentoPage({
   }
 
   // Sempre exibe todas as colunas de fabricação, independente de haver OPs em andamento
-  const colunas = [
-    ...setores
-      .filter(
-        (setor) =>
-          !ehSetorFinal(setor.nome) &&
-          !ehSetor(setor.nome, "Plasma Tubo") &&
-          !ehSetor(setor.nome, "Ponteira"),
-      )
-      .map((setor) => ({
-        chave: `SETOR:${setor.id}`,
-        setorId: setor.id,
-        setorNome: setor.nome,
-        ordemPadrao: setor.ordemPadrao,
-      })),
-    ...(setorPonteira
-      ? [{
-          chave: "PONTEIRA",
-          setorId: setorPonteira.id,
-          setorNome: "PONTEIRA",
-          ordemPadrao: setorPonteira.ordemPadrao,
-        }]
-      : []),
-    ...(setorComponentes || setorPonteira
-      ? [{
-          chave: "REFORCO",
-          setorId: (setorComponentes ?? setorPonteira)!.id,
-          setorNome: "REFORÇO",
-          ordemPadrao: (setorComponentes ?? setorPonteira)!.ordemPadrao + 0.5,
-        }]
-      : []),
-  ].sort((a, b) => a.ordemPadrao - b.ordemPadrao);
+  const colunas = setores
+    .filter((setor) => !ehSetorFinal(setor.nome))
+    .map((setor) => ({
+      chave: ehSetor(setor.nome, "Componente Reforço")
+        ? "REFORCO"
+        : ehSetor(setor.nome, "Ponteira")
+          ? "PONTEIRA"
+          : `SETOR:${setor.id}`,
+      setorId: setor.id,
+      setorNome: setor.nome,
+      ordemPadrao: setor.ordemPadrao,
+    }))
+    .sort((a, b) => a.ordemPadrao - b.ordemPadrao);
 
   // Cálculos para os Cards Superiores
   const totalWIP = progresso.reduce((acc, p) => acc + p.op.quantidade, 0);

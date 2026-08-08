@@ -32,8 +32,12 @@ function categoriaDaPeca(
   peca: OPProgresso["op"]["modelo"]["pecas"][number]["peca"],
 ) {
   const nome = normalizar(peca.nome);
-  if (peca.tipoMaterial === "REFORCO" || nome.includes("REFORCO")) return "REFORCO";
   const etapaFinal = etapaFinalDaPeca(peca);
+  if (
+    peca.tipoMaterial === "REFORCO" ||
+    nome.includes("REFORCO") ||
+    (etapaFinal && ehSetor(etapaFinal.setor.nome, "Componente Reforço"))
+  ) return "REFORCO";
   if (
     peca.tipoMaterial === "PONTEIRA" ||
     nome.includes("PONTEIRA") ||

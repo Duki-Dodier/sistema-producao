@@ -6,6 +6,7 @@ import { Card, CardHeader } from "@/components/card";
 import { SubmitButton } from "@/components/submit-button";
 import { STATUS_OP_LABEL } from "@/lib/labels";
 import { DeleteOPForm } from "@/components/delete-op-form";
+import { ehSetor } from "@/lib/setores";
 
 export default async function OPDetailPage({
   params,
@@ -16,7 +17,19 @@ export default async function OPDetailPage({
   const opId = Number(id);
 
   const [op, modelos, totalApontamentos] = await Promise.all([
-    prisma.oP.findUnique({ where: { id: opId } }),
+    prisma.oP.findUnique({
+      where: { id: opId },
+      include: {
+        modelo: {
+          include: {
+            roteiro: {
+              orderBy: { ordem: "asc" },
+              include: { setor: true },
+            },
+          },
+        },
+      },
+    }),
     prisma.modelo.findMany({ orderBy: { codigo: "asc" } }),
     prisma.apontamento.count({ where: { opId } }),
   ]);
@@ -129,6 +142,40 @@ export default async function OPDetailPage({
           </div>
           <SubmitButton>Salvar</SubmitButton>
         </form>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={`Fluxo da OP · ${op.modelo.codigo}`}
+          subtitle="A preparação termina no Agrupamento. Depois o conjunto segue para Solda, Pintura e Montagem."
+        />
+        <div className="flex flex-wrap items-center gap-2 px-5 py-4">
+          {op.modelo.roteiro.map((etapa) => {
+            const final = ["Agrupamento", "Solda", "Pintura", "Montagem"].some((nome) =>
+              ehSetor(etapa.setor.nome, nome),
+            );
+            return (
+              <div key={etapa.id} className="flex items-center gap-2">
+                <span
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                    final
+                      ? "border-amber-300/30 bg-amber-400/10 text-amber-200"
+                      : "border-cyan-300/25 bg-cyan-400/10 text-cyan-200"
+                  }`}
+                >
+                  <span className="mr-1 font-mono text-[10px] opacity-70">{etapa.ordem}.</span>
+                  {etapa.setor.nome}
+                </span>
+                {etapa.ordem < op.modelo.roteiro.length && (
+                  <span className="text-slate-600">→</span>
+                )}
+              </div>
+            );
+          })}
+          {op.modelo.roteiro.length === 0 && (
+            <p className="text-xs text-amber-200">Este modelo ainda não possui roteiro cadastrado.</p>
+          )}
+        </div>
       </Card>
 
       <DeleteOPForm opId={op.id} temApontamentos={totalApontamentos > 0} />
