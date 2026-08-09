@@ -79,9 +79,16 @@ export default async function AgrupamentoPage({
     });
   }
 
-  // Sempre exibe todas as colunas de fabricação, independente de haver OPs em andamento
+  // No Agrupamento mostramos apenas as famílias que precisam ser conferidas
+  // no kit. Plasma Tubo é a etapa de corte da ponteira removível e Acessórios
+  // não entra como uma coluna separada nesta conferência.
   const colunas = setores
-    .filter((setor) => !ehSetorFinal(setor.nome))
+    .filter(
+      (setor) =>
+        !ehSetorFinal(setor.nome) &&
+        !ehSetor(setor.nome, "Plasma Tubo") &&
+        !ehSetor(setor.nome, "Acessórios"),
+    )
     .map((setor) => ({
       chave: ehSetor(setor.nome, "Componente Reforço")
         ? "REFORCO"
@@ -89,7 +96,13 @@ export default async function AgrupamentoPage({
           ? "PONTEIRA"
           : `SETOR:${setor.id}`,
       setorId: setor.id,
-      setorNome: setor.nome,
+      setorNome: ehSetor(setor.nome, "Componente Barra Chata e Cantoneira")
+        ? "COMPONENTE BARRA CHATA E CANTONEIRA"
+        : ehSetor(setor.nome, "Componente Reforço")
+          ? "COMPONENTE REFORÇO"
+          : ehSetor(setor.nome, "Ponteira")
+            ? "PONTEIRA"
+            : setor.nome.toLocaleUpperCase("pt-BR"),
       ordemPadrao: setor.ordemPadrao,
     }))
     .sort((a, b) => a.ordemPadrao - b.ordemPadrao);
@@ -189,7 +202,7 @@ export default async function AgrupamentoPage({
               <th className="px-3 py-3 font-semibold whitespace-nowrap border-r border-white/5">Curva</th>
               {colunas.map((c) => (
                 <th key={c.chave} className="px-3 py-3 font-semibold whitespace-nowrap border-r border-white/5">
-                  Status: {c.setorNome}
+                  STATUS: {c.setorNome.toLocaleUpperCase("pt-BR")}
                 </th>
               ))}
               <th className="px-3 py-3 font-semibold whitespace-nowrap border-r border-white/5 text-center">Envio p/ Solda</th>

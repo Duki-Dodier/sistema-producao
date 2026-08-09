@@ -42,7 +42,9 @@ function categoriaDaPeca(
     peca.tipoMaterial === "PONTEIRA" ||
     nome.includes("PONTEIRA") ||
     nome.includes("CABECA REMOVIVEL") ||
-    (etapaFinal && ehSetor(etapaFinal.setor.nome, "Ponteira"))
+    (etapaFinal &&
+      (ehSetor(etapaFinal.setor.nome, "Ponteira") ||
+        ehSetor(etapaFinal.setor.nome, "Plasma Tubo")))
   ) {
     return "PONTEIRA";
   }
