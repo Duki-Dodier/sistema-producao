@@ -13,8 +13,21 @@ const revalidarApontamentos = () => {
   revalidatePath("/monitoramento");
 };
 
-export async function createApontamento(formData: FormData) {
+function nomeComparavel(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleUpperCase("pt-BR");
+}
+
+export type ResultadoApontamento =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function createApontamento(formData: FormData): Promise<ResultadoApontamento> {
   const usuarioAutenticado = await exigirUsuarioLogado();
+  try {
   const opId = Number(formData.get("opId"));
   const setorId = Number(formData.get("setorId"));
   const pecaIdRaw = String(formData.get("pecaId") ?? "").trim();
@@ -276,20 +289,26 @@ export async function createApontamento(formData: FormData) {
         throw new Error(`Quantidade maior que o total da OP: ${op.quantidade}.`);
       }
       if (etapaSolda) {
-        const [abastecido, jaSoldado] = await Promise.all([
-          tx.apontamento.aggregate({
-            where: { opId, setorId, soldador: usuario },
-            _sum: { quantidadeBoa: true },
-          }),
-          tx.apontamento.aggregate({
-            where: { opId, setorId, soldador: null, usuario },
-            _sum: { quantidadeBoa: true },
-          }),
-        ]);
-        const saldoAbastecido =
-          (abastecido._sum.quantidadeBoa ?? 0) - (jaSoldado._sum.quantidadeBoa ?? 0);
+        // O nome pode ter diferenca de acento/caixa entre o envio do
+        // Agrupamento e a sessao do operador. Comparamos de forma estavel.
+        const registrosSolda = await tx.apontamento.findMany({
+          where: { opId, setorId },
+          select: { soldador: true, usuario: true, quantidadeBoa: true },
+        });
+        const nomeOperador = nomeComparavel(usuario);
+        const abastecido = registrosSolda
+          .filter((registro) => registro.soldador && nomeComparavel(registro.soldador) === nomeOperador)
+          .reduce((total, registro) => total + registro.quantidadeBoa, 0);
+        const jaSoldado = registrosSolda
+          .filter((registro) => !registro.soldador && nomeComparavel(registro.usuario) === nomeOperador)
+          .reduce((total, registro) => total + registro.quantidadeBoa, 0);
+        const saldoAbastecido = abastecido - jaSoldado;
         if (quantidadeBoa > saldoAbastecido) {
-          throw new Error(`Quantidade maior que o saldo abastecido para Solda: ${saldoAbastecido}.`);
+          throw new Error(
+            saldoAbastecido > 0
+              ? `Quantidade maior que o saldo abastecido para Solda: ${saldoAbastecido}.`
+              : "Esta OP nao possui saldo enviado para este soldador. Escolha uma OP destinada a ele.",
+          );
         }
       }
     }
@@ -312,4 +331,14 @@ export async function createApontamento(formData: FormData) {
 
   revalidarApontamentos();
   refresh();
+  return { ok: true };
+  } catch (error) {
+    console.error("Falha ao registrar apontamento", error);
+    return {
+      ok: false,
+      error: error instanceof Error && error.message
+        ? error.message
+        : "Nao foi possivel registrar o apontamento. Tente novamente.",
+    };
+  }
 }

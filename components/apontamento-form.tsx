@@ -71,7 +71,8 @@ export function ApontamentoForm({ ops }: { ops: OPOption[] }) {
     
     try {
       const formData = new FormData(ev.currentTarget);
-      await createApontamento(formData);
+      const resultado = await createApontamento(formData);
+      if (!resultado.ok) throw new Error(resultado.error);
       // Apaga só a quantidade para permitir digitação rápida do próximo
       setQtd(""); 
       // Focar de volta no input de quantidade se possível (mantém o fluxo rápido)

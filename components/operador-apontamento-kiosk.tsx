@@ -108,7 +108,11 @@ export function OperadorApontamentoKiosk({
     setSucesso(null);
     setEnviando(true);
     try {
-      await createApontamento(formData);
+      const resultado = await createApontamento(formData);
+      if (!resultado.ok) {
+        setErro(resultado.error);
+        return;
+      }
       setSucesso(
         `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}.`,
       );

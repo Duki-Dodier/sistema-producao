@@ -106,7 +106,11 @@ export function MonitorApontamentoForm({
     }
 
     try {
-      await createApontamento(formData);
+      const resultado = await createApontamento(formData);
+      if (!resultado.ok) {
+        setErro(resultado.error);
+        return;
+      }
       setSucesso("Produção lançada com sucesso.");
       setOpId("");
       setBuscaOp("");
