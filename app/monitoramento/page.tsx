@@ -313,6 +313,14 @@ async function CockpitSetor({
 
         <div className="ml-auto flex items-center gap-2">
           <Link
+            href={`/monitoramento/relatorio/pdf?setor=${setor.id}&mes=${fmtParam(inicioMes)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded border border-[#f59e0b]/50 bg-[#f59e0b]/10 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[#fbbf24] hover:border-[#fbbf24]"
+          >
+            Imprimir PDF
+          </Link>
+          <Link
             href={`/monitoramento?visao=setor&setor=${setor.id}&mes=${fmtParam(mesAnterior)}`}
             className="rounded border border-[#2d3449] bg-[#060e20] px-2.5 py-1.5 font-mono text-xs text-slate-400 hover:text-[#4cd7f6]"
           >
@@ -703,6 +711,14 @@ async function CockpitGeralSetores({
         ))}
 
         <div className="ml-auto flex items-center gap-2">
+          <Link
+            href={`/monitoramento/relatorio/pdf?setor=geral&mes=${fmtParam(inicioMes)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded border border-[#f59e0b]/50 bg-[#f59e0b]/10 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[#fbbf24] hover:border-[#fbbf24]"
+          >
+            Imprimir PDF geral
+          </Link>
           <Link
             href={`/monitoramento?visao=setor&setor=geral&mes=${fmtParam(mesAnterior)}`}
             className="rounded border border-[#2d3449] bg-[#060e20] px-2.5 py-1.5 font-mono text-xs text-slate-400 hover:text-[#4cd7f6]"
