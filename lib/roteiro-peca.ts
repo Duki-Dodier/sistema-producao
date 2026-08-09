@@ -51,10 +51,6 @@ export function roteiroPadraoDaPeca(
     if (setorId) etapas.push({ setorId, processo });
   };
 
-  const reforco75x3 =
-    peca.tipoMaterial === "REFORCO" &&
-    Math.abs((peca.medidaA ?? 0) - 75) < 0.01 &&
-    Math.abs((peca.espessuraMm ?? 0) - 3) < 0.01;
   const nomePeca = normalizarDescricao(peca.nome);
   const ponteiraRemovivel =
     peca.tipoMaterial === "PONTEIRA" &&
@@ -67,7 +63,11 @@ export function roteiroPadraoDaPeca(
     normalizarNomeSetor(principal?.nome ?? "") === "PLASMA TUBO" &&
     (peca.nome ?? "").toLocaleUpperCase("pt-BR").includes("ANEL");
 
-  if (ponteiraRemovivel) {
+  if (peca.tipoMaterial === "REFORCO") {
+    for (const processo of processosDaPeca({ ...peca, setor: principal })) {
+      adicionar(reforco?.id ?? setorComponente?.id ?? principal?.id, processo);
+    }
+  } else if (ponteiraRemovivel) {
     adicionar(plasmaTubo?.id, "CORTE");
     adicionar(ponteira?.id, "SOLDAGEM");
     adicionar(ponteira?.id, "LIXAR");
@@ -76,16 +76,14 @@ export function roteiroPadraoDaPeca(
     adicionar(ponteira?.id, "BATIDA");
     adicionar(ponteira?.id, "LIXAR");
     adicionar(ponteira?.id, "SOLDAGEM");
-  } else if (reforco75x3) {
-    adicionar(ponteira?.id, "CORTE");
-    adicionar(reforco?.id ?? setorComponente?.id, "DOBRA");
   } else if (anelPlasmaTubo) {
     adicionar(principal?.id, "CORTE");
     adicionar(ponteira?.id, "LIXAR");
     adicionar(ponteira?.id, "SOLDAGEM");
   } else if (peca.tipoMaterial === "CANTONEIRA") {
-    adicionar(componente?.id ?? setorComponente?.id ?? principal?.id, "CORTE");
-    adicionar(ponteira?.id, "DOBRA");
+    for (const processo of processosDaPeca({ ...peca, setor: principal })) {
+      adicionar(componente?.id ?? setorComponente?.id ?? principal?.id, processo);
+    }
   } else if (peca.tipoMaterial === "PLASMA") {
     adicionar(principal?.id, "CORTE");
     if (processosDaPeca(peca).includes("DOBRA")) {

@@ -39,6 +39,14 @@ function categoriaDaPeca(
     (etapaFinal && ehSetor(etapaFinal.setor.nome, "Componente Reforço"))
   ) return "REFORCO";
   if (
+    peca.tipoMaterial === "BARRA_CHATA" ||
+    peca.tipoMaterial === "CANTONEIRA" ||
+    nome.includes("BARRA CHATA") ||
+    nome.includes("CANTONEIRA")
+  ) {
+    return `SETOR:${peca.setorId}`;
+  }
+  if (
     peca.tipoMaterial === "PONTEIRA" ||
     nome.includes("PONTEIRA") ||
     nome.includes("CABECA REMOVIVEL") ||

@@ -135,14 +135,6 @@ export default async function ApontamentosPage({
           select: {
             codigo: true,
             pecas: {
-              where: {
-                peca: {
-                  OR: [
-                    { setorId: setor.id },
-                    { roteiro: { some: { setorId: setor.id } } },
-                  ],
-                },
-              },
               select: {
                 pecaId: true,
                 quantidadeNecessaria: true,
@@ -211,23 +203,30 @@ export default async function ApontamentosPage({
           modeloCodigo: op.modelo.codigo,
           pecaId: null,
           roteiroEtapaId: null,
-          pecaCodigo: "PRODUÇÃO",
-          pecaNome: `Produção de ${setor.nome}`,
+          pecaCodigo: "OP SEM BOM",
+          pecaNome: `Produção geral da OP · ${setor.nome}`,
           necessario: op.quantidade,
           processos: [{
             codigo: "PRODUCAO",
-            label: "Produção",
+            label: "Produção geral",
             apontado,
             estado: concluido ? "concluido" : "atual",
           }],
           proximoProcesso: null,
-          proximoLabel: "Produção",
+          proximoLabel: "Produção geral",
           restante: Math.max(op.quantidade - apontado, 0),
           concluido,
         }];
       }
 
-      return op.modelo.pecas.flatMap((modeloPeca): ItemApontamentoOperador[] => {
+      const pecasDoSetor = op.modelo.pecas.filter(
+        (modeloPeca) =>
+          modeloPeca.peca.setorId === setor.id ||
+          modeloPeca.peca.roteiro.some((etapa) => etapa.setorId === setor.id),
+      );
+      if (pecasDoSetor.length === 0) return [];
+
+      return pecasDoSetor.flatMap((modeloPeca): ItemApontamentoOperador[] => {
         const necessario = op.quantidade * modeloPeca.quantidadeNecessaria;
         const etapas = modeloPeca.peca.roteiro.length > 0
           ? modeloPeca.peca.roteiro
@@ -262,7 +261,10 @@ export default async function ApontamentosPage({
         const concluido = indiceAtual === -1;
         const etapaAtual = concluido ? null : etapas[indiceAtual];
         if (!concluido && etapaAtual?.setorId !== setor.id) return [];
-        if (concluido && etapas.at(-1)?.setorId !== setor.id) return [];
+        const ultimaEtapaDeProducao = [...etapas]
+          .reverse()
+          .find((etapa) => etapa.processo !== "AGRUPAR");
+        if (concluido && ultimaEtapaDeProducao?.setorId !== setor.id) return [];
 
         return [{
           chave: `${op.id}-${modeloPeca.pecaId}`,
