@@ -43,6 +43,7 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
   const funcionarioIdRaw = String(formData.get("funcionarioId") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
   const usarSessao = String(formData.get("usarSessao") ?? "") === "1";
+  const soldadorInformado = String(formData.get("soldador") ?? "").trim();
   let usuario = String(formData.get("usuario") ?? "").trim();
   let funcionarioIdRegistrado: number | null = null;
 
@@ -55,7 +56,12 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
     if (sessao.papel === "OPERADOR" && !sessao.processosPermitidos.includes(processoPermitido)) {
       throw new Error("Este operador nao esta autorizado para este processo.");
     }
-    usuario = sessao.nome;
+    // PCP/admin pode operar a fila de qualquer soldador. O cartão da OP
+    // informa para quem o Agrupamento enviou o lote; operadores comuns ficam
+    // sempre limitados ao próprio nome da sessão.
+    usuario = (sessao.papel === "PCP" || sessao.administrador) && soldadorInformado
+      ? soldadorInformado
+      : sessao.nome;
     funcionarioIdRegistrado = sessao.id;
   } else if (funcionarioIdRaw) {
     const funcionarioId = Number(funcionarioIdRaw);

@@ -13,6 +13,7 @@ export type ItemApontamentoOperador = {
   roteiroEtapaId: number | null;
   pecaCodigo: string;
   pecaNome: string;
+  soldador?: string | null;
   necessario: number;
   processos: {
     codigo: string;
@@ -301,6 +302,7 @@ export function OperadorApontamentoKiosk({
             <input type="hidden" name="funcionarioId" value={operador} />
             <input type="hidden" name="pin" value={pin} />
             <input type="hidden" name="usarSessao" value={sessao ? "1" : ""} />
+            <input type="hidden" name="soldador" value={item.soldador ?? ""} />
             <input type="hidden" name="quantidadeBoa" value={quantidade} />
 
             <div className="rounded-lg border border-[#2d3449] bg-[#0b1326] p-3 sm:p-4">

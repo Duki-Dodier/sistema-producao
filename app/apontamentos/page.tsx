@@ -229,6 +229,7 @@ export default async function ApontamentosPage({
             roteiroEtapaId: null,
             pecaCodigo: "SOLDA",
             pecaNome: `Soldagem · ${soldador}`,
+            soldador,
             necessario: enviado,
             processos: [{
               codigo: "SOLDAGEM",
