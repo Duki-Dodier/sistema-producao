@@ -27,6 +27,7 @@ model Setor {
   nome         String  @unique
   ordemPadrao  Int     @default(0) // ordem típica no fluxo, só para exibição
   metaMensal   Int? // meta de peças/mês do setor — usada no cockpit de Monitoramento
+  mediaDiariaMeta Float? // média diária cadastrada para acompanhar o ritmo da meta
   lider        String? // líder do setor — exibido no cockpit de Monitoramento
   diasUteisMes Int? // dias úteis do mês (override do cálculo seg–sex automático)
 

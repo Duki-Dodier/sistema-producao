@@ -100,7 +100,13 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
   const periodo = periodoProducao(mesInformado);
   const setores = await prisma.setor.findMany({
     orderBy: { ordemPadrao: "asc" },
-    select: { id: true, nome: true, metaMensal: true, diasUteisMes: true },
+    select: {
+      id: true,
+      nome: true,
+      metaMensal: true,
+      mediaDiariaMeta: true,
+      diasUteisMes: true,
+    },
   });
   const setor = setorId === null ? null : setores.find((item) => item.id === setorId) ?? null;
   const [apontamentos, funcionarios] = await Promise.all([
@@ -128,6 +134,7 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
   const totaisPorDiaSetor = new Map<string, number>();
   const totaisPorOperador = new Map<string, number>();
   const diasPorOperador = new Map<string, Set<number>>();
+  const diasPorSetor = new Map<number, Set<number>>();
   const totaisPorSetor = new Map<number, number>();
   const diasComProducao = new Set<number>();
   for (const item of finalizados) {
@@ -145,6 +152,9 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
     diasDoOperador.add(dia);
     diasPorOperador.set(item.usuario, diasDoOperador);
     totaisPorSetor.set(item.setorId, (totaisPorSetor.get(item.setorId) ?? 0) + item.quantidadeBoa);
+    const diasDoSetor = diasPorSetor.get(item.setorId) ?? new Set<number>();
+    diasDoSetor.add(dia);
+    diasPorSetor.set(item.setorId, diasDoSetor);
   }
 
   const operadores = setorId === null
@@ -189,11 +199,6 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
     };
   });
 
-  const setoresRelatorio = setores.map((item) => ({
-    nome: item.nome,
-    total: totaisPorSetor.get(item.id) ?? 0,
-  }));
-
   let diasUteisPadrao = 0;
   for (let dia = 1; dia <= periodo.diasNoMes; dia += 1) {
     const diaSemana = new Date(periodo.ano, periodo.mes - 1, dia).getDay();
@@ -213,6 +218,31 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
   const metaTotal = setorId === null
     ? setores.reduce((total, item) => total + (item.metaMensal ?? 0), 0)
     : setor?.metaMensal ?? null;
+  const setoresRelatorio = setores.map((item) => {
+    const total = totaisPorSetor.get(item.id) ?? 0;
+    const diasComProducaoSetor = diasPorSetor.get(item.id)?.size ?? 0;
+    const diasUteisSetor = item.diasUteisMes ?? diasUteisPadrao;
+    const mediaLancamentos = diasComProducaoSetor > 0
+      ? total / diasComProducaoSetor
+      : 0;
+    const mediaMeta = item.mediaDiariaMeta ?? (
+      item.metaMensal && diasUteisSetor > 0
+        ? item.metaMensal / diasUteisSetor
+        : null
+    );
+    return {
+      nome: item.nome,
+      total,
+      diasComProducao: diasComProducaoSetor,
+      mediaLancamentos,
+      mediaMeta,
+      situacao: mediaMeta === null
+        ? "Sem media cadastrada"
+        : mediaLancamentos >= mediaMeta
+          ? "Dentro da media"
+          : "Abaixo da media",
+    };
+  });
   const quantidadeLancamentos = finalizados.length;
   const mediaPorLancamento = quantidadeLancamentos > 0
     ? finalizados.reduce((total, item) => total + item.quantidadeBoa, 0) / quantidadeLancamentos

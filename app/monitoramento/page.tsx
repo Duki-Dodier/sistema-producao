@@ -586,6 +586,20 @@ async function CockpitSetor({
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
+              Media/dia cadastrada
+            </label>
+            <input
+              name="mediaDiariaMeta"
+              type="number"
+              min={0}
+              step="0.1"
+              defaultValue={setor.mediaDiariaMeta ?? ""}
+              placeholder="Ex.: 850"
+              className={`w-36 ${INPUT_CLS}`}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
               Líder do setor
             </label>
             <input
@@ -671,6 +685,7 @@ async function CockpitGeralSetores({
 
   const grade = new Map<string, number>();
   const totalPorSetor = new Map<number, number>();
+  const diasPorSetor = new Map<number, Set<number>>();
   for (const apontamento of finalizados) {
     const dia = apontamento.dataHora.getDate();
     const chave = `${apontamento.setorId}|${dia}`;
@@ -679,6 +694,9 @@ async function CockpitGeralSetores({
       apontamento.setorId,
       (totalPorSetor.get(apontamento.setorId) ?? 0) + apontamento.quantidadeBoa,
     );
+    const diasDoSetor = diasPorSetor.get(apontamento.setorId) ?? new Set<number>();
+    diasDoSetor.add(dia);
+    diasPorSetor.set(apontamento.setorId, diasDoSetor);
   }
 
   const totalGeral = finalizados.reduce((soma, item) => soma + item.quantidadeBoa, 0);
@@ -789,6 +807,15 @@ async function CockpitGeralSetores({
           const percentual = setor.metaMensal
             ? Math.round((total / setor.metaMensal) * 100)
             : null;
+          const diasSetor = diasPorSetor.get(setor.id)?.size ?? 0;
+          const mediaLancamentosSetor = diasSetor > 0 ? total / diasSetor : 0;
+          const diasUteisSetor = setor.diasUteisMes ?? diasUteisPadrao;
+          const mediaMetaSetor = setor.mediaDiariaMeta ?? (
+            setor.metaMensal && diasUteisSetor > 0
+              ? setor.metaMensal / diasUteisSetor
+              : null
+          );
+          const dentroDaMedia = mediaMetaSetor !== null && mediaLancamentosSetor >= mediaMetaSetor;
           return (
             <Link
               key={setor.id}
@@ -812,6 +839,12 @@ async function CockpitGeralSetores({
               </div>
               <p className="mt-2 font-mono text-[9px] uppercase tracking-wider text-slate-500">
                 {percentual === null ? "Meta não definida" : `${percentual}% da meta · somente finalizados`}
+              </p>
+              <p className={`mt-1 font-mono text-[9px] uppercase tracking-wider ${dentroDaMedia ? "text-[#4edea3]" : "text-[#ffb690]"}`}>
+                Média: {mediaLancamentosSetor.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                {mediaMetaSetor === null
+                  ? " · meta/dia não cadastrada"
+                  : ` · meta/dia ${mediaMetaSetor.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}`}
               </p>
             </Link>
           );

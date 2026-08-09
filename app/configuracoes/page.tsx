@@ -145,6 +145,20 @@ export default async function ConfiguracoesPage() {
                     className={`text-center ${INPUT_CLS}`}
                   />
                 </div>
+                <div className="flex w-32 flex-col gap-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Media/dia
+                  </label>
+                  <input
+                    name="mediaDiariaMeta"
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    defaultValue={setor.mediaDiariaMeta ?? ""}
+                    placeholder="auto"
+                    className={`text-center ${INPUT_CLS}`}
+                  />
+                </div>
                 <div className="flex flex-1 min-w-32 flex-col gap-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                     Líder

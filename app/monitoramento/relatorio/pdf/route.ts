@@ -127,6 +127,25 @@ export async function GET(request: Request) {
             ],
             linhas: linhasGradeGeral,
           },
+          {
+            titulo: "Media por setor",
+            colunas: [
+              { titulo: "Setor", largura: 205 },
+              { titulo: "Total lancado", largura: 95, alinhar: "right" },
+              { titulo: "Dias", largura: 70, alinhar: "right" },
+              { titulo: "Media lancamentos", largura: 130, alinhar: "right" },
+              { titulo: "Media cadastrada", largura: 130, alinhar: "right" },
+              { titulo: "Situacao", largura: 136 },
+            ],
+            linhas: dados.setoresRelatorio.map((item) => [
+              nomeSetorRelatorio(item.nome),
+              numero(item.total),
+              String(item.diasComProducao),
+              numero(item.mediaLancamentos, 1),
+              item.mediaMeta === null ? "-" : numero(item.mediaMeta, 1),
+              item.situacao,
+            ]),
+          },
         ],
       })
     : gerarPdfRelatorio({

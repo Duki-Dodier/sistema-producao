@@ -19,13 +19,20 @@ export async function createSetor(formData: FormData) {
 export async function updateSetorConfig(id: number, formData: FormData) {
   await exigirAdministrador();
   const metaRaw = String(formData.get("metaMensal") ?? "").trim();
+  const mediaRaw = String(formData.get("mediaDiariaMeta") ?? "").trim();
   const lider = String(formData.get("lider") ?? "").trim();
   const diasRaw = String(formData.get("diasUteisMes") ?? "").trim();
+  const mediaDiariaMeta = mediaRaw ? Number(mediaRaw) : null;
+
+  if (mediaDiariaMeta !== null && (!Number.isFinite(mediaDiariaMeta) || mediaDiariaMeta < 0)) {
+    throw new Error("A mÃ©dia diÃ¡ria deve ser um nÃºmero maior ou igual a zero.");
+  }
 
   await prisma.setor.update({
     where: { id },
     data: {
       metaMensal: metaRaw ? Number(metaRaw) : null,
+      mediaDiariaMeta,
       lider: lider || null,
       diasUteisMes: diasRaw ? Number(diasRaw) : null,
     },
