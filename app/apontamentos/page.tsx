@@ -134,7 +134,14 @@ export default async function ApontamentosPage({
         modelo: {
           select: {
             codigo: true,
+            _count: { select: { pecas: true } },
             pecas: {
+              where: {
+                OR: [
+                  { peca: { setorId: setor.id } },
+                  { peca: { roteiro: { some: { setorId: setor.id } } } },
+                ],
+              },
               select: {
                 pecaId: true,
                 quantidadeNecessaria: true,
@@ -191,7 +198,7 @@ export default async function ApontamentosPage({
 
   const itens: ItemApontamentoOperador[] = opsAbertas.flatMap(
     (op): ItemApontamentoOperador[] => {
-      if (op.modelo.pecas.length === 0) {
+      if (op.modelo._count.pecas === 0) {
         const apontado = op.apontamentos
           .filter((item) => item.pecaId === null && item.setorId === setor.id)
           .reduce((soma, item) => soma + item.quantidadeBoa, 0);

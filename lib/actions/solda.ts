@@ -12,56 +12,86 @@ function revalidarSolda() {
   revalidatePath("/monitoramento");
 }
 
-export async function createApontamentoSolda(formData: FormData) {
-  await exigirUsuarioLogado();
-  const opId = Number(formData.get("opId"));
-  const soldador = String(formData.get("soldador") ?? "").trim();
-  const bancada = String(formData.get("bancada") ?? "").trim();
-  const abastecedor = String(formData.get("abastecedor") ?? "").trim();
-  const quantidadeBoa = Number(formData.get("quantidadeBoa") ?? 0);
-  const dataInformada = String(formData.get("data") ?? "").trim();
+export type ResultadoEnvioSolda =
+  | { ok: true }
+  | { ok: false; error: string };
 
-  if (!Number.isInteger(opId) || !soldador || !bancada) throw new Error("Preencha OP, soldador e bancada.");
-  if (!Number.isInteger(quantidadeBoa) || quantidadeBoa <= 0) throw new Error("Informe uma quantidade inteira positiva.");
+export async function createApontamentoSolda(formData: FormData): Promise<ResultadoEnvioSolda> {
+  try {
+    await exigirUsuarioLogado();
+    const opId = Number(formData.get("opId"));
+    const soldador = String(formData.get("soldador") ?? "").trim();
+    const bancada = String(formData.get("bancada") ?? "").trim();
+    const abastecedor = String(formData.get("abastecedor") ?? "").trim();
+    const quantidadeBoa = Number(formData.get("quantidadeBoa") ?? 0);
+    const dataInformada = String(formData.get("data") ?? "").trim();
 
-  // O adaptador Prisma do Cloudflare D1 nao oferece transacoes interativas.
-  // Validamos com leituras diretas e fazemos uma unica gravacao, como no
-  // apontamento comum, evitando o erro de Server Components no envio.
-  const setores = await prisma.setor.findMany();
-  const setorSolda = setores.find((setor) => ehSetor(setor.nome, "Solda"));
-  if (!setorSolda) throw new Error('Setor "Solda" nao esta cadastrado.');
+    if (!Number.isInteger(opId) || !soldador || !bancada) {
+      throw new Error("Preencha OP, soldador e bancada.");
+    }
+    if (!Number.isInteger(quantidadeBoa) || quantidadeBoa <= 0) {
+      throw new Error("Informe uma quantidade inteira positiva.");
+    }
 
-  const [op, jaEnviado] = await Promise.all([
-    prisma.oP.findUnique({
+    // O adaptador Prisma do Cloudflare D1 nao oferece transacoes interativas.
+    // Validamos com leituras diretas e fazemos uma unica gravacao, como no
+    // apontamento comum, evitando o erro de Server Components no envio.
+    const setores = await prisma.setor.findMany({ select: { id: true, nome: true } });
+    const setorSolda = setores.find((setor) => ehSetor(setor.nome, "Solda"));
+    if (!setorSolda) throw new Error('Setor "Solda" nao esta cadastrado.');
+
+    const op = await prisma.oP.findUnique({
       where: { id: opId },
-      select: { quantidade: true, status: true, modelo: { select: { roteiro: { select: { setorId: true } } } } },
-    }),
-    prisma.apontamento.aggregate({
-      where: { opId, setorId: setorSolda.id, soldador: { not: null } },
-      _sum: { quantidadeBoa: true },
-    }),
-  ]);
-  if (!op) throw new Error("OP nao encontrada.");
-  if (op.status !== "ABERTA") throw new Error("So e possivel enviar uma OP aberta para Solda.");
-  if (!op.modelo.roteiro.some((etapa) => etapa.setorId === setorSolda.id)) {
-    throw new Error("A OP nao possui Solda no roteiro.");
-  }
-  const saldo = op.quantidade - (jaEnviado._sum.quantidadeBoa ?? 0);
-  if (quantidadeBoa > saldo) throw new Error(`Quantidade maior que o saldo da OP: restam ${saldo} peca(s).`);
+      select: {
+        quantidade: true,
+        status: true,
+        modelo: { select: { roteiro: { select: { setorId: true } } } },
+      },
+    });
+    if (!op) throw new Error("OP nao encontrada.");
+    if (op.status !== "ABERTA") throw new Error("So e possivel enviar uma OP aberta para Solda.");
+    if (!op.modelo.roteiro.some((etapa) => etapa.setorId === setorSolda.id)) {
+      throw new Error("A OP nao possui Solda no roteiro.");
+    }
 
-  await prisma.apontamento.create({
-    data: {
-      opId,
-      setorId: setorSolda.id,
-      usuario: soldador,
-      soldador,
-      bancada,
-      abastecedor: abastecedor || null,
-      quantidadeBoa,
-      ...(dataInformada ? { dataHora: new Date(`${dataInformada}T12:00:00`) } : {}),
-    },
-  });
-  revalidarSolda();
+    // A soma em JavaScript evita o aggregate com filtro de nulo, que falha
+    // de forma intermitente em algumas versoes do adaptador D1.
+    const enviosAnteriores = await prisma.apontamento.findMany({
+      where: { opId, setorId: setorSolda.id },
+      select: { quantidadeBoa: true, soldador: true },
+    });
+    const totalEnviado = enviosAnteriores
+      .filter((apontamento) => apontamento.soldador !== null)
+      .reduce((total, apontamento) => total + apontamento.quantidadeBoa, 0);
+    const saldo = op.quantidade - totalEnviado;
+    if (saldo <= 0) throw new Error("Esta OP ja foi totalmente enviada para Solda.");
+    if (quantidadeBoa > saldo) {
+      throw new Error(`Quantidade maior que o saldo da OP: restam ${saldo} peca(s).`);
+    }
+
+    await prisma.apontamento.create({
+      data: {
+        opId,
+        setorId: setorSolda.id,
+        usuario: soldador,
+        soldador,
+        bancada,
+        abastecedor: abastecedor || null,
+        quantidadeBoa,
+        ...(dataInformada ? { dataHora: new Date(`${dataInformada}T12:00:00`) } : {}),
+      },
+    });
+    revalidarSolda();
+    return { ok: true };
+  } catch (error) {
+    console.error("Falha ao enviar OP para Solda", error);
+    return {
+      ok: false,
+      error: error instanceof Error && error.message
+        ? error.message
+        : "Nao foi possivel enviar a OP para Solda. Tente novamente.",
+    };
+  }
 }
 
 export async function updateQuantidadeSoldada(envioId: number, formData: FormData) {

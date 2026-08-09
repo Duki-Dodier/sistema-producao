@@ -7,6 +7,10 @@ function formatDate(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 const INPUT_CLS =
   "rounded border border-slate-700 bg-[#1A222C] px-2 py-1.5 text-[11px] text-slate-200 placeholder-slate-500 focus:border-[#3B82F6] focus:outline-none transition-colors";
 
@@ -93,12 +97,12 @@ export default async function SoldaPage({
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   // Métricas do topo.
-  const hoje = new Date().toDateString();
+  const hoje = dateKey(new Date());
   const abastecidasHoje = envios
-    .filter((e) => e.dataHora.toDateString() === hoje)
+    .filter((e) => dateKey(e.dataHora) === hoje)
     .reduce((s, e) => s + e.quantidadeBoa, 0);
   const soldadasHoje = apontamentosDeSolda
-    .filter((e) => e.dataHora.toDateString() === hoje)
+    .filter((e) => dateKey(e.dataHora) === hoje)
     .reduce((s, e) => s + e.quantidadeBoa, 0);
   const pendenteSolda = envios.reduce(
     (s, e) => s + (e.quantidadeBoa - (quantidadeSoldadaPorEnvio.get(e.id) ?? 0)),

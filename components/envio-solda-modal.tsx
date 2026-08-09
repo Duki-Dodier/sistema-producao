@@ -40,7 +40,9 @@ export function EnvioSoldaModal({
     () => false,
   );
   const [enviando, setEnviando] = useState(false);
-  const hoje = new Date().toISOString().slice(0, 10);
+  // toISOString() usa UTC e pode mudar o dia para quem esta no Brasil.
+  const agora = new Date();
+  const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -55,7 +57,11 @@ export function EnvioSoldaModal({
   const handleSubmit = async (formData: FormData) => {
     setEnviando(true);
     try {
-      await createApontamentoSolda(formData);
+      const resultado = await createApontamentoSolda(formData);
+      if (!resultado.ok) {
+        alert(resultado.error);
+        return;
+      }
       onClose();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao enviar para a Solda.");
