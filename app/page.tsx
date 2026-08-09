@@ -22,10 +22,7 @@ export default async function PainelPcpPage({
   const dataInicio = sp.inicio ? new Date(sp.inicio) : null;
   const dataFim = sp.fim ? new Date(`${sp.fim}T23:59:59`) : null;
 
-  const inicioUltimosSeteDias = new Date();
-  inicioUltimosSeteDias.setDate(inicioUltimosSeteDias.getDate() - 7);
-
-  const [ops, setores, apontamentosRecentes] = await Promise.all([
+  const [ops, setores] = await Promise.all([
     prisma.oP.findMany({
       where: { status: "ABERTA" },
       include: {
@@ -47,10 +44,6 @@ export default async function PainelPcpPage({
       },
     }),
     prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } }),
-    prisma.apontamento.findMany({
-      where: { dataHora: { gte: inicioUltimosSeteDias } },
-      select: { quantidadeBoa: true, dataHora: true },
-    }),
   ]);
 
   let progresso = calcularProgressoOPs(ops).sort(
@@ -97,14 +90,17 @@ export default async function PainelPcpPage({
     .filter((s) => s.value > 0)
     .sort((a, b) => b.value - a.value);
 
-  const producaoPorDia = Array.from({ length: 7 }).map((_, i) => {
-    const dia = new Date();
-    dia.setDate(dia.getDate() - (6 - i));
-    const chave = dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-    const total = apontamentosRecentes
-      .filter((a) => a.dataHora.toDateString() === dia.toDateString())
-      .reduce((sum, a) => sum + a.quantidadeBoa, 0);
-    return { label: chave, value: total };
+  const sequenciamentoPorSetor = setores.map((setor) => {
+    const fila = progresso
+      .filter((item) => item.setorAtual?.setorId === setor.id)
+      .sort((a, b) => a.op.numeroSequencia - b.op.numeroSequencia);
+    const primeiro = fila[0] ?? null;
+    return {
+      setor: setor.nome,
+      sequencia: primeiro?.op.numeroSequencia ?? null,
+      codigo: primeiro?.op.modelo.codigo ?? null,
+      fila: fila.length,
+    };
   });
 
   // Filtros da lista "OPs em andamento".
@@ -191,10 +187,40 @@ export default async function PainelPcpPage({
         </Card>
         <Card>
           <CardHeader
-            title="Produção (peças boas)"
-            subtitle="Últimos 7 dias, todos os setores."
+            title="Sequenciamento atual por setor"
+            subtitle="Menor sequência da OP em produção em cada setor."
           />
-          <MiniBarChart data={producaoPorDia} />
+          <div className="space-y-2 px-5 py-4">
+            {sequenciamentoPorSetor.map((item) => (
+              <div
+                key={item.setor}
+                className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md border border-white/5 bg-[#202A36] px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-200">
+                    {item.setor}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                    {item.codigo
+                      ? `OP ${item.sequencia} · ${item.codigo}`
+                      : "Nenhuma OP em produção"}
+                  </p>
+                </div>
+                <span
+                  className={`rounded px-2 py-1 font-mono text-[11px] font-bold ${
+                    item.sequencia === null
+                      ? "bg-slate-700/50 text-slate-500"
+                      : "bg-cyan-500/15 text-cyan-300"
+                  }`}
+                >
+                  {item.sequencia === null ? "—" : `SEQ ${item.sequencia}`}
+                </span>
+                <span className="min-w-12 text-right text-[10px] text-slate-500">
+                  {item.fila > 0 ? `${item.fila} OP${item.fila === 1 ? "" : "s"}` : "Livre"}
+                </span>
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
 
