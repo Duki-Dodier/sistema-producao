@@ -684,6 +684,22 @@ async function CockpitGeralSetores({
   const totalGeral = finalizados.reduce((soma, item) => soma + item.quantidadeBoa, 0);
   const diasComProducao = new Set(finalizados.map((item) => item.dataHora.getDate())).size;
   const setoresComProducao = setores.filter((setor) => (totalPorSetor.get(setor.id) ?? 0) > 0).length;
+  let diasUteisPadrao = 0;
+  for (let dia = 1; dia <= diasNoMes; dia += 1) {
+    const diaSemana = new Date(ano, mes - 1, dia).getDay();
+    if (diaSemana !== 0 && diaSemana !== 6) diasUteisPadrao += 1;
+  }
+  const diasConfigurados = setores
+    .map((setor) => setor.diasUteisMes)
+    .filter((valor): valor is number => valor !== null && valor > 0);
+  const mesmaConfiguracao = diasConfigurados.length > 0 && diasConfigurados.every(
+    (valor) => valor === diasConfigurados[0],
+  );
+  const diasUteis = mesmaConfiguracao ? diasConfigurados[0] : diasUteisPadrao;
+  const metaGeral = setores.reduce((total, setor) => total + (setor.metaMensal ?? 0), 0);
+  const mediaParaMeta = metaGeral > 0 && diasUteis > 0 ? metaGeral / diasUteis : null;
+  const mediaLancamentosDia = diasComProducao > 0 ? totalGeral / diasComProducao : 0;
+  const mediaPorLancamento = finalizados.length > 0 ? totalGeral / finalizados.length : 0;
 
   return (
     <>
@@ -737,8 +753,32 @@ async function CockpitGeralSetores({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Kpi label="Itens finalizados" value={totalGeral.toLocaleString("pt-BR")} tone="cyan" />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <Kpi label="Total produzido" value={totalGeral.toLocaleString("pt-BR")} tone="cyan" />
+        <Kpi
+          label="Meta geral"
+          value={metaGeral > 0 ? metaGeral.toLocaleString("pt-BR") : "—"}
+          sub="soma das metas dos setores"
+          tone="neutral"
+        />
+        <Kpi
+          label="Média p/ meta por dia"
+          value={mediaParaMeta === null ? "—" : mediaParaMeta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+          sub={`${diasUteis} dias úteis considerados`}
+          tone="orange"
+        />
+        <Kpi
+          label="Média dos lançamentos/dia"
+          value={mediaLancamentosDia.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+          sub="nos dias com produção"
+          tone="neutral"
+        />
+        <Kpi
+          label="Média por lançamento"
+          value={mediaPorLancamento.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+          tone="neutral"
+        />
+        <Kpi label="Lançamentos" value={String(finalizados.length)} tone="neutral" />
         <Kpi label="Setores com produção" value={`${setoresComProducao}/${setores.length}`} tone="neutral" />
         <Kpi label="Dias com produção" value={String(diasComProducao)} tone="neutral" />
       </div>

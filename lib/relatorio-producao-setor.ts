@@ -100,7 +100,7 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
   const periodo = periodoProducao(mesInformado);
   const setores = await prisma.setor.findMany({
     orderBy: { ordemPadrao: "asc" },
-    select: { id: true, nome: true, metaMensal: true },
+    select: { id: true, nome: true, metaMensal: true, diasUteisMes: true },
   });
   const setor = setorId === null ? null : setores.find((item) => item.id === setorId) ?? null;
   const [apontamentos, funcionarios] = await Promise.all([
@@ -194,6 +194,30 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
     total: totaisPorSetor.get(item.id) ?? 0,
   }));
 
+  let diasUteisPadrao = 0;
+  for (let dia = 1; dia <= periodo.diasNoMes; dia += 1) {
+    const diaSemana = new Date(periodo.ano, periodo.mes - 1, dia).getDay();
+    if (diaSemana !== 0 && diaSemana !== 6) diasUteisPadrao += 1;
+  }
+  const diasConfigurados = setores
+    .map((item) => item.diasUteisMes)
+    .filter((valor): valor is number => valor !== null && valor > 0);
+  const mesmaConfiguracao = diasConfigurados.length > 0 && diasConfigurados.every(
+    (valor) => valor === diasConfigurados[0],
+  );
+  const diasUteis = mesmaConfiguracao
+    ? diasConfigurados[0]
+    : setorId !== null && setor?.diasUteisMes
+      ? setor.diasUteisMes
+      : diasUteisPadrao;
+  const metaTotal = setorId === null
+    ? setores.reduce((total, item) => total + (item.metaMensal ?? 0), 0)
+    : setor?.metaMensal ?? null;
+  const quantidadeLancamentos = finalizados.length;
+  const mediaPorLancamento = quantidadeLancamentos > 0
+    ? finalizados.reduce((total, item) => total + item.quantidadeBoa, 0) / quantidadeLancamentos
+    : 0;
+
   const ordensMapa = new Map<string, {
     setor: string;
     numero: number;
@@ -222,6 +246,10 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
     periodo,
     total: finalizados.reduce((total, item) => total + item.quantidadeBoa, 0),
     diasComProducao: diasComProducao.size,
+    diasUteis,
+    metaTotal,
+    quantidadeLancamentos,
+    mediaPorLancamento,
     operadores,
     producaoDiaria,
     producaoDiariaSetores,

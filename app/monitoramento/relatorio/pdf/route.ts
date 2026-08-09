@@ -68,6 +68,9 @@ export async function GET(request: Request) {
   const mediaDia = dados.diasComProducao > 0
     ? dados.total / dados.diasComProducao
     : 0;
+  const mediaParaMeta = dados.metaTotal && dados.diasUteis > 0
+    ? dados.metaTotal / dados.diasUteis
+    : null;
   const valorGrade = (valor: number) => valor > 0 ? numero(valor) : "-";
   const larguraTabelaGeral = 842 - 38 * 2;
   const larguraDataGeral = 54;
@@ -75,6 +78,18 @@ export async function GET(request: Request) {
   const larguraSetorGeral =
     (larguraTabelaGeral - larguraDataGeral - larguraTotalGeral) /
     Math.max(dados.setores.length, 1);
+  const linhasGradeGeral = [
+    ...dados.producaoDiariaSetores.map((item) => [
+      item.label,
+      ...item.valores.map(valorGrade),
+      valorGrade(item.total),
+    ]),
+    [
+      "TOTAL DO MES",
+      ...dados.setoresRelatorio.map((item) => valorGrade(item.total)),
+      valorGrade(dados.total),
+    ],
+  ];
 
   const pdf = setorId === null
     ? gerarPdfRelatorio({
@@ -83,13 +98,20 @@ export async function GET(request: Request) {
         periodo: dados.periodo.mesLabel,
         orientacao: "paisagem",
         kpis: [
-          { label: "Itens finalizados", value: numero(dados.total) },
+          { label: "Total produzido", value: numero(dados.total) },
+          { label: "Meta geral", value: dados.metaTotal ? numero(dados.metaTotal) : "-" },
+          {
+            label: "Media p/ meta por dia",
+            value: mediaParaMeta === null ? "-" : numero(mediaParaMeta, 1),
+          },
+          { label: "Media dos lancamentos/dia", value: numero(mediaDia, 1) },
+          { label: "Lancamentos", value: numero(dados.quantidadeLancamentos) },
+          { label: "Media por lancamento", value: numero(dados.mediaPorLancamento, 1) },
           { label: "Dias com producao", value: String(dados.diasComProducao) },
           {
             label: "Setores com producao",
             value: String(dados.setoresRelatorio.filter((item) => item.total > 0).length),
           },
-          { label: "Media por dia", value: numero(mediaDia, 1) },
         ],
         secoes: [
           {
@@ -103,11 +125,7 @@ export async function GET(request: Request) {
               })),
               { titulo: "Total", largura: larguraTotalGeral, alinhar: "right" as const },
             ],
-            linhas: dados.producaoDiariaSetores.map((item) => [
-              item.label,
-              ...item.valores.map(valorGrade),
-              valorGrade(item.total),
-            ]),
+            linhas: linhasGradeGeral,
           },
         ],
       })
