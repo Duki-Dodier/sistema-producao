@@ -18,6 +18,20 @@ const numero = (valor: number, casas = 0) =>
 const percentual = (valor: number, total: number) =>
   total > 0 ? `${Math.round((valor / total) * 100)}%` : "0%";
 
+function rotuloSetorCompacto(nome: string) {
+  const chave = nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  if (chave.includes("BARRA CHATA") || chave.includes("CANTONEIRA")) return "BARRA/CANT.";
+  if (chave.includes("REFOR")) return "REFORCO";
+  if (chave.includes("PLASMA CHAPA")) return "PLASMA CH.";
+  if (chave.includes("PLASMA TUBO")) return "PLASMA TUB.";
+  if (chave.includes("ACESS")) return "ACESS.";
+  if (chave.includes("AGRUP")) return "AGRUP.";
+  return chave;
+}
+
 function nomeArquivo(valor: string) {
   return valor
     .normalize("NFD")
@@ -54,11 +68,12 @@ export async function GET(request: Request) {
   const mediaDia = dados.diasComProducao > 0
     ? dados.total / dados.diasComProducao
     : 0;
+  const valorGrade = (valor: number) => valor > 0 ? numero(valor) : "-";
 
   const pdf = setorId === null
     ? gerarPdfRelatorio({
         titulo: "Relatorio de Producao Geral",
-        subtitulo: "Saida final por setor e ordens de producao apontadas",
+        subtitulo: "Saida final diaria por setor",
         periodo: dados.periodo.mesLabel,
         kpis: [
           { label: "Itens finalizados", value: numero(dados.total) },
@@ -73,43 +88,18 @@ export async function GET(request: Request) {
           {
             titulo: "Producao diaria geral",
             colunas: [
-              { titulo: "Data", largura: 260 },
-              { titulo: "Itens finalizados", largura: 259, alinhar: "right" },
+              { titulo: "Data", largura: 46 },
+              ...dados.setores.map((setor) => ({
+                titulo: rotuloSetorCompacto(setor.nome),
+                largura: (519 - 46 - 50) / Math.max(dados.setores.length, 1),
+                alinhar: "right" as const,
+              })),
+              { titulo: "Total", largura: 50, alinhar: "right" as const },
             ],
-            linhas: producaoDiaria.map((item) => [item.label, numero(item.total)]),
-          },
-          {
-            titulo: "Total por setor",
-            colunas: [
-              { titulo: "Setor", largura: 300 },
-              { titulo: "Producao", largura: 100, alinhar: "right" },
-              { titulo: "Participacao", largura: 119, alinhar: "right" },
-            ],
-            linhas: dados.setoresRelatorio.map((item) => [
-              nomeSetorRelatorio(item.nome),
-              numero(item.total),
-              percentual(item.total, dados.total),
-            ]),
-          },
-          {
-            titulo: "Ordens apontadas",
-            colunas: [
-              { titulo: "OP", largura: 42 },
-              { titulo: "Lote", largura: 78 },
-              { titulo: "Codigo", largura: 88 },
-              { titulo: "Setor", largura: 145 },
-              { titulo: "Qtd. OP", largura: 58, alinhar: "right" },
-              { titulo: "Produzido", largura: 58, alinhar: "right" },
-              { titulo: "Saldo", largura: 50, alinhar: "right" },
-            ],
-            linhas: dados.ordens.map((item) => [
-              String(item.numero),
-              item.lote ?? "-",
-              item.codigo,
-              nomeSetorRelatorio(item.setor),
-              numero(item.quantidade),
-              numero(item.produzido),
-              numero(Math.max(item.quantidade - item.produzido, 0)),
+            linhas: dados.producaoDiariaSetores.map((item) => [
+              item.label,
+              ...item.valores.map(valorGrade),
+              valorGrade(item.total),
             ]),
           },
         ],

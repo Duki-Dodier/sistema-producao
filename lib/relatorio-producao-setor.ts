@@ -125,6 +125,7 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
   });
 
   const grade = new Map<string, number>();
+  const totaisPorDiaSetor = new Map<string, number>();
   const totaisPorOperador = new Map<string, number>();
   const diasPorOperador = new Map<string, Set<number>>();
   const totaisPorSetor = new Map<number, number>();
@@ -134,6 +135,11 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
     diasComProducao.add(dia);
     const chave = `${item.setorId}|${dia}|${item.usuario}`;
     grade.set(chave, (grade.get(chave) ?? 0) + item.quantidadeBoa);
+    const chaveDiaSetor = `${item.setorId}|${dia}`;
+    totaisPorDiaSetor.set(
+      chaveDiaSetor,
+      (totaisPorDiaSetor.get(chaveDiaSetor) ?? 0) + item.quantidadeBoa,
+    );
     totaisPorOperador.set(item.usuario, (totaisPorOperador.get(item.usuario) ?? 0) + item.quantidadeBoa);
     const diasDoOperador = diasPorOperador.get(item.usuario) ?? new Set<number>();
     diasDoOperador.add(dia);
@@ -153,6 +159,17 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
       finalizados
         .filter((item) => item.dataHora.getDate() === dia.dia && item.usuario === operador)
         .reduce((total, item) => total + item.quantidadeBoa, 0),
+    );
+    return {
+      ...dia,
+      valores,
+      total: valores.reduce((total, valor) => total + valor, 0),
+    };
+  });
+
+  const producaoDiariaSetores = dias.map((dia) => {
+    const valores = setores.map(
+      (item) => totaisPorDiaSetor.get(`${item.id}|${dia.dia}`) ?? 0,
     );
     return {
       ...dia,
@@ -207,6 +224,7 @@ export async function relatorioProducaoSetor(setorId: number | null, mesInformad
     diasComProducao: diasComProducao.size,
     operadores,
     producaoDiaria,
+    producaoDiariaSetores,
     resumoOperadores,
     setoresRelatorio,
     ordens: [...ordensMapa.values()].sort((a, b) => a.numero - b.numero || a.setor.localeCompare(b.setor, "pt-BR")),
