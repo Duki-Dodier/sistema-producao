@@ -11,6 +11,8 @@ export default async function AgrupamentoPage({
 }) {
   const sp = await searchParams;
   const busca = (sp.busca ?? "").trim().toLowerCase();
+  const filtroFalta = (sp.falta ?? "").trim();
+  const filtroSetorId = /^\d+$/.test(filtroFalta) ? Number(filtroFalta) : null;
 
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
   const setorSolda = setores.find((setor) => ehSetor(setor.nome, "Solda"));
@@ -85,6 +87,12 @@ export default async function AgrupamentoPage({
     });
   }
 
+  if (filtroSetorId !== null) {
+    progresso = progresso.filter((p) =>
+      p.setores.some((setor) => setor.setorId === filtroSetorId && !setor.completo),
+    );
+  }
+
   // No Agrupamento mostramos apenas as famílias que precisam ser conferidas
   // no kit. Plasma Tubo é a etapa de corte da ponteira removível e Acessórios
   // não entra como uma coluna separada nesta conferência.
@@ -112,6 +120,10 @@ export default async function AgrupamentoPage({
       ordemPadrao: setor.ordemPadrao,
     }))
     .sort((a, b) => a.ordemPadrao - b.ordemPadrao);
+
+  const queryRelatorio = new URLSearchParams();
+  if (sp.busca) queryRelatorio.set("busca", sp.busca);
+  if (filtroFalta) queryRelatorio.set("falta", filtroFalta);
 
   // Cálculos para os Cards Superiores
   const totalWIP = progresso.reduce((acc, p) => acc + p.op.quantidade, 0);
@@ -173,26 +185,39 @@ export default async function AgrupamentoPage({
          </div>
          
          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 hover:text-white transition-colors">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-3.5 w-3.5" strokeWidth={2}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-              Filtrar
-            </button>
             <Link
-              href={`/agrupamento/relatorio/pdf${busca ? `?busca=${encodeURIComponent(busca)}` : ""}`}
+              href={`/agrupamento/relatorio/pdf${queryRelatorio.toString() ? `?${queryRelatorio.toString()}` : ""}`}
               target="_blank"
               className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:text-white"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-3.5 w-3.5" strokeWidth={2}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               Exportar PDF
             </Link>
-            <form className="relative w-64" method="get">
-               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" strokeWidth={2}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-               <input
-                 name="busca"
-                 defaultValue={sp.busca ?? ""}
-                 placeholder="Pesquisar..."
-                 className="w-full rounded bg-[#1A222C] border border-slate-700 py-1.5 pl-8 pr-3 text-[11px] text-slate-200 placeholder-slate-500 focus:border-[#3B82F6] focus:outline-none transition-colors"
-               />
+            <form className="flex flex-wrap items-center gap-2" method="get">
+               <label className="sr-only" htmlFor="filtro-falta">Filtrar pendências por setor</label>
+               <select
+                 id="filtro-falta"
+                 name="falta"
+                 defaultValue={filtroFalta}
+                 className="rounded bg-[#1A222C] border border-slate-700 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300 focus:border-[#3B82F6] focus:outline-none"
+                 title="Mostrar somente OPs com pendência no setor escolhido"
+               >
+                 <option value="">Pendências: todos os setores</option>
+                 {colunas.map((coluna) => (
+                   <option key={coluna.chave} value={coluna.setorId}>
+                     Pendências: {coluna.setorNome}
+                   </option>
+                 ))}
+               </select>
+               <div className="relative w-56">
+                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" strokeWidth={2}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                 <input
+                   name="busca"
+                   defaultValue={sp.busca ?? ""}
+                   placeholder="Pesquisar..."
+                   className="w-full rounded bg-[#1A222C] border border-slate-700 py-1.5 pl-8 pr-3 text-[11px] text-slate-200 placeholder-slate-500 focus:border-[#3B82F6] focus:outline-none transition-colors"
+                 />
+               </div>
             </form>
          </div>
       </div>

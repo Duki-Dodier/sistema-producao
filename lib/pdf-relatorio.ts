@@ -1,6 +1,7 @@
 type KpiPdf = { label: string; value: string };
 type SecaoPdf = {
   titulo: string;
+  paginaNovaAntes?: boolean;
   colunas: { titulo: string; largura: number; alinhar?: "left" | "right" }[];
   linhas: string[][];
 };
@@ -110,6 +111,7 @@ class DocumentoPdf {
   }
 
   adicionarSecao(secao: SecaoPdf) {
+    if (secao.paginaNovaAntes && this.pagina.length > 0) this.novaPagina();
     this.garantir(62);
     this.texto(secao.titulo, MARGEM, this.y, 12, true, cor(15, 29, 52));
     this.y += 12;
