@@ -2,14 +2,9 @@ import { PROCESSO_LABEL, type Processo } from "@/lib/processos";
 import type { OPRastreada } from "@/lib/rastreamento";
 import { ehSetorFinal } from "@/lib/setores";
 
-export type ClassificacaoPrioridade =
-  | "FECHAR_PRE_PRONTO"
-  | "QUASE_CONCLUIDA";
-
 export type PrioridadePrePronto = {
   chave: string;
   prioridade: number;
-  classificacao: ClassificacaoPrioridade;
   opId: number;
   numeroSequencia: number;
   lote: string | null;
@@ -29,13 +24,19 @@ export type PrioridadePrePronto = {
   pecasTotal: number;
   pecasPendentes: number;
   preProntoPercentual: number;
+  outrosNecessario: number;
+  outrosPronto: number;
+  prontidaoOutrosPercentual: number;
   motivo: string;
 };
 
 /**
- * Monta uma fila de fabricação para fechar os pré-prontos com o menor número
- * de retomadas possível. O critério principal é fechar uma OP que já tem
- * todas as outras peças prontas; em empate, prevalece a sequência da OP.
+ * Monta a fila de um setor pela prontidão do restante da OP.
+ *
+ * O setor selecionado fica fora do cálculo: uma OP com 71% concluído nos
+ * outros setores deve aparecer antes de uma OP com 70% para o mesmo setor.
+ * O peso é a quantidade necessária de cada peça, evitando que uma peça de
+ * quantidade pequena tenha o mesmo peso de um lote maior.
  */
 export function calcularPrioridadesPrePronto(
   itens: OPRastreada[],
@@ -61,6 +62,24 @@ export function calcularPrioridadesPrePronto(
       ? Math.round((pecasCompletas / pecasTotal) * 100)
       : 0;
 
+    const outrosSetores = item.pecas.filter(
+      (peca) => peca.setorId !== setorId && !ehSetorFinal(peca.setorNome),
+    );
+    const outrosNecessario = outrosSetores.reduce(
+      (total, peca) => total + Math.max(peca.necessaria, 0),
+      0,
+    );
+    const outrosPronto = outrosSetores.reduce(
+      (total, peca) => total + Math.min(Math.max(peca.pronta, 0), Math.max(peca.necessaria, 0)),
+      0,
+    );
+    const prontidaoOutrosPercentual = outrosNecessario > 0
+      ? Math.min(100, Math.round((outrosPronto / outrosNecessario) * 100))
+      : 100;
+    const motivo = outrosNecessario > 0
+      ? `Outros setores: ${prontidaoOutrosPercentual}% concluídos.`
+      : "Não há outras peças pendentes em setores anteriores.";
+
     for (const peca of item.pecas.filter((peca) => peca.setorId === setorId && peca.falta > 0)) {
       const processoAtual = peca.processos.find((processo) => processo.estado !== "concluido") ?? peca.processos.at(-1);
       if (!processoAtual) continue;
@@ -68,19 +87,10 @@ export function calcularPrioridadesPrePronto(
       const percentual = peca.necessaria > 0
         ? Math.min(100, Math.round((peca.pronta / peca.necessaria) * 100))
         : 0;
-      const limiteQuaseConcluida = Math.max(1, Math.ceil(peca.necessaria * 0.1));
-      const fechaPrePronto = pecasPendentes === 1;
-      const quaseConcluida = peca.pronta > 0 && (peca.falta <= limiteQuaseConcluida || percentual >= 90);
-      if (!fechaPrePronto && !quaseConcluida) continue;
-      const classificacao: ClassificacaoPrioridade = fechaPrePronto
-        ? "FECHAR_PRE_PRONTO"
-        : "QUASE_CONCLUIDA";
-      const prioridade = classificacao === "FECHAR_PRE_PRONTO" ? 1 : 2;
 
       prioridades.push({
         chave: `${item.op.id}-${setorId}-${peca.id}`,
-        prioridade,
-        classificacao,
+        prioridade: 0,
         opId: item.op.id,
         numeroSequencia: item.op.numeroSequencia,
         lote: item.op.lote,
@@ -100,18 +110,21 @@ export function calcularPrioridadesPrePronto(
         pecasTotal,
         pecasPendentes,
         preProntoPercentual,
-        motivo: fechaPrePronto
-          ? "Última peça pendente para fechar o pré-pronto desta OP."
-          : `Restam ${peca.falta.toLocaleString("pt-BR")} unidade(s) neste setor.`,
+        outrosNecessario,
+        outrosPronto,
+        prontidaoOutrosPercentual,
+        motivo,
       });
     }
   }
 
-  return prioridades.sort((a, b) =>
-    a.prioridade - b.prioridade ||
-    a.numeroSequencia - b.numeroSequencia ||
-    b.preProntoPercentual - a.preProntoPercentual ||
-    a.restante - b.restante ||
-    a.pecaCodigo.localeCompare(b.pecaCodigo, "pt-BR"),
-  );
+  return prioridades
+    .sort((a, b) =>
+      b.prontidaoOutrosPercentual - a.prontidaoOutrosPercentual ||
+      a.numeroSequencia - b.numeroSequencia ||
+      b.preProntoPercentual - a.preProntoPercentual ||
+      a.restante - b.restante ||
+      a.pecaCodigo.localeCompare(b.pecaCodigo, "pt-BR"),
+    )
+    .map((item, indice) => ({ ...item, prioridade: indice + 1 }));
 }

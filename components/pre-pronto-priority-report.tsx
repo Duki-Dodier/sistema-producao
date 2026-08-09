@@ -1,17 +1,6 @@
 import { BotaoImprimir } from "@/components/botao-imprimir";
 import type { PrioridadePrePronto } from "@/lib/prioridades-pre-pronto";
 
-const CLASSIFICACAO = {
-  FECHAR_PRE_PRONTO: {
-    label: "Fechar pré-pronto",
-    classe: "border-emerald-400/40 bg-emerald-400/15 text-emerald-300 print:border-emerald-700 print:bg-emerald-100 print:text-emerald-800",
-  },
-  QUASE_CONCLUIDA: {
-    label: "Quase concluída",
-    classe: "border-amber-400/40 bg-amber-400/15 text-amber-200 print:border-amber-700 print:bg-amber-100 print:text-amber-800",
-  },
-} as const;
-
 export function PreProntoPriorityReport({
   itens,
   setorId,
@@ -24,8 +13,10 @@ export function PreProntoPriorityReport({
   busca: string;
 }) {
   const setor = setores.find((item) => item.id === setorId);
-  const fechar = itens.filter((item) => item.classificacao === "FECHAR_PRE_PRONTO").length;
-  const quase = itens.filter((item) => item.classificacao === "QUASE_CONCLUIDA").length;
+  const maiorProntidao = itens[0]?.prontidaoOutrosPercentual ?? 0;
+  const menorProntidao = itens.length > 0
+    ? itens.reduce((menor, item) => Math.min(menor, item.prontidaoOutrosPercentual), 100)
+    : 0;
 
   return (
     <section className="rounded-xl border border-emerald-400/25 bg-[#101b2b] shadow-[0_0_20px_rgba(16,185,129,.06)] print:border-slate-300 print:bg-white print:shadow-none">
@@ -39,8 +30,8 @@ export function PreProntoPriorityReport({
               {setor?.nome ?? "Selecione um setor"}
             </span>
           </div>
-            <p className="mt-1 max-w-3xl text-xs text-slate-400 print:text-slate-700">
-            Relatório para entregar ao líder: mostra somente a última peça pendente da OP ou peças com até 10% restante.
+          <p className="mt-1 max-w-3xl text-xs text-slate-400 print:text-slate-700">
+            Fila completa do setor, ordenada pela porcentagem concluída nos outros setores da OP.
           </p>
         </div>
 
@@ -65,23 +56,24 @@ export function PreProntoPriorityReport({
       </div>
 
       <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4 print:grid-cols-4 print:p-3">
-        <Resumo label="Itens de atenção" valor={String(itens.length)} cor="text-white" />
-        <Resumo label="Fecham pré-pronto" valor={String(fechar)} cor="text-emerald-300" />
-        <Resumo label="Quase concluídas" valor={String(quase)} cor="text-amber-300" />
+        <Resumo label="Peças na fila" valor={String(itens.length)} cor="text-white" />
         <Resumo label="OPs na fila" valor={String(new Set(itens.map((item) => item.opId)).size)} cor="text-cyan-300" />
+        <Resumo label="Maior prontidão" valor={`${maiorProntidao}%`} cor="text-emerald-300" />
+        <Resumo label="Menor prontidão" valor={`${menorProntidao}%`} cor="text-amber-300" />
       </div>
 
       {itens.length === 0 ? (
         <p className="border-t border-white/10 px-4 py-10 text-center text-sm text-slate-500 print:border-slate-300 print:text-slate-700">
-          Não há peças em atenção neste setor nas OPs abertas com o filtro atual.
+          Não há peças pendentes neste setor nas OPs abertas com o filtro atual.
         </p>
       ) : (
         <div className="overflow-x-auto border-t border-white/10 print:border-slate-300">
-          <table className="w-full min-w-[980px] border-collapse text-left print:min-w-0 print:text-[10px]">
+          <table className="w-full min-w-[1100px] border-collapse text-left print:min-w-0 print:text-[10px]">
             <thead className="bg-white/[.03] print:bg-slate-100">
               <tr className="font-mono text-[10px] uppercase tracking-wider text-slate-500 print:text-black">
                 <th className="px-3 py-2">Fila</th>
                 <th className="px-3 py-2">OP / modelo</th>
+                <th className="px-3 py-2">Prontidão dos outros</th>
                 <th className="px-3 py-2">Peça</th>
                 <th className="px-3 py-2">Próximo processo</th>
                 <th className="px-3 py-2 text-right">Necessário</th>
@@ -91,38 +83,42 @@ export function PreProntoPriorityReport({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[.07] print:divide-slate-300">
-              {itens.map((item, indice) => {
-                const classificacao = CLASSIFICACAO[item.classificacao];
-                return (
-                  <tr key={item.chave} className="align-top hover:bg-white/[.025] print:hover:bg-transparent">
-                    <td className="px-3 py-3 print:py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/15 font-mono text-[11px] font-bold text-emerald-300 print:bg-emerald-100 print:text-emerald-800">{indice + 1}</span>
-                        <span className={`rounded border px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider ${classificacao.classe}`}>{classificacao.label}</span>
-                      </div>
-                      <p className="mt-1 max-w-44 text-[10px] text-slate-500 print:text-slate-700">{item.motivo}</p>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 print:py-2">
-                      <div className="font-mono text-xs font-bold text-cyan-300 print:text-black">OP {item.numeroSequencia}</div>
-                      <div className="text-[11px] text-slate-300 print:text-slate-700">{item.modeloCodigo}{item.lote ? ` · lote ${item.lote}` : ""}</div>
-                    </td>
-                    <td className="px-3 py-3 print:py-2">
-                      <div className="font-mono text-xs font-bold text-white print:text-black">{item.pecaCodigo}</div>
-                      <div className="max-w-52 text-[11px] text-slate-400 print:text-slate-700">{item.pecaNome}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 print:py-2">
-                      <span className="rounded border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 font-mono text-[10px] font-bold uppercase text-cyan-200 print:border-cyan-700 print:bg-cyan-100 print:text-cyan-800">{item.processoLabel}</span>
-                    </td>
-                    <td className="px-3 py-3 text-right font-mono text-xs text-slate-300 print:text-black">{item.necessaria.toLocaleString("pt-BR")}</td>
-                    <td className="px-3 py-3 text-right font-mono text-xs text-emerald-300 print:text-emerald-800">{item.produzida.toLocaleString("pt-BR")}</td>
-                    <td className="px-3 py-3 text-right font-mono text-sm font-bold text-amber-300 print:text-amber-800">{item.restante.toLocaleString("pt-BR")}</td>
-                    <td className="min-w-36 px-3 py-3 print:py-2">
-                      <div className="flex items-center justify-between gap-2 font-mono text-[10px] text-slate-400 print:text-slate-700"><span>{item.pecasCompletas}/{item.pecasTotal} peças</span><span>{item.preProntoPercentual}%</span></div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800 print:bg-slate-200"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${item.preProntoPercentual}%` }} /></div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {itens.map((item, indice) => (
+                <tr key={item.chave} className="align-top hover:bg-white/[.025] print:hover:bg-transparent">
+                  <td className="px-3 py-3 print:py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/15 font-mono text-[11px] font-bold text-emerald-300 print:bg-emerald-100 print:text-emerald-800">{indice + 1}</span>
+                      <span className="rounded border border-emerald-400/40 bg-emerald-400/15 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-300 print:border-emerald-700 print:bg-emerald-100 print:text-emerald-800">Sequenciamento</span>
+                    </div>
+                    <p className="mt-1 max-w-44 text-[10px] text-slate-500 print:text-slate-700">{item.motivo}</p>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 print:py-2">
+                    <div className="font-mono text-xs font-bold text-cyan-300 print:text-black">OP {item.numeroSequencia}</div>
+                    <div className="text-[11px] text-slate-300 print:text-slate-700">{item.modeloCodigo}{item.lote ? ` · lote ${item.lote}` : ""}</div>
+                  </td>
+                  <td className="min-w-44 px-3 py-3 print:py-2">
+                    <div className="font-mono text-[10px] text-slate-300 print:text-slate-700">{item.prontidaoOutrosPercentual}% concluídos</div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800 print:bg-slate-200">
+                      <div className="h-full rounded-full bg-cyan-400" style={{ width: `${item.prontidaoOutrosPercentual}%` }} />
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-500 print:text-slate-700">{item.outrosPronto.toLocaleString("pt-BR")} de {item.outrosNecessario.toLocaleString("pt-BR")}</p>
+                  </td>
+                  <td className="px-3 py-3 print:py-2">
+                    <div className="font-mono text-xs font-bold text-white print:text-black">{item.pecaCodigo}</div>
+                    <div className="max-w-52 text-[11px] text-slate-400 print:text-slate-700">{item.pecaNome}</div>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 print:py-2">
+                    <span className="rounded border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 font-mono text-[10px] font-bold uppercase text-cyan-200 print:border-cyan-700 print:bg-cyan-100 print:text-cyan-800">{item.processoLabel}</span>
+                  </td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-slate-300 print:text-black">{item.necessaria.toLocaleString("pt-BR")}</td>
+                  <td className="px-3 py-3 text-right font-mono text-xs text-emerald-300 print:text-emerald-800">{item.produzida.toLocaleString("pt-BR")}</td>
+                  <td className="px-3 py-3 text-right font-mono text-sm font-bold text-amber-300 print:text-amber-800">{item.restante.toLocaleString("pt-BR")}</td>
+                  <td className="min-w-36 px-3 py-3 print:py-2">
+                    <div className="flex items-center justify-between gap-2 font-mono text-[10px] text-slate-400 print:text-slate-700"><span>{item.pecasCompletas}/{item.pecasTotal} peças</span><span>{item.preProntoPercentual}%</span></div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800 print:bg-slate-200"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${item.preProntoPercentual}%` }} /></div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
