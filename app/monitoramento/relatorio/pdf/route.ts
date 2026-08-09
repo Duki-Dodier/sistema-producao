@@ -64,6 +64,7 @@ export async function GET(request: Request) {
   );
   const relatorioSetor = dados.setor;
   const tituloSetor = nomeSetorRelatorio(relatorioSetor?.nome);
+  const tituloSetorMaiusculo = tituloSetor.toLocaleUpperCase("pt-BR");
   const producaoDiaria = dados.producaoDiaria.filter((item) => item.total > 0);
   const mediaDia = dados.diasComProducao > 0
     ? dados.total / dados.diasComProducao
@@ -137,7 +138,7 @@ export async function GET(request: Request) {
               { titulo: "Situação", largura: 161 },
             ],
             linhas: dados.setoresRelatorio.map((item) => [
-              nomeSetorRelatorio(item.nome),
+              nomeSetorRelatorio(item.nome).toLocaleUpperCase("pt-BR"),
               numero(item.total),
               numero(item.mediaLancamentos, 1),
               item.mediaMeta === null ? "-" : numero(item.mediaMeta, 1),
@@ -151,7 +152,7 @@ export async function GET(request: Request) {
         ],
       })
     : gerarPdfRelatorio({
-        titulo: `Relatório de Produção - ${tituloSetor}`,
+        titulo: `Relatório de Produção - ${tituloSetorMaiusculo}`,
         subtitulo: "Produção final por operador e ordens apontadas",
         periodo: dados.periodo.mesLabel,
         kpis: [
