@@ -24,7 +24,7 @@ function rotuloSetorCompacto(nome: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase();
   if (chave.includes("BARRA CHATA") || chave.includes("CANTONEIRA")) return "BARRA/CANT.";
-  if (chave.includes("REFOR")) return "REFORCO";
+  if (chave.includes("REFOR")) return "REFORÇO";
   if (chave.includes("PLASMA CHAPA")) return "PLASMA CH.";
   if (chave.includes("PLASMA TUBO")) return "PLASMA TUB.";
   if (chave.includes("ACESS")) return "ACESS.";
@@ -43,7 +43,7 @@ function nomeArquivo(valor: string) {
 
 export async function GET(request: Request) {
   if (!(await buscarOperadorLogado())) {
-    return new Response("Nao autorizado", { status: 401 });
+    return new Response("Não autorizado", { status: 401 });
   }
 
   const url = new URL(request.url);
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   const setorId = idSetorPorParametro(setorParametro, setores);
 
   if (setorParametro !== "geral" && setorId === null) {
-    return new Response("Setor invalido.", { status: 400 });
+    return new Response("Setor inválido.", { status: 400 });
   }
 
   const dados = await relatorioProducaoSetor(
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
       valorGrade(item.total),
     ]),
     [
-      "TOTAL DO MES",
+      "TOTAL DO MÊS",
       ...dados.setoresRelatorio.map((item) => valorGrade(item.total)),
       valorGrade(dados.total),
     ],
@@ -93,29 +93,29 @@ export async function GET(request: Request) {
 
   const pdf = setorId === null
     ? gerarPdfRelatorio({
-        titulo: "Relatorio de Producao Geral",
-        subtitulo: "Saida final diaria por setor",
+        titulo: "Relatório de Produção Geral",
+        subtitulo: "Saída final diária por setor",
         periodo: dados.periodo.mesLabel,
         orientacao: "paisagem",
         kpis: [
           { label: "Total produzido", value: numero(dados.total) },
           { label: "Meta geral", value: dados.metaTotal ? numero(dados.metaTotal) : "-" },
           {
-            label: "Media p/ meta por dia",
+            label: "Média p/ meta por dia",
             value: mediaParaMeta === null ? "-" : numero(mediaParaMeta, 1),
           },
-          { label: "Media dos lancamentos/dia", value: numero(mediaDia, 1) },
-          { label: "Lancamentos", value: numero(dados.quantidadeLancamentos) },
-          { label: "Media por lancamento", value: numero(dados.mediaPorLancamento, 1) },
-          { label: "Dias com producao", value: String(dados.diasComProducao) },
+          { label: "Média dos lançamentos/dia", value: numero(mediaDia, 1) },
+          { label: "Lançamentos", value: numero(dados.quantidadeLancamentos) },
+          { label: "Média por lançamento", value: numero(dados.mediaPorLancamento, 1) },
+          { label: "Dias com produção", value: String(dados.diasComProducao) },
           {
-            label: "Setores com producao",
+            label: "Setores com produção",
             value: String(dados.setoresRelatorio.filter((item) => item.total > 0).length),
           },
         ],
         secoes: [
           {
-            titulo: "Producao diaria geral",
+            titulo: "Produção diária geral",
             colunas: [
               { titulo: "Data", largura: larguraDataGeral },
               ...dados.setores.map((setor) => ({
@@ -128,45 +128,47 @@ export async function GET(request: Request) {
             linhas: linhasGradeGeral,
           },
           {
-            titulo: "Media por setor",
+            titulo: "Média por setor",
             colunas: [
               { titulo: "Setor", largura: 205 },
-              { titulo: "Total lancado", largura: 95, alinhar: "right" },
-              { titulo: "Dias", largura: 70, alinhar: "right" },
-              { titulo: "Media lancamentos", largura: 130, alinhar: "right" },
-              { titulo: "Media cadastrada", largura: 130, alinhar: "right" },
-              { titulo: "Situacao", largura: 136 },
+              { titulo: "Total lançado", largura: 105, alinhar: "right" },
+              { titulo: "Média real", largura: 150, alinhar: "right" },
+              { titulo: "Meta/dia", largura: 145, alinhar: "right" },
+              { titulo: "Situação", largura: 161 },
             ],
             linhas: dados.setoresRelatorio.map((item) => [
               nomeSetorRelatorio(item.nome),
               numero(item.total),
-              String(item.diasComProducao),
               numero(item.mediaLancamentos, 1),
               item.mediaMeta === null ? "-" : numero(item.mediaMeta, 1),
-              item.situacao,
+              item.situacao === "Dentro da media"
+                ? "Dentro"
+                : item.situacao === "Abaixo da media"
+                  ? "Abaixo"
+                  : "Sem meta",
             ]),
           },
         ],
       })
     : gerarPdfRelatorio({
-        titulo: `Relatorio de Producao - ${tituloSetor}`,
-        subtitulo: "Producao final por operador e ordens apontadas",
+        titulo: `Relatório de Produção - ${tituloSetor}`,
+        subtitulo: "Produção final por operador e ordens apontadas",
         periodo: dados.periodo.mesLabel,
         kpis: [
-          { label: "Producao do setor", value: numero(dados.total) },
-          { label: "Dias com producao", value: String(dados.diasComProducao) },
+          { label: "Produção do setor", value: numero(dados.total) },
+          { label: "Dias com produção", value: String(dados.diasComProducao) },
           {
-            label: "Operadores com producao",
+            label: "Operadores com produção",
             value: String(dados.resumoOperadores.filter((item) => item.total > 0).length),
           },
-          { label: "Media por dia", value: numero(mediaDia, 1) },
+          { label: "Média por dia", value: numero(mediaDia, 1) },
         ],
         secoes: [
           {
-            titulo: "Producao diaria",
+            titulo: "Produção diária",
             colunas: [
               { titulo: "Data", largura: 260 },
-              { titulo: "Producao", largura: 259, alinhar: "right" },
+              { titulo: "Produção", largura: 259, alinhar: "right" },
             ],
             linhas: producaoDiaria.map((item) => [item.label, numero(item.total)]),
           },
@@ -174,10 +176,10 @@ export async function GET(request: Request) {
             titulo: "Resumo por operador",
             colunas: [
               { titulo: "Operador", largura: 210 },
-              { titulo: "Pecas", largura: 82, alinhar: "right" },
+              { titulo: "Peças", largura: 82, alinhar: "right" },
               { titulo: "Dias", largura: 62, alinhar: "right" },
-              { titulo: "Media/dia", largura: 85, alinhar: "right" },
-              { titulo: "Participacao", largura: 80, alinhar: "right" },
+              { titulo: "Média/dia", largura: 85, alinhar: "right" },
+              { titulo: "Participação", largura: 80, alinhar: "right" },
             ],
             linhas: dados.resumoOperadores.map((item) => [
               item.nome,
@@ -192,7 +194,7 @@ export async function GET(request: Request) {
             colunas: [
               { titulo: "OP", largura: 48 },
               { titulo: "Lote", largura: 88 },
-              { titulo: "Codigo", largura: 120 },
+              { titulo: "Código", largura: 120 },
               { titulo: "Qtd. OP", largura: 82, alinhar: "right" },
               { titulo: "Produzido", largura: 90, alinhar: "right" },
               { titulo: "Saldo", largura: 91, alinhar: "right" },
