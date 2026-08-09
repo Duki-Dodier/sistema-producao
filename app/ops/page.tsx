@@ -8,7 +8,6 @@ import { Badge } from "@/components/badge";
 import { StatusSelect } from "@/components/status-select";
 import { CURVA_VARIANT } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
-import { ehSetor } from "@/lib/setores";
 
 export default async function OpsPage() {
   const [ops, modelos] = await Promise.all([
@@ -20,15 +19,12 @@ export default async function OpsPage() {
         lote: true,
         quantidade: true,
         dataLiberacao: true,
+        dataFinalizacao: true,
         status: true,
         modelo: {
           select: {
             codigo: true,
             curva: true,
-            roteiro: {
-              orderBy: { ordem: "asc" },
-              select: { ordem: true, setor: { select: { nome: true } } },
-            },
           },
         },
       },
@@ -148,16 +144,16 @@ export default async function OpsPage() {
       <Card>
         <CardHeader title={`OPs (${ops.length})`} subtitle="Altere o status conforme a situação real da ordem." />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-sm">
+          <table className="w-full min-w-[980px] text-sm">
           <thead>
             <tr className="border-b border-white/5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-5 py-3">Seq.</th>
               <th className="px-5 py-3">Lote</th>
               <th className="px-5 py-3">Modelo</th>
-              <th className="px-5 py-3">Fluxo da OP</th>
               <th className="px-5 py-3">Curva</th>
               <th className="px-5 py-3">Quantidade</th>
               <th className="px-5 py-3">Liberada em</th>
+              <th className="px-5 py-3">Finalizada em</th>
               <th className="px-5 py-3">Status</th>
               <th className="w-16 px-5 py-3" />
             </tr>
@@ -174,24 +170,6 @@ export default async function OpsPage() {
                 <td className="px-5 py-3 font-mono text-slate-300">
                   {op.modelo.codigo}
                 </td>
-                <td className="max-w-[360px] px-5 py-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    {op.modelo.roteiro.map((etapa) => (
-                      <span
-                        key={`${op.id}-${etapa.ordem}-${etapa.setor.nome}`}
-                        className={`rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                          ehSetor(etapa.setor.nome, "Agrupamento")
-                            ? "border-amber-300/30 bg-amber-400/10 text-amber-200"
-                            : ["Solda", "Pintura", "Montagem"].some((nome) => ehSetor(etapa.setor.nome, nome))
-                              ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
-                              : "border-cyan-300/20 bg-cyan-400/5 text-cyan-200"
-                        }`}
-                      >
-                        {etapa.ordem}. {etapa.setor.nome}
-                      </span>
-                    ))}
-                  </div>
-                </td>
                 <td className="px-5 py-3">
                   <Badge
                     variant={
@@ -205,6 +183,9 @@ export default async function OpsPage() {
                 <td className="px-5 py-3 text-slate-400">{op.quantidade}</td>
                 <td className="px-5 py-3 text-slate-500">
                   {formatDate(op.dataLiberacao)}
+                </td>
+                <td className="px-5 py-3 text-slate-500">
+                  {op.dataFinalizacao ? formatDate(op.dataFinalizacao) : "—"}
                 </td>
                 <td className="px-5 py-3">
                   <StatusSelect opId={op.id} status={op.status} />

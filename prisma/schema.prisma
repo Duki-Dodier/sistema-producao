@@ -262,6 +262,7 @@ model OP {
   quantidade      Int
   status          String   @default("ABERTA") // "ABERTA" | "CONCLUIDA" | "CANCELADA"
   dataLiberacao   DateTime @default(now())
+  dataFinalizacao DateTime? // preenchida automaticamente ao marcar a OP como CONCLUIDA
   previsaoEntrega DateTime? // impressa na capa do documento da OP
 
   modelo                  Modelo                   @relation(fields: [modeloId], references: [id], onDelete: Restrict)

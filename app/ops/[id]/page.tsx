@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { STATUS_OP_LABEL } from "@/lib/labels";
 import { DeleteOPForm } from "@/components/delete-op-form";
 import { ehSetor } from "@/lib/setores";
+import { formatDate } from "@/lib/format";
 
 export default async function OPDetailPage({
   params,
@@ -123,6 +124,14 @@ export default async function OPDetailPage({
               defaultValue={previsaoISO}
               className="rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+          </div>
+          <div className="flex w-40 flex-col gap-1.5">
+            <label className="text-xs font-medium text-slate-400">Data de finalização</label>
+            <div className="rounded-md border border-white/5 bg-[#1A222C] px-3 py-2 text-sm text-slate-400">
+              {op.dataFinalizacao
+                ? formatDate(op.dataFinalizacao)
+                : "Preenchida ao concluir"}
+            </div>
           </div>
           <div className="flex w-40 flex-col gap-1.5">
             <label className="text-xs font-medium text-slate-400">

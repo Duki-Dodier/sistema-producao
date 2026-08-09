@@ -97,7 +97,19 @@ export async function updateStatusOP(
   }
 
   try {
-    await prisma.oP.update({ where: { id }, data: { status } });
+    const opAtual = await prisma.oP.findUnique({
+      where: { id },
+      select: { dataFinalizacao: true },
+    });
+    if (!opAtual) return { error: "OP não encontrada." };
+    await prisma.oP.update({
+      where: { id },
+      data: {
+        status,
+        dataFinalizacao:
+          status === "CONCLUIDA" ? opAtual.dataFinalizacao ?? new Date() : null,
+      },
+    });
   } catch (error) {
     console.error("Falha ao atualizar status da OP", error);
     return { error: "Não foi possível atualizar o status da OP." };
@@ -123,6 +135,11 @@ export async function updateOP(id: number, formData: FormData) {
   if (!STATUS_OP.has(status)) throw new Error("Status da OP invalido.");
 
   try {
+    const opAtual = await prisma.oP.findUnique({
+      where: { id },
+      select: { dataFinalizacao: true },
+    });
+    if (!opAtual) throw new Error("OP nao encontrada.");
     await prisma.oP.update({
       where: { id },
       data: {
@@ -131,6 +148,8 @@ export async function updateOP(id: number, formData: FormData) {
         modeloId,
         quantidade,
         status,
+        dataFinalizacao:
+          status === "CONCLUIDA" ? opAtual.dataFinalizacao ?? new Date() : null,
         ...(dataInformada ? { dataLiberacao: new Date(`${dataInformada}T12:00:00`) } : {}),
         previsaoEntrega: previsaoInformada ? new Date(`${previsaoInformada}T12:00:00`) : null,
       },

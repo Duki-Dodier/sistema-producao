@@ -89,9 +89,10 @@ export default async function DocumentoOPPage({
     : null;
   const tudoCompleto = rastreio.kitsCompletos >= op.quantidade;
   const fimReal =
-    tudoCompleto && producao.length
+    op.dataFinalizacao ??
+    (tudoCompleto && producao.length
       ? producao.reduce((m, a) => (a.dataHora > m ? a.dataHora : m), producao[0].dataHora)
-      : null;
+      : null);
   const totalEnviado = envios.reduce((s, e) => s + e.quantidadeBoa, 0);
   const soldadores = [...new Set(envios.map((e) => e.soldador).filter(Boolean))] as string[];
 
