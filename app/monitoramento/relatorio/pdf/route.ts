@@ -69,12 +69,19 @@ export async function GET(request: Request) {
     ? dados.total / dados.diasComProducao
     : 0;
   const valorGrade = (valor: number) => valor > 0 ? numero(valor) : "-";
+  const larguraTabelaGeral = 842 - 38 * 2;
+  const larguraDataGeral = 54;
+  const larguraTotalGeral = 62;
+  const larguraSetorGeral =
+    (larguraTabelaGeral - larguraDataGeral - larguraTotalGeral) /
+    Math.max(dados.setores.length, 1);
 
   const pdf = setorId === null
     ? gerarPdfRelatorio({
         titulo: "Relatorio de Producao Geral",
         subtitulo: "Saida final diaria por setor",
         periodo: dados.periodo.mesLabel,
+        orientacao: "paisagem",
         kpis: [
           { label: "Itens finalizados", value: numero(dados.total) },
           { label: "Dias com producao", value: String(dados.diasComProducao) },
@@ -88,13 +95,13 @@ export async function GET(request: Request) {
           {
             titulo: "Producao diaria geral",
             colunas: [
-              { titulo: "Data", largura: 46 },
+              { titulo: "Data", largura: larguraDataGeral },
               ...dados.setores.map((setor) => ({
                 titulo: rotuloSetorCompacto(setor.nome),
-                largura: (519 - 46 - 50) / Math.max(dados.setores.length, 1),
+                largura: larguraSetorGeral,
                 alinhar: "right" as const,
               })),
-              { titulo: "Total", largura: 50, alinhar: "right" as const },
+              { titulo: "Total", largura: larguraTotalGeral, alinhar: "right" as const },
             ],
             linhas: dados.producaoDiariaSetores.map((item) => [
               item.label,

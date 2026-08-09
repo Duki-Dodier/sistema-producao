@@ -9,6 +9,7 @@ type RelatorioPdf = {
   titulo: string;
   subtitulo: string;
   periodo: string;
+  orientacao?: "retrato" | "paisagem";
   kpis: KpiPdf[];
   secoes: SecaoPdf[];
 };
@@ -52,11 +53,15 @@ class DocumentoPdf {
   private paginas: string[][] = [];
   private pagina: string[] = [];
   private y = 0;
+  private larguraPagina: number;
+  private alturaPagina: number;
   private titulo = "";
   private subtitulo = "";
   private periodo = "";
 
   constructor(private relatorio: RelatorioPdf) {
+    this.larguraPagina = relatorio.orientacao === "paisagem" ? ALTURA : LARGURA;
+    this.alturaPagina = relatorio.orientacao === "paisagem" ? LARGURA : ALTURA;
     this.titulo = relatorio.titulo;
     this.subtitulo = relatorio.subtitulo;
     this.periodo = relatorio.periodo;
@@ -64,7 +69,7 @@ class DocumentoPdf {
   }
 
   private retangulo(x: number, yTopo: number, largura: number, altura: number, preenchimento: string, borda?: string) {
-    const y = ALTURA - yTopo - altura;
+    const y = this.alturaPagina - yTopo - altura;
     this.pagina.push(`${preenchimento} rg`);
     if (borda) this.pagina.push(`${borda} RG 0.6 w`);
     this.pagina.push(`${x} ${y} ${largura} ${altura} re ${borda ? "B" : "f"}`);
@@ -74,25 +79,25 @@ class DocumentoPdf {
     const conteudo = escaparPdf(texto);
     const estimada = conteudo.length * tamanho * 0.51;
     const posX = alinhar === "right" && largura ? x + largura - estimada : x;
-    this.pagina.push(`BT /${negrito ? "F2" : "F1"} ${tamanho} Tf ${fill} rg 1 0 0 1 ${Math.max(x, posX).toFixed(1)} ${(ALTURA - yTopo).toFixed(1)} Tm (${conteudo}) Tj ET`);
+    this.pagina.push(`BT /${negrito ? "F2" : "F1"} ${tamanho} Tf ${fill} rg 1 0 0 1 ${Math.max(x, posX).toFixed(1)} ${(this.alturaPagina - yTopo).toFixed(1)} Tm (${conteudo}) Tj ET`);
   }
 
   private novaPagina() {
     if (this.pagina.length) this.paginas.push(this.pagina);
     this.pagina = [];
-    this.retangulo(0, 0, LARGURA, 64, cor(15, 29, 52));
+    this.retangulo(0, 0, this.larguraPagina, 64, cor(15, 29, 52));
     this.texto(this.titulo, MARGEM, 29, 18, true, cor(255, 255, 255));
     this.texto(this.subtitulo, MARGEM, 48, 8.5, false, cor(165, 180, 202));
-    this.texto(this.periodo, LARGURA - MARGEM - 185, 34, 9, true, cor(191, 219, 254), "right", 185);
+    this.texto(this.periodo, this.larguraPagina - MARGEM - 185, 34, 9, true, cor(191, 219, 254), "right", 185);
     this.y = 82;
   }
 
   private garantir(altura: number) {
-    if (this.y + altura > ALTURA - 42) this.novaPagina();
+    if (this.y + altura > this.alturaPagina - 42) this.novaPagina();
   }
 
   adicionarKpis(kpis: KpiPdf[]) {
-    const largura = (LARGURA - MARGEM * 2 - 12) / 4;
+    const largura = (this.larguraPagina - MARGEM * 2 - 12) / 4;
     kpis.forEach((kpi, indice) => {
       if (indice > 0 && indice % 4 === 0) this.y += 66;
       const coluna = indice % 4;
@@ -115,13 +120,13 @@ class DocumentoPdf {
       return;
     }
     secao.linhas.forEach((linha, indice) => {
-      if (this.y + 21 > ALTURA - 42) {
+      if (this.y + 21 > this.alturaPagina - 42) {
         this.novaPagina();
         this.texto(`${secao.titulo} (continuação)`, MARGEM, this.y, 12, true, cor(15, 29, 52));
         this.y += 12;
         this.desenharCabecalho(secao);
       }
-      if (indice % 2 === 1) this.retangulo(MARGEM, this.y, LARGURA - MARGEM * 2, 20, cor(248, 250, 252));
+      if (indice % 2 === 1) this.retangulo(MARGEM, this.y, this.larguraPagina - MARGEM * 2, 20, cor(248, 250, 252));
       let x = MARGEM;
       linha.forEach((valor, coluna) => {
         const config = secao.colunas[coluna];
@@ -130,7 +135,7 @@ class DocumentoPdf {
         this.texto(texto, x + 5, this.y + 13.5, 8.2, coluna === 0, cor(51, 65, 85), config.alinhar ?? "left", config.largura - 10);
         x += config.largura;
       });
-      this.pagina.push(`${cor(226, 232, 240)} RG 0.35 w ${MARGEM} ${(ALTURA - this.y - 20).toFixed(1)} ${LARGURA - MARGEM * 2} 0 re S`);
+      this.pagina.push(`${cor(226, 232, 240)} RG 0.35 w ${MARGEM} ${(this.alturaPagina - this.y - 20).toFixed(1)} ${this.larguraPagina - MARGEM * 2} 0 re S`);
       this.y += 20;
     });
     this.y += 18;
@@ -138,7 +143,7 @@ class DocumentoPdf {
 
   private desenharCabecalho(secao: SecaoPdf) {
     this.garantir(28);
-    this.retangulo(MARGEM, this.y, LARGURA - MARGEM * 2, 24, cor(225, 234, 246));
+    this.retangulo(MARGEM, this.y, this.larguraPagina - MARGEM * 2, 24, cor(225, 234, 246));
     let x = MARGEM;
     for (const coluna of secao.colunas) {
       this.texto(limitar(coluna.titulo.toUpperCase(), coluna.largura - 10, 7.3), x + 5, this.y + 16, 7.3, true, cor(51, 65, 85), coluna.alinhar ?? "left", coluna.largura - 10);
@@ -150,11 +155,11 @@ class DocumentoPdf {
   finalizar() {
     if (this.pagina.length) this.paginas.push(this.pagina);
     this.paginas.forEach((pagina, indice) => {
-      pagina.push(`${cor(203, 213, 225)} RG 0.5 w ${MARGEM} 28 ${LARGURA - MARGEM * 2} 0 re S`);
+      pagina.push(`${cor(203, 213, 225)} RG 0.5 w ${MARGEM} 28 ${this.larguraPagina - MARGEM * 2} 0 re S`);
       pagina.push(`BT /F1 7.5 Tf ${cor(100, 116, 139)} rg 1 0 0 1 ${MARGEM} 16 Tm (MES - Fábrica de Engates) Tj ET`);
-      pagina.push(`BT /F1 7.5 Tf ${cor(100, 116, 139)} rg 1 0 0 1 ${LARGURA - MARGEM - 55} 16 Tm (Página ${indice + 1}) Tj ET`);
+      pagina.push(`BT /F1 7.5 Tf ${cor(100, 116, 139)} rg 1 0 0 1 ${this.larguraPagina - MARGEM - 55} 16 Tm (Página ${indice + 1}) Tj ET`);
     });
-    return montarArquivoPdf(this.paginas);
+    return montarArquivoPdf(this.paginas, this.larguraPagina, this.alturaPagina);
   }
 }
 
@@ -162,7 +167,7 @@ function bufferLatin1(texto: string) {
   return Buffer.from(texto, "latin1");
 }
 
-function montarArquivoPdf(paginas: string[][]) {
+function montarArquivoPdf(paginas: string[][], larguraPagina: number, alturaPagina: number) {
   const objetos: Buffer[] = [];
   const idsPaginas = paginas.map((_, indice) => 5 + indice * 2);
   objetos[1] = bufferLatin1("<< /Type /Catalog /Pages 2 0 R >>");
@@ -173,7 +178,7 @@ function montarArquivoPdf(paginas: string[][]) {
     const paginaId = 5 + indice * 2;
     const conteudoId = paginaId + 1;
     const stream = bufferLatin1(comandos.join("\n"));
-    objetos[paginaId] = bufferLatin1(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${LARGURA} ${ALTURA}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${conteudoId} 0 R >>`);
+    objetos[paginaId] = bufferLatin1(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${larguraPagina} ${alturaPagina}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${conteudoId} 0 R >>`);
     objetos[conteudoId] = Buffer.concat([bufferLatin1(`<< /Length ${stream.length} >>\nstream\n`), stream, bufferLatin1("\nendstream")]);
   });
 
