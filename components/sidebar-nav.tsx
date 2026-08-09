@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/agrupamento", label: "Agrupamento (WIP)", icon: KittingIcon },
   { href: "/solda", label: "Soldagem", icon: WeldingIcon },
   { href: "/pintura-montagem", label: "Pintura / Montagem", icon: FinalLineIcon },
+  { href: "/estoque", label: "Estoque", icon: StockIcon },
   { href: "/apontamentos", label: "Apontamentos da Fábrica", icon: QualityIcon },
   { href: "/modelos", label: "Engenharia de Produto", icon: ConfigIcon },
   { href: "/configuracoes", label: "Configurações (Funcionários, Metas)", icon: SettingsIcon },
@@ -30,11 +31,12 @@ export function SidebarNav({
     : papel === "OPERADOR"
       ? NAV_ITEMS.filter((item) =>
           item.href === "/apontamentos" ||
-          (item.href === "/pintura-montagem" && /PINTURA|MONTAGEM/i.test(setorNome)),
+          (item.href === "/pintura-montagem" && /PINTURA|MONTAGEM/i.test(setorNome)) ||
+          (item.href === "/estoque" && /MONTAGEM/i.test(setorNome)),
         )
       : papel === "LIDER"
         ? NAV_ITEMS.filter((item) =>
-            ["/", "/monitoramento", "/agrupamento", "/solda", "/pintura-montagem", "/apontamentos"].includes(item.href),
+            ["/", "/monitoramento", "/agrupamento", "/solda", "/pintura-montagem", "/estoque", "/apontamentos"].includes(item.href),
           )
         : NAV_ITEMS.filter((item) => item.href !== "/configuracoes");
 
@@ -132,6 +134,16 @@ function FinalLineIcon(props: React.SVGProps<SVGSVGElement>) {
       <path d="M12 7h4a4 4 0 0 1 4 4v1" />
       <path d="M5 14h14v6H5z" />
       <path d="m9 17 2 2 4-4" />
+    </svg>
+  );
+}
+
+function StockIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m3 8 9-5 9 5-9 5z" />
+      <path d="m3 8 9 5 9-5v8l-9 5-9-5z" />
+      <path d="M12 13v8" />
     </svg>
   );
 }
