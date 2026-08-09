@@ -7,6 +7,7 @@ import { createApontamentoSolda } from "@/lib/actions/solda";
 type Sugestoes = {
   soldadores: string[];
   bancadas: string[];
+  bancadasPorSoldador: Record<string, string>;
   abastecedores: string[];
 };
 
@@ -40,6 +41,7 @@ export function EnvioSoldaModal({
     () => false,
   );
   const [enviando, setEnviando] = useState(false);
+  const [bancada, setBancada] = useState("");
   // toISOString() usa UTC e pode mudar o dia para quem esta no Brasil.
   const agora = new Date();
   const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
@@ -115,17 +117,22 @@ export function EnvioSoldaModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                Bancada
+                Bancada / box fixa
               </label>
               <input
                 name="bancada"
                 required
                 list="envio-bancadas"
+                value={bancada}
+                onChange={(event) => setBancada(event.target.value)}
                 placeholder="Ex.: BOX 22"
                 className={INPUT_CLS}
               />
+              <span className="text-[10px] text-slate-500">
+                A bancada cadastrada aparece automaticamente ao escolher o soldador.
+              </span>
               <datalist id="envio-bancadas">
-                {sugestoes.bancadas.map((b) => (
+                {[...new Set([...sugestoes.bancadas, ...Object.values(sugestoes.bancadasPorSoldador)])].map((b) => (
                   <option key={b} value={b} />
                 ))}
               </datalist>
@@ -138,6 +145,9 @@ export function EnvioSoldaModal({
                 name="soldador"
                 required
                 defaultValue=""
+                onChange={(event) => {
+                  setBancada(sugestoes.bancadasPorSoldador[event.target.value] ?? "");
+                }}
                 className={INPUT_CLS}
               >
                 <option value="" disabled>

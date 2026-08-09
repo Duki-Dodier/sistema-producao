@@ -16,6 +16,18 @@ export async function createFuncionario(formData: FormData) {
     throw new Error("Preencha nome e setor do funcionário.");
   }
 
+  const setor = await prisma.setor.findUnique({
+    where: { id: setorId },
+    select: { nome: true },
+  });
+  const ehSolda = setor?.nome.trim().toLocaleUpperCase("pt-BR") === "SOLDA";
+  const bancadasCadastradas = ehSolda
+    ? await prisma.funcionario.count({ where: { setorId, bancada: { not: null } } })
+    : 0;
+  const bancada = ehSolda
+    ? `BOX ${String(bancadasCadastradas + 1).padStart(2, "0")}`
+    : null;
+
   try {
     await prisma.funcionario.create({
       data: {
@@ -24,6 +36,7 @@ export async function createFuncionario(formData: FormData) {
         usuario,
         pin: "1234",
         senhaHash: await criarSenhaHash("1234"),
+        bancada,
       },
     });
   } catch {
@@ -44,6 +57,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   const papel = String(formData.get("papel") ?? "OPERADOR");
   const setorId = Number(formData.get("setorId"));
   const pinRaw = String(formData.get("pin") ?? "").trim();
+  const bancadaRaw = String(formData.get("bancada") ?? "").trim();
   const processos = PROCESSOS.filter((processo) =>
     formData.getAll("processos").map(String).includes(processo),
   );
@@ -61,7 +75,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   await prisma.$transaction(async (tx) => {
     await tx.funcionario.update({
       where: { id },
-      data: { papel, setorId, pin: pinRaw || null },
+      data: { papel, setorId, pin: pinRaw || null, bancada: bancadaRaw || null },
     });
     await tx.funcionarioProcesso.deleteMany({ where: { funcionarioId: id } });
     if (processos.length > 0) {

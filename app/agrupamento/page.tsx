@@ -46,7 +46,7 @@ export default async function AgrupamentoPage({
     setorSolda
       ? prisma.funcionario.findMany({
           where: { setorId: setorSolda.id, ativo: true },
-          select: { nome: true },
+          select: { nome: true, bancada: true },
           orderBy: { nome: "asc" },
         })
       : Promise.resolve([]),
@@ -65,6 +65,11 @@ export default async function AgrupamentoPage({
       ]),
     ],
     bancadas: [...new Set(enviosSolda.map((e) => e.bancada).filter(Boolean) as string[])],
+    bancadasPorSoldador: Object.fromEntries(
+      soldadoresCadastrados
+        .filter((funcionario) => funcionario.bancada)
+        .map((funcionario) => [funcionario.nome, funcionario.bancada as string]),
+    ),
     abastecedores: [...new Set(enviosSolda.map((e) => e.abastecedor).filter(Boolean) as string[])],
   };
 

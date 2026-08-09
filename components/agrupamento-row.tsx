@@ -180,6 +180,7 @@ function StatusBadge({
 export type SugestoesEnvio = {
   soldadores: string[];
   bancadas: string[];
+  bancadasPorSoldador: Record<string, string>;
   abastecedores: string[];
 };
 

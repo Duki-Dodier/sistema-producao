@@ -198,6 +198,7 @@ export default async function ConfiguracoesPage() {
                   const boundToggle = toggleFuncionario.bind(null, f.id);
                   const boundDelete = deleteFuncionario.bind(null, f.id);
                   const boundAcesso = updateFuncionarioAcesso.bind(null, f.id);
+                  const ehSetorSolda = setor.nome.trim().toLocaleUpperCase("pt-BR") === "SOLDA";
                   const processosAtuais = new Set(f.processosPermitidos.map((item) => item.processo));
                   return (
                     <li
@@ -262,6 +263,25 @@ export default async function ConfiguracoesPage() {
                             className="w-16 rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-center font-mono text-[11px] tracking-[0.2em] text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none"
                             title="PIN de 4 dígitos (vazio = sem PIN)"
                           />
+                          {ehSetorSolda && (
+                            <>
+                              <label
+                                htmlFor={`bancada-${f.id}`}
+                                className="text-[9px] font-bold uppercase tracking-wider text-slate-500"
+                              >
+                                Bancada
+                              </label>
+                              <input
+                                key={`bancada-${f.id}-${f.bancada ?? ""}`}
+                                id={`bancada-${f.id}`}
+                                name="bancada"
+                                defaultValue={f.bancada ?? ""}
+                                placeholder="BOX 01"
+                                className="w-24 rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none"
+                                title="Bancada/box fixa do soldador"
+                              />
+                            </>
+                          )}
                           <div className="flex min-w-full flex-wrap gap-x-2 gap-y-1 rounded border border-slate-700/70 bg-[#151C26] px-2 py-1.5">
                             <span className="w-full text-[9px] font-bold uppercase tracking-wider text-slate-500">
                               Processos permitidos
