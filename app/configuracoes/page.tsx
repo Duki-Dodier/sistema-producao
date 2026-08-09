@@ -62,9 +62,9 @@ export default async function ConfiguracoesPage() {
         </div>
         <form
           action={createFuncionario}
-          className="flex flex-wrap items-end gap-3 px-5 py-4"
+          className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_14rem_auto] md:items-end"
         >
-          <div className="flex flex-1 min-w-48 flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
               Nome
             </label>
@@ -75,7 +75,7 @@ export default async function ConfiguracoesPage() {
               className={INPUT_CLS}
             />
           </div>
-          <div className="flex w-52 flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
               Setor
             </label>
@@ -92,7 +92,7 @@ export default async function ConfiguracoesPage() {
           </div>
           <button
             type="submit"
-            className="rounded bg-[#3B82F6] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition-colors hover:bg-blue-500"
+            className="w-full rounded bg-[#3B82F6] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition-colors hover:bg-blue-500 md:w-auto"
           >
             Adicionar
           </button>
@@ -130,9 +130,9 @@ export default async function ConfiguracoesPage() {
               {/* Config: meta, líder, dias úteis */}
               <form
                 action={boundConfig}
-                className="flex flex-wrap items-end gap-3 border-b border-white/5 bg-[#1E2733] px-5 py-3"
+                className="grid grid-cols-1 gap-3 border-b border-white/5 bg-[#1E2733] px-5 py-4 sm:grid-cols-2 xl:grid-cols-5 xl:items-end"
               >
-                <div className="flex w-28 flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                     Meta do mês
                   </label>
@@ -145,7 +145,7 @@ export default async function ConfiguracoesPage() {
                     className={`text-center ${INPUT_CLS}`}
                   />
                 </div>
-                <div className="flex w-32 flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                     Media/dia
                   </label>
@@ -159,7 +159,7 @@ export default async function ConfiguracoesPage() {
                     className={`text-center ${INPUT_CLS}`}
                   />
                 </div>
-                <div className="flex flex-1 min-w-32 flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                     Líder
                   </label>
@@ -170,7 +170,7 @@ export default async function ConfiguracoesPage() {
                     className={INPUT_CLS}
                   />
                 </div>
-                <div className="flex w-28 flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                     Dias úteis/mês
                   </label>
@@ -201,133 +201,105 @@ export default async function ConfiguracoesPage() {
                   const ehSetorSolda = setor.nome.trim().toLocaleUpperCase("pt-BR") === "SOLDA";
                   const processosAtuais = new Set(f.processosPermitidos.map((item) => item.processo));
                   return (
-                    <li
-                      key={f.id}
-                      className="flex flex-wrap items-center justify-between gap-3 px-5 py-2"
-                    >
-                      <span
-                        className={`min-w-28 text-sm ${
-                          f.ativo ? "text-slate-200" : "text-slate-500 line-through"
-                        }`}
-                      >
-                        {f.nome}
-                        <span className="ml-2 font-mono text-[9px] text-cyan-400">
-                          @{f.usuario ?? "sem-usuario"}
-                        </span>
-                        {f.administrador && (
-                          <span className="ml-2 rounded bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-300">
-                            administrador
-                          </span>
-                        )}
-                        {f.ativo && !f.pin && (
-                          <span
-                            className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400"
-                            title="Sem PIN: aponta sem senha até você definir um"
-                          >
-                            sem PIN
-                          </span>
-                        )}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <form action={boundAcesso} className="flex items-center gap-2">
-                          <select
-                            name="setorId"
-                            defaultValue={f.setorId}
-                            className="max-w-48 rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-[10px] text-slate-200 focus:border-[#3B82F6] focus:outline-none"
-                            title="Setor atual do funcionário"
-                          >
-                            {setores.map((opcao) => (
-                              <option key={opcao.id} value={opcao.id}>
-                                {opcao.nome}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            key={`papel-${f.id}-${f.papel}`}
-                            name="papel"
-                            defaultValue={f.papel}
-                            className="rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-[11px] text-slate-200 focus:border-[#3B82F6] focus:outline-none"
-                            title="Papel: Líder autoriza ajustes do próprio setor; PCP autoriza qualquer setor"
-                          >
-                            <option value="OPERADOR">Operador</option>
-                            <option value="LIDER">Líder</option>
-                            <option value="PCP">PCP</option>
-                          </select>
-                          <input
-                            key={`pin-${f.id}-${f.pin ?? ""}`}
-                            name="pin"
-                            defaultValue={f.pin ?? ""}
-                            placeholder="PIN"
-                            maxLength={4}
-                            pattern="\d{4}"
-                            className="w-16 rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-center font-mono text-[11px] tracking-[0.2em] text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none"
-                            title="PIN de 4 dígitos (vazio = sem PIN)"
-                          />
-                          {ehSetorSolda && (
-                            <>
-                              <label
-                                htmlFor={`bancada-${f.id}`}
-                                className="text-[9px] font-bold uppercase tracking-wider text-slate-500"
-                              >
-                                Bancada
-                              </label>
-                              <input
-                                key={`bancada-${f.id}-${f.bancada ?? ""}`}
-                                id={`bancada-${f.id}`}
-                                name="bancada"
-                                defaultValue={f.bancada ?? ""}
-                                placeholder="BOX 01"
-                                className="w-24 rounded border border-slate-700 bg-[#1A222C] px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none"
-                                title="Bancada/box fixa do soldador"
-                              />
-                            </>
-                          )}
-                          <div className="flex min-w-full flex-wrap gap-x-2 gap-y-1 rounded border border-slate-700/70 bg-[#151C26] px-2 py-1.5">
-                            <span className="w-full text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                              Processos permitidos
+                    <li key={f.id} className="px-5 py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`text-sm font-semibold ${f.ativo ? "text-slate-100" : "text-slate-500 line-through"}`}>
+                              {f.nome}
                             </span>
+                            <span className="rounded bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[9px] text-cyan-300">
+                              @{f.usuario ?? "sem-usuario"}
+                            </span>
+                            {f.administrador && (
+                              <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-300">
+                                administrador
+                              </span>
+                            )}
+                            {f.ativo && !f.pin && (
+                              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400" title="Sem PIN: aponta sem senha até você definir um">
+                                sem PIN
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                            Defina o acesso, a função e os processos que este funcionário pode apontar.
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <form action={boundToggle}>
+                            <button
+                              type="submit"
+                              className={`rounded px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                                f.ativo
+                                  ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                                  : "bg-slate-700/40 text-slate-500 hover:bg-slate-700/60"
+                              }`}
+                              title={f.ativo ? "Clique para desativar" : "Clique para reativar"}
+                            >
+                              {f.ativo ? "Ativo" : "Inativo"}
+                            </button>
+                          </form>
+                          <form action={boundDelete}>
+                            <button
+                              type="submit"
+                              className="rounded border border-red-500/20 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-red-400 transition-colors hover:border-red-500/40 hover:bg-red-500/10"
+                            >
+                              Excluir
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+
+                      <form action={boundAcesso} className="mt-4 space-y-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <label className="flex min-w-0 flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Setor atual</span>
+                            <select name="setorId" defaultValue={f.setorId} className={INPUT_CLS} title="Setor atual do funcionário">
+                              {setores.map((opcao) => <option key={opcao.id} value={opcao.id}>{opcao.nome}</option>)}
+                            </select>
+                          </label>
+                          <label className="flex min-w-0 flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Função</span>
+                            <select key={`papel-${f.id}-${f.papel}`} name="papel" defaultValue={f.papel} className={INPUT_CLS} title="Líder autoriza ajustes do próprio setor; PCP autoriza qualquer setor">
+                              <option value="OPERADOR">Operador</option>
+                              <option value="LIDER">Líder</option>
+                              <option value="PCP">PCP</option>
+                            </select>
+                          </label>
+                          <label className="flex min-w-0 flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">PIN de acesso</span>
+                            <input key={`pin-${f.id}-${f.pin ?? ""}`} name="pin" defaultValue={f.pin ?? ""} placeholder="4 dígitos" maxLength={4} pattern="\d{4}" className={INPUT_CLS} title="PIN de 4 dígitos (vazio = sem PIN)" />
+                          </label>
+                          {ehSetorSolda ? (
+                            <label className="flex min-w-0 flex-col gap-1.5">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Bancada / box</span>
+                              <input key={`bancada-${f.id}-${f.bancada ?? ""}`} name="bancada" defaultValue={f.bancada ?? ""} placeholder="BOX 01" className={INPUT_CLS} title="Bancada/box fixa do soldador" />
+                            </label>
+                          ) : <div className="hidden xl:block" aria-hidden="true" />}
+                        </div>
+
+                        <fieldset className="rounded-lg border border-slate-700/70 bg-[#151C26] p-3">
+                          <legend className="px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Processos permitidos</legend>
+                          <p className="mb-3 text-[10px] leading-relaxed text-slate-500">
+                            Marque somente as operações que este funcionário poderá apontar no celular ou no computador.
+                          </p>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                             {PROCESSOS.map((processo) => (
-                              <label key={processo} className="flex items-center gap-1 text-[10px] text-slate-300">
-                                <input
-                                  type="checkbox"
-                                  name="processos"
-                                  value={processo}
-                                  defaultChecked={processosAtuais.has(processo)}
-                                  className="accent-blue-500"
-                                />
-                                {PROCESSO_LABEL[processo]}
+                              <label key={processo} className="flex min-h-9 items-center gap-2 rounded border border-white/5 bg-[#1A222C] px-2.5 py-2 text-[10px] font-medium text-slate-300 transition-colors hover:border-blue-400/40 hover:bg-blue-500/10">
+                                <input type="checkbox" name="processos" value={processo} defaultChecked={processosAtuais.has(processo)} className="h-3.5 w-3.5 shrink-0 accent-blue-500" />
+                                <span className="leading-tight">{PROCESSO_LABEL[processo]}</span>
                               </label>
                             ))}
                           </div>
-                          <button
-                            type="submit"
-                            className="rounded bg-[#3B82F6]/20 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-300 transition-colors hover:bg-[#3B82F6]/35"
-                          >
-                            Salvar
+                        </fieldset>
+
+                        <div className="flex justify-end border-t border-white/5 pt-3">
+                          <button type="submit" className="rounded bg-[#3B82F6] px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-white shadow-md shadow-blue-500/15 transition-colors hover:bg-blue-500">
+                            Salvar acesso e processos
                           </button>
-                        </form>
-                        <form action={boundToggle}>
-                          <button
-                            type="submit"
-                            className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${
-                              f.ativo
-                                ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
-                                : "bg-slate-700/40 text-slate-500 hover:bg-slate-700/60"
-                            }`}
-                            title={f.ativo ? "Clique p/ desativar" : "Clique p/ reativar"}
-                          >
-                            {f.ativo ? "Ativo" : "Inativo"}
-                          </button>
-                        </form>
-                        <form action={boundDelete}>
-                          <button
-                            type="submit"
-                            className="text-[10px] font-bold uppercase tracking-wider text-red-500 transition-colors hover:text-red-400"
-                          >
-                            Excluir
-                          </button>
-                        </form>
-                      </div>
+                        </div>
+                      </form>
                     </li>
                   );
                 })}
