@@ -2,10 +2,12 @@ export function StatCard({
   label,
   value,
   accent = "neutral",
+  detail,
 }: {
   label: string;
   value: number | string;
   accent?: "neutral" | "success" | "warning" | "danger";
+  detail?: string;
 }) {
   const accentClasses = {
     neutral: "bg-[#2C3645] border-white/5",
@@ -31,6 +33,7 @@ export function StatCard({
       <span className={`mt-1 text-3xl font-light ${textClasses[accent]}`}>
         {value}
       </span>
+      {detail && <span className="mt-1 text-[10px] text-slate-500">{detail}</span>}
     </div>
   );
 }

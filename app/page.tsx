@@ -6,6 +6,8 @@ import { StatCard } from "@/components/stat-card";
 import { MiniBarChart } from "@/components/mini-bar-chart";
 import Link from "next/link";
 import { montarFluxoProducao } from "@/lib/fluxo-producao";
+import { calcularRastreamento } from "@/lib/rastreamento";
+import { ehSetor } from "@/lib/setores";
 import { DashboardOPFlow, type DashboardFlowItem } from "@/components/dashboard-op-flow";
 
 export default async function PainelPcpPage({
@@ -57,14 +59,40 @@ export default async function PainelPcpPage({
 
   // Métricas gerais calculadas ANTES do filtro de visualização (refletem a fábrica toda).
   const totalAbertas = progresso.length;
-  const completas = progresso.filter((p) => p.completo).length;
-  const foraDeSequencia = progresso.filter((p) => p.foraDeSequencia).length;
-  const semRoteiro = progresso.filter((p) => p.totalCount === 0).length;
+  const rastreamentoPorOp = new Map(calcularRastreamento(ops).map((item) => [item.op.id, item]));
+  const quantidadePrePronto = progresso.reduce((total, item) => {
+    const rastreamento = rastreamentoPorOp.get(item.op.id);
+    if (rastreamento && rastreamento.pecas.length > 0) {
+      return total + Math.min(item.op.quantidade, rastreamento.kitsCompletos);
+    }
 
-  const wipPorSetor = setores
+    const etapasPrePronto = item.setoresPreSolda.filter(
+      (setor) => !ehSetor(setor.setorNome, "Agrupamento"),
+    );
+    const maiorQuantidadeProduzida = Math.max(
+      0,
+      ...etapasPrePronto.map((setor) => setor.quantidadeBoa),
+    );
+    return total + Math.min(item.op.quantidade, maiorQuantidadeProduzida);
+  }, 0);
+
+  const opsNaSolda = progresso.filter((item) => {
+    const solda = item.setores.find((setor) => ehSetor(setor.setorNome, "Solda"));
+    return Boolean(
+      solda &&
+        !solda.completo &&
+        (item.setorAtual?.setorId === solda.setorId ||
+          item.op.apontamentos.some((apontamento) => apontamento.setorId === solda.setorId)),
+    );
+  }).length;
+  const opsProntasParaSolda = progresso.filter((item) => item.prontoParaSolda).length;
+
+  const pendenciasPorEtapa = setores
     .map((s) => ({
       label: s.nome,
-      value: progresso.filter((p) => p.setorAtual?.setorId === s.id).length,
+      value: progresso
+        .filter((p) => p.setorAtual?.setorId === s.id)
+        .reduce((total, p) => total + (p.setorAtual?.falta ?? 0), 0),
     }))
     .filter((s) => s.value > 0)
     .sort((a, b) => b.value - a.value);
@@ -122,28 +150,39 @@ export default async function PainelPcpPage({
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="OPs abertas" value={totalAbertas} />
-        <StatCard label="Kit completo" value={completas} accent="success" />
         <StatCard
-          label="Fora de sequência"
-          value={foraDeSequencia}
-          accent={foraDeSequencia > 0 ? "danger" : "neutral"}
+          label="Peças no pré-pronto"
+          value={quantidadePrePronto.toLocaleString("pt-BR")}
+          accent="success"
+          detail="kits concluídos aguardando agrupamento"
         />
         <StatCard
-          label="Sem roteiro definido"
-          value={semRoteiro}
-          accent={semRoteiro > 0 ? "warning" : "neutral"}
+          label="OPs abertas"
+          value={totalAbertas}
+          detail="ordens em produção"
+        />
+        <StatCard
+          label="OPs na Solda"
+          value={opsNaSolda}
+          accent={opsNaSolda > 0 ? "warning" : "neutral"}
+          detail="com envio ou apontamento ativo"
+        />
+        <StatCard
+          label="Prontas para Solda"
+          value={opsProntasParaSolda}
+          accent="success"
+          detail="pré-pronto completo"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader
-            title="Gargalo por setor (WIP)"
-            subtitle="Quantas OPs estão paradas esperando cada setor agora."
+            title="Pendências por etapa"
+            subtitle="Peças que faltam para concluir o setor atual de cada OP."
           />
-          {wipPorSetor.length > 0 ? (
-            <MiniBarChart data={wipPorSetor} />
+          {pendenciasPorEtapa.length > 0 ? (
+            <MiniBarChart data={pendenciasPorEtapa} />
           ) : (
             <p className="px-5 py-8 text-center text-sm text-slate-400">
               Nenhuma OP pendente em setor algum no momento.
