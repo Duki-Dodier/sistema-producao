@@ -19,7 +19,7 @@ export function PreProntoPriorityReport({
     : 0;
 
   return (
-    <section className="rounded-xl border border-emerald-400/25 bg-[#101b2b] shadow-[0_0_20px_rgba(16,185,129,.06)] print:border-slate-300 print:bg-white print:shadow-none">
+    <section className="relatorio-pre-pronto-section rounded-xl border border-emerald-400/25 bg-[#101b2b] shadow-[0_0_20px_rgba(16,185,129,.06)] print:w-full print:rounded-none print:border-slate-300 print:bg-white print:shadow-none">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 p-4 print:border-slate-300 print:p-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -67,8 +67,19 @@ export function PreProntoPriorityReport({
           Não há peças pendentes neste setor nas OPs abertas com o filtro atual.
         </p>
       ) : (
-        <div className="overflow-x-auto border-t border-white/10 print:border-slate-300">
-          <table className="w-full min-w-[1100px] border-collapse text-left print:min-w-0 print:text-[10px]">
+        <div className="relatorio-pre-pronto-scroll overflow-x-auto border-t border-white/10 print:border-slate-300">
+          <table className="relatorio-pre-pronto-table w-full min-w-[1100px] border-collapse text-left print:min-w-0 print:text-[9px] print:table-fixed">
+            <colgroup>
+              <col className="w-[18%]" />
+              <col className="w-[10%]" />
+              <col className="w-[14%]" />
+              <col className="w-[18%]" />
+              <col className="w-[12%]" />
+              <col className="w-[6%]" />
+              <col className="w-[6%]" />
+              <col className="w-[6%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead className="bg-white/[.03] print:bg-slate-100">
               <tr className="font-mono text-[10px] uppercase tracking-wider text-slate-500 print:text-black">
                 <th className="px-3 py-2">Fila</th>

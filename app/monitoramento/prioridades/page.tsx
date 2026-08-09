@@ -52,7 +52,7 @@ export default async function PrioridadesPreProntoPage({
     : [];
 
   return (
-    <div className="flex min-h-full w-full flex-col gap-5 bg-[#0b1326] p-6 print:bg-white">
+    <div className="relatorio-pre-pronto flex min-h-full w-full flex-col gap-5 bg-[#0b1326] p-6 print:bg-white print:p-0 print:gap-0">
       <div className="print:hidden">
         <PageHeader
           title="Prioridades para fechar pré-pronto"

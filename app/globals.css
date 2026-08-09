@@ -18,8 +18,19 @@ body {
   color: var(--foreground);
 }
 
+@page relatorio-pre-pronto {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
 /* Impressão do Documento da OP: esconde a casca do app e quebra por folha */
 @media print {
+  html,
+  body {
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
   aside,
   header,
   .nao-imprimir {
@@ -32,5 +43,34 @@ body {
   }
   .folha-op {
     break-after: page;
+  }
+
+  .relatorio-pre-pronto {
+    page: relatorio-pre-pronto;
+    width: 100% !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .relatorio-pre-pronto-section,
+  .relatorio-pre-pronto-scroll {
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .relatorio-pre-pronto-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+
+  .relatorio-pre-pronto-table th,
+  .relatorio-pre-pronto-table td {
+    overflow-wrap: anywhere;
+    padding: 2mm 1.5mm !important;
+  }
+
+  .relatorio-pre-pronto-table .whitespace-nowrap {
+    white-space: normal !important;
   }
 }
