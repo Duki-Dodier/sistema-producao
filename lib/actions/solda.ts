@@ -24,41 +24,42 @@ export async function createApontamentoSolda(formData: FormData) {
   if (!Number.isInteger(opId) || !soldador || !bancada) throw new Error("Preencha OP, soldador e bancada.");
   if (!Number.isInteger(quantidadeBoa) || quantidadeBoa <= 0) throw new Error("Informe uma quantidade inteira positiva.");
 
-  await prisma.$transaction(async (tx) => {
-    const setores = await tx.setor.findMany();
-    const setorSolda = setores.find((setor) => ehSetor(setor.nome, "Solda"));
-    if (!setorSolda) throw new Error('Setor "Solda" nao esta cadastrado.');
+  // O adaptador Prisma do Cloudflare D1 nao oferece transacoes interativas.
+  // Validamos com leituras diretas e fazemos uma unica gravacao, como no
+  // apontamento comum, evitando o erro de Server Components no envio.
+  const setores = await prisma.setor.findMany();
+  const setorSolda = setores.find((setor) => ehSetor(setor.nome, "Solda"));
+  if (!setorSolda) throw new Error('Setor "Solda" nao esta cadastrado.');
 
-    const [op, jaEnviado] = await Promise.all([
-      tx.oP.findUnique({
-        where: { id: opId },
-        select: { quantidade: true, status: true, modelo: { select: { roteiro: { select: { setorId: true } } } } },
-      }),
-      tx.apontamento.aggregate({
-        where: { opId, setorId: setorSolda.id, soldador: { not: null } },
-        _sum: { quantidadeBoa: true },
-      }),
-    ]);
-    if (!op) throw new Error("OP nao encontrada.");
-    if (op.status !== "ABERTA") throw new Error("So e possivel enviar uma OP aberta para Solda.");
-    if (!op.modelo.roteiro.some((etapa) => etapa.setorId === setorSolda.id)) {
-      throw new Error("A OP nao possui Solda no roteiro.");
-    }
-    const saldo = op.quantidade - (jaEnviado._sum.quantidadeBoa ?? 0);
-    if (quantidadeBoa > saldo) throw new Error(`Quantidade maior que o saldo da OP: restam ${saldo} peca(s).`);
+  const [op, jaEnviado] = await Promise.all([
+    prisma.oP.findUnique({
+      where: { id: opId },
+      select: { quantidade: true, status: true, modelo: { select: { roteiro: { select: { setorId: true } } } } },
+    }),
+    prisma.apontamento.aggregate({
+      where: { opId, setorId: setorSolda.id, soldador: { not: null } },
+      _sum: { quantidadeBoa: true },
+    }),
+  ]);
+  if (!op) throw new Error("OP nao encontrada.");
+  if (op.status !== "ABERTA") throw new Error("So e possivel enviar uma OP aberta para Solda.");
+  if (!op.modelo.roteiro.some((etapa) => etapa.setorId === setorSolda.id)) {
+    throw new Error("A OP nao possui Solda no roteiro.");
+  }
+  const saldo = op.quantidade - (jaEnviado._sum.quantidadeBoa ?? 0);
+  if (quantidadeBoa > saldo) throw new Error(`Quantidade maior que o saldo da OP: restam ${saldo} peca(s).`);
 
-    await tx.apontamento.create({
-      data: {
-        opId,
-        setorId: setorSolda.id,
-        usuario: soldador,
-        soldador,
-        bancada,
-        abastecedor: abastecedor || null,
-        quantidadeBoa,
-        ...(dataInformada ? { dataHora: new Date(`${dataInformada}T12:00:00`) } : {}),
-      },
-    });
+  await prisma.apontamento.create({
+    data: {
+      opId,
+      setorId: setorSolda.id,
+      usuario: soldador,
+      soldador,
+      bancada,
+      abastecedor: abastecedor || null,
+      quantidadeBoa,
+      ...(dataInformada ? { dataHora: new Date(`${dataInformada}T12:00:00`) } : {}),
+    },
   });
   revalidarSolda();
 }
