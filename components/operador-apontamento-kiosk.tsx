@@ -114,7 +114,7 @@ export function OperadorApontamentoKiosk({
       );
       setQuantidade("");
       if (modoQr) {
-        window.setTimeout(() => window.location.assign("/apontamentos/scanner"), 1400);
+        window.setTimeout(() => window.location.assign("/apontamentos/scanner"), 3000);
       }
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível salvar o apontamento.");
