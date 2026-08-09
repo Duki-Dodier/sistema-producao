@@ -232,6 +232,9 @@ export async function createApontamento(formData: FormData) {
           ? {}
           : { OR: [{ processo }, { processo: null }] }),
         ...(etapaSolda ? { soldador: null } : {}),
+        // Na Solda, cada operador aponta somente o que foi abastecido para
+        // ele. Nos demais setores o usuario continua sendo apenas o autor.
+        ...(etapaSolda ? { usuario } : {}),
       },
       _sum: { quantidadeBoa: true },
     });
@@ -275,11 +278,11 @@ export async function createApontamento(formData: FormData) {
       if (etapaSolda) {
         const [abastecido, jaSoldado] = await Promise.all([
           tx.apontamento.aggregate({
-            where: { opId, setorId, soldador: { not: null } },
+            where: { opId, setorId, soldador: usuario },
             _sum: { quantidadeBoa: true },
           }),
           tx.apontamento.aggregate({
-            where: { opId, setorId, soldador: null },
+            where: { opId, setorId, soldador: null, usuario },
             _sum: { quantidadeBoa: true },
           }),
         ]);

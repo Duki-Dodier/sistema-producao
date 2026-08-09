@@ -10,7 +10,7 @@ type OpcaoOP = {
   id: number;
   numeroSequencia: number;
   lote: string | null;
-  apontamentos?: { soldador: string | null }[];
+  apontamentos?: { soldador: string | null; quantidadeBoa: number }[];
   modelo: {
     codigo: string;
     pecas: {
@@ -57,16 +57,16 @@ export function MonitorApontamentoForm({
     return ops.filter((op) => {
       // Regra de bloqueio da Solda: Se for setor Solda e não tem soldador alocado, esconde a OP.
       if (isSolda) {
-        const soldadorAlocado = op.apontamentos?.[0]?.soldador;
-        if (!soldadorAlocado) return false;
+        if (!usuario) return false;
+        if (!op.apontamentos?.some((item) => item.soldador === usuario)) return false;
       }
       return true;
     });
-  }, [ops, isSolda]);
+  }, [ops, isSolda, usuario]);
 
   // Resultados da busca
   const searchResults = useMemo(() => {
-    if (!buscaOp) return [];
+    if (!buscaOp) return opsFiltradas.slice(0, 8);
     const b = buscaOp.toLowerCase();
     return opsFiltradas
       .filter((op) =>
@@ -127,7 +127,9 @@ export function MonitorApontamentoForm({
     setProcesso("");
     setDropdownOpen(false);
 
-    const soldadorAlocado = selectedOp.apontamentos?.[0]?.soldador;
+    const soldadorAlocado = isSolda
+      ? selectedOp.apontamentos?.find((item) => item.soldador === usuario)?.soldador
+      : selectedOp.apontamentos?.[0]?.soldador;
     if (soldadorAlocado) {
       setUsuario(soldadorAlocado);
       setUsuarioFixo(true);
@@ -154,12 +156,17 @@ export function MonitorApontamentoForm({
       <input type="hidden" name="setorId" value={setorId} />
       {usuarioFixo && <input type="hidden" name="usuario" value={usuario} />}
       <input type="hidden" name="opId" value={opId} />
+      {isSolda && !exigePeca && <input type="hidden" name="processo" value="SOLDAGEM" />}
 
       <div>
         <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-[#dae2fd]">
           Lançar produção · {setorNome}
         </h2>
-        <p className="mt-1 text-xs text-slate-500">Busque pela OP e lance a quantidade efetivamente feita.</p>
+        <p className="mt-1 text-xs text-slate-500">
+          {isSolda
+            ? "Escolha o soldador; depois clique no campo da OP para ver somente os lotes enviados a ele."
+            : "Busque pela OP e lance a quantidade efetivamente feita."}
+        </p>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -173,12 +180,12 @@ export function MonitorApontamentoForm({
               setBuscaOp(e.target.value);
               setOpId("");
               setDropdownOpen(true);
-              setUsuario("");
+              if (!isSolda) setUsuario("");
               setUsuarioFixo(false);
             }}
             onFocus={() => setDropdownOpen(true)}
             onBlur={() => setTimeout(() => setDropdownOpen(false), 200)}
-            placeholder="Lote ou OP..."
+            placeholder={isSolda ? "Clique para ver as OPs enviadas" : "Lote ou OP..."}
             className="w-40 rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-sm text-[#dae2fd] placeholder-slate-600 focus:border-[#4cd7f6] focus:outline-none"
           />
           {dropdownOpen && searchResults.length > 0 && (
@@ -219,10 +226,18 @@ export function MonitorApontamentoForm({
             name="usuario"
             required 
             value={usuario}
-            onChange={(e) => setUsuario(e.target.value)}
+            onChange={(e) => {
+              setUsuario(e.target.value);
+              setOpId("");
+              setBuscaOp("");
+              setPecaId("");
+              setProcesso("");
+              setUsuarioFixo(false);
+              setDropdownOpen(false);
+            }}
             className="rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-sm text-[#dae2fd] focus:border-[#4cd7f6] focus:outline-none"
           >
-            <option value="" disabled>Operador...</option>
+            <option value="" disabled>{isSolda ? "Selecione o soldador" : "Operador..."}</option>
             {operadores.map((operador) => (
               <option key={operador.id} value={operador.nome}>{operador.nome}</option>
             ))}

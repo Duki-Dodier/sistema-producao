@@ -120,15 +120,17 @@ export default async function ApontamentosPage({
         numeroSequencia: true,
         quantidade: true,
         apontamentos: {
-          where: {
-            ...(setorSolda ? { soldador: null } : {}),
-          },
+          ...(setorSolda
+            ? { where: { setorId: setor.id } }
+            : { where: { soldador: null } }),
           select: {
             setorId: true,
             pecaId: true,
             processo: true,
             roteiroEtapaId: true,
             quantidadeBoa: true,
+            usuario: true,
+            soldador: true,
           },
         },
         modelo: {
@@ -198,6 +200,50 @@ export default async function ApontamentosPage({
 
   const itens: ItemApontamentoOperador[] = opsAbertas.flatMap(
     (op): ItemApontamentoOperador[] => {
+      if (setorSolda) {
+        const nomesPermitidos = operadorLogado && operadorLogado.papel !== "PCP"
+          ? [operadorLogado.nome]
+          : funcionarios.map((funcionario) => funcionario.nome);
+        const enviosPorSoldador = new Map<string, number>();
+        for (const apontamento of op.apontamentos) {
+          if (apontamento.soldador && nomesPermitidos.includes(apontamento.soldador)) {
+            enviosPorSoldador.set(
+              apontamento.soldador,
+              (enviosPorSoldador.get(apontamento.soldador) ?? 0) + apontamento.quantidadeBoa,
+            );
+          }
+        }
+
+        return [...enviosPorSoldador.entries()].map(([soldador, enviado]) => {
+          const soldado = op.apontamentos
+            .filter((apontamento) => apontamento.soldador === null && apontamento.usuario === soldador)
+            .reduce((soma, apontamento) => soma + apontamento.quantidadeBoa, 0);
+          const restante = Math.max(enviado - soldado, 0);
+          const concluido = restante === 0;
+          return {
+            chave: `${op.id}-solda-${soldador}`,
+            opId: op.id,
+            numeroSequencia: op.numeroSequencia,
+            modeloCodigo: op.modelo.codigo,
+            pecaId: null,
+            roteiroEtapaId: null,
+            pecaCodigo: "SOLDA",
+            pecaNome: `Soldagem · ${soldador}`,
+            necessario: enviado,
+            processos: [{
+              codigo: "SOLDAGEM",
+              label: "Soldagem",
+              apontado: soldado,
+              estado: concluido ? "concluido" : "atual",
+            }],
+            proximoProcesso: concluido ? null : "SOLDAGEM",
+            proximoLabel: concluido ? "Concluído" : "Soldagem",
+            restante,
+            concluido,
+          } satisfies ItemApontamentoOperador;
+        });
+      }
+
       if (op.modelo._count.pecas === 0) {
         const apontado = op.apontamentos
           .filter((item) => item.pecaId === null && item.setorId === setor.id)

@@ -193,8 +193,8 @@ async function CockpitSetor({
         apontamentos: {
           where: { setorId: setor.id, soldador: { not: null } },
           orderBy: { dataHora: "desc" },
-          take: 1,
-          select: { soldador: true },
+          ...(monitorandoSolda ? {} : { take: 1 }),
+          select: { soldador: true, quantidadeBoa: true },
         },
         modelo: {
           select: {
