@@ -1,8 +1,6 @@
-# MES Engates
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Sistema de acompanhamento da produção de engates.
-
-## Desenvolvimento local
+## Getting Started
 
 First, run the development server:
 
@@ -16,53 +14,23 @@ pnpm dev
 bun dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000) no navegador.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-Na primeira execução, crie o banco local e os dados de demonstração:
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```bash
-npm run db:migrate
-npm run db:seed
-```
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Publicar na nuvem
+## Learn More
 
-O projeto está preparado para rodar como um container Docker, com volumes
-persistentes para o banco SQLite e para as imagens enviadas pelos usuários.
-Isso é necessário: plataformas com sistema de arquivos efêmero (por exemplo,
-um deploy serverless sem volume) perderiam os apontamentos e uploads após uma
-nova publicação.
+To learn more about Next.js, take a look at the following resources:
 
-1. Crie um serviço Docker em um provedor que ofereça **disco persistente**
-   (por exemplo, Render, Railway, Fly.io, uma VM ou Kubernetes) e conecte este
-   repositório.
-2. Use o `Dockerfile` da raiz. O container expõe a porta `3000`; configure o
-   provedor para encaminhar o tráfego para ela.
-3. Monte dois volumes persistentes, sem compartilhar entre ambientes:
-   * `/data` para o arquivo do banco;
-   * `/app/public/uploads` para as imagens cadastradas.
-4. Configure as variáveis de ambiente:
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-   ```text
-   DATABASE_URL=file:/data/mes-engates.db
-   SEED_DATABASE=true
-   ```
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-   `SEED_DATABASE` só cria os dados de demonstração quando o banco ainda não
-   existe. Para iniciar uma operação vazia, defina-a como `false` antes do
-   primeiro deploy.
-5. Faça o deploy. A URL pública fornecida pelo provedor é o link que pode ser
-   compartilhado com a equipe.
+## Deploy on Vercel
 
-Para validar a mesma configuração antes de publicar, execute:
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-```bash
-docker compose up --build
-```
-
-Depois, acesse `http://localhost:3000`. Os volumes nomeados no
-`docker-compose.yml` mantêm os dados mesmo que o container seja recriado.
-
-> **Backup:** copie regularmente o arquivo `mes-engates.db` do volume `/data`
-> e o conteúdo do volume de uploads. Não remova esses volumes ao atualizar o
-> serviço.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
