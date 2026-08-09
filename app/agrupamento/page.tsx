@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import { calcularProgressoOPs } from "@/lib/pcp";
 import { AgrupamentoRow } from "@/components/agrupamento-row";
 import { ehSetor, ehSetorFinal } from "@/lib/setores";
@@ -176,10 +177,14 @@ export default async function AgrupamentoPage({
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-3.5 w-3.5" strokeWidth={2}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
               Filtrar
             </button>
-            <button className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 hover:text-white transition-colors">
+            <Link
+              href={`/agrupamento/relatorio/pdf${busca ? `?busca=${encodeURIComponent(busca)}` : ""}`}
+              target="_blank"
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:text-white"
+            >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-3.5 w-3.5" strokeWidth={2}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              Exportar
-            </button>
+              Exportar PDF
+            </Link>
             <form className="relative w-64" method="get">
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" strokeWidth={2}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                <input
