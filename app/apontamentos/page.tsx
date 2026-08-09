@@ -22,6 +22,7 @@ export default async function ApontamentosPage({
   const setor = setores.find((item) => item.id === setorId) ?? setores[0];
   const opIdFiltro = sp.op ? Number(sp.op) : null;
   const pecaIdFiltro = sp.peca ? Number(sp.peca) : null;
+  const modoQr = sp.origem === "qrcode" || (Number.isInteger(opIdFiltro) && sp.origem !== "pc");
   const quantidadeInicial = sp.quantidade ? Number(sp.quantidade) : null;
   const quantidadeInicialValida = typeof quantidadeInicial === "number" && Number.isInteger(quantidadeInicial) && quantidadeInicial > 0
     ? quantidadeInicial
@@ -38,6 +39,7 @@ export default async function ApontamentosPage({
   const operadorLogado = await buscarOperadorLogado();
   if (Number.isInteger(opIdFiltro) && !operadorLogado) {
     const destinoParams = new URLSearchParams({ op: String(opIdFiltro), setor: String(setor.id) });
+    if (modoQr) destinoParams.set("origem", "qrcode");
     if (Number.isInteger(pecaIdFiltro)) destinoParams.set("peca", String(pecaIdFiltro));
     if (quantidadeInicialValida !== null) {
       destinoParams.set("quantidade", String(quantidadeInicialValida));
@@ -341,9 +343,9 @@ export default async function ApontamentosPage({
 
       <div className="flex items-center gap-2 overflow-x-auto rounded-lg border border-slate-700 bg-[#131b2e] p-3">
         <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          {Number.isInteger(opIdFiltro) ? "Setor do QR" : "Posto / setor"}
+          {modoQr ? "Setor do QR" : "Posto / setor"}
         </span>
-        {Number.isInteger(opIdFiltro) ? (
+        {modoQr ? (
           <span className="whitespace-nowrap rounded border border-[#4cd7f6] bg-[#4cd7f6]/10 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-[#4cd7f6]">
             {setor.nome}
           </span>
@@ -387,7 +389,7 @@ export default async function ApontamentosPage({
         opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
         pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}
         quantidadeInicial={quantidadeInicialValida}
-        modoQr={Number.isInteger(opIdFiltro)}
+        modoQr={modoQr}
       />
 
       <HistoricoApontamentos

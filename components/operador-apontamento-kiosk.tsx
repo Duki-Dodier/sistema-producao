@@ -113,6 +113,9 @@ export function OperadorApontamentoKiosk({
         `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}.`,
       );
       setQuantidade("");
+      if (modoQr) {
+        window.setTimeout(() => window.location.assign("/apontamentos/scanner"), 1400);
+      }
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível salvar o apontamento.");
     } finally {
@@ -341,7 +344,20 @@ export function OperadorApontamentoKiosk({
                   Usar toda a quantidade pendente ({item.restante})
                 </button>
                 {erro && <p role="alert" className="mt-3 rounded bg-red-500/10 p-3 text-sm text-red-300">{erro}</p>}
-                {sucesso && <p role="status" className="mt-3 rounded bg-emerald-500/10 p-3 text-sm text-emerald-300">{sucesso}</p>}
+                {sucesso && (
+                  <div role="status" className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                    <p>{sucesso}</p>
+                    {modoQr && (
+                      <button
+                        type="button"
+                        onClick={() => window.location.assign("/apontamentos/scanner")}
+                        className="mt-3 w-full rounded-md border border-emerald-300/40 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-100 hover:bg-emerald-300/10"
+                      >
+                        Ler próximo QR Code
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-2">
