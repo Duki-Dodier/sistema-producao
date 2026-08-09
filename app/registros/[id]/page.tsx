@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { deleteModelo } from "@/lib/actions/modelos";
-import { addPecaToEngate, updatePecaMedidas } from "@/lib/actions/pecas";
+import { addPecaToEngate, updatePecaMedidas, updatePecaProcessos } from "@/lib/actions/pecas";
 import { TIPO_MATERIAL_LABEL } from "@/lib/labels";
 import Link from "next/link";
 import { ImageUploader } from "@/components/image-uploader";
 import { uploadImagemModelo, uploadImagemPeca } from "@/lib/actions/upload";
 import { buscarImagensOrganizadas } from "@/lib/upload";
 import { SubmitButton } from "@/components/submit-button";
+import { PROCESSOS, PROCESSO_LABEL, processosDaPeca } from "@/lib/processos";
 
 export default async function FichaEngatePage({
   params,
@@ -40,8 +41,10 @@ export default async function FichaEngatePage({
                 medidaB: true,
                 espessuraMm: true,
                 comprimentoMm: true,
+                processos: true,
                 tipoMaterial: true,
                 imagemUrl: true,
+                setor: { select: { nome: true } },
               },
             },
           },
@@ -165,6 +168,14 @@ export default async function FichaEngatePage({
                 const iconColor = pending ? 'text-[#FF9100]' : 'text-cyan-400';
                 const imagemPeca = mp.peca.imagemUrl ?? imagensOrganizadas.pecas.get(mp.peca.codigo);
                 const boundUpdatePecaMedidas = updatePecaMedidas.bind(null, mp.peca.id, modelo.id);
+                const boundUpdatePecaProcessos = updatePecaProcessos.bind(null, mp.peca.id, modelo.id);
+                const processosCadastrados = (mp.peca.processos ?? "")
+                  .split(",")
+                  .map((processo) => processo.trim())
+                  .filter((processo): processo is (typeof PROCESSOS)[number] => PROCESSOS.includes(processo as (typeof PROCESSOS)[number]));
+                const processosSelecionados = new Set(
+                  processosCadastrados.length > 0 ? processosCadastrados : processosDaPeca(mp.peca),
+                );
                 const dimensoes = [
                   mp.peca.medidaA !== null ? `A ${mp.peca.medidaA.toLocaleString("pt-BR")} mm` : null,
                   mp.peca.medidaB !== null ? `B ${mp.peca.medidaB.toLocaleString("pt-BR")} mm` : null,
@@ -285,6 +296,36 @@ export default async function FichaEngatePage({
                               className="mt-2 w-full rounded-sm border border-[#FF9100]/50 bg-[#FF9100]/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFB454] hover:bg-[#FF9100]/20"
                             >
                               Salvar medidas
+                            </SubmitButton>
+                          </form>
+                        </details>
+                        <details className="mt-3 border-t border-white/5 pt-3">
+                          <summary className="cursor-pointer list-none text-[9px] font-bold uppercase tracking-wider text-cyan-400 hover:text-cyan-300">
+                            Processos da peça
+                          </summary>
+                          <form action={boundUpdatePecaProcessos} className="mt-2 border-t border-cyan-500/20 pt-3">
+                            <p className="mb-2 text-[9px] leading-4 text-slate-500">
+                              Selecione os processos necessários. O agrupamento continua automático no final do roteiro.
+                            </p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {PROCESSOS.filter((processo) => processo !== "PRODUCAO" && processo !== "AGRUPAR").map((processo) => (
+                                <label key={processo} className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-white/5 bg-[#0B101E] px-2 py-1.5 text-[10px] text-slate-300 hover:border-cyan-500/40 hover:text-white">
+                                  <input
+                                    type="checkbox"
+                                    name="processos"
+                                    value={processo}
+                                    defaultChecked={processosSelecionados.has(processo)}
+                                    className="accent-cyan-500"
+                                  />
+                                  {PROCESSO_LABEL[processo]}
+                                </label>
+                              ))}
+                            </div>
+                            <SubmitButton
+                              pendingText="Salvando..."
+                              className="mt-2 w-full rounded-sm border border-cyan-500/50 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan-300 hover:bg-cyan-500/20"
+                            >
+                              Salvar processos
                             </SubmitButton>
                           </form>
                         </details>

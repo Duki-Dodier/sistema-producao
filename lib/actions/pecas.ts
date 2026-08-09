@@ -196,6 +196,30 @@ export async function updatePecaMedidas(
   revalidatePath("/apontamentos");
 }
 
+/** Atualiza os processos cadastrados para a peça na ficha técnica. */
+export async function updatePecaProcessos(
+  pecaId: number,
+  modeloId: number,
+  formData: FormData,
+) {
+  await exigirAdministrador();
+
+  const processos = processosDoForm(formData);
+  if (!processos) {
+    throw new Error("Selecione pelo menos um processo da peça.");
+  }
+
+  await prisma.peca.update({
+    where: { id: pecaId },
+    data: { processos },
+  });
+
+  revalidatePath(`/registros/${modeloId}`);
+  revalidatePath(`/registros/pecas/${pecaId}`);
+  revalidatePath("/monitoramento");
+  revalidatePath("/apontamentos");
+}
+
 export async function deletePeca(id: number) {
   await exigirAdministrador();
   try {
