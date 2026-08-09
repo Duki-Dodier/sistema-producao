@@ -5,7 +5,7 @@ import {
   colunasRoteiro,
   type OPProgresso,
 } from "@/lib/pcp";
-import { createApontamento } from "@/lib/actions/apontamentos";
+import { createApontamentoForm } from "@/lib/actions/apontamentos";
 import { updateSetorConfig } from "@/lib/actions/setores";
 import { Badge } from "@/components/badge";
 import { SubmitButton } from "@/components/submit-button";
@@ -1149,12 +1149,10 @@ async function ProducaoGeral({
   const colunas = colunasRoteiro(progresso);
 
   const setoresLinhaFinal = setores.filter((s) =>
-    ["Solda", "Pintura", "Montagem"].some((nome) => ehSetor(s.nome, nome)),
+    ehSetor(s.nome, "Solda"),
   );
   const opsParaLinhaFinal = progressoTotal.filter((p) =>
-    p.setores.some(
-      (s) => ["Solda", "Pintura", "Montagem"].some((nome) => ehSetor(s.setorNome, nome)) && !s.completo,
-    ),
+    p.setores.some((s) => ehSetor(s.setorNome, "Solda") && !s.completo),
   );
 
   return (
@@ -1330,11 +1328,14 @@ async function ProducaoGeral({
             Apontamento de linha final
           </h2>
           <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-            Registre a produção realizada por OP e responsável, inclusive na Solda.
+            Registre aqui somente a Solda. Pintura, Montagem e Estoque possuem controle parcial próprio.
           </p>
+          <Link href="/pintura-montagem" className="mt-2 inline-flex text-xs font-bold text-cyan-300 hover:text-cyan-200">
+            Abrir Pintura / Montagem →
+          </Link>
         </div>
         <form
-          action={createApontamento}
+          action={createApontamentoForm}
           className="flex flex-wrap items-end gap-3 px-5 py-4"
         >
           <div className="flex flex-col gap-1.5">

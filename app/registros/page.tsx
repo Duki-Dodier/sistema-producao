@@ -48,7 +48,7 @@ export default function NovoSKUPage() {
                      />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid gap-6 sm:grid-cols-3">
                     <div className="flex flex-col gap-1.5">
                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Curva ABC</label>
                        <select name="curva" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
@@ -63,6 +63,14 @@ export default function NovoSKUPage() {
                        <select name="tipo" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
                          <option value="FIXO">Fixo</option>
                          <option value="REMOVIVEL">Removível</option>
+                       </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Linha do Produto</label>
+                       <select name="linhaProduto" required className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
+                         <option value="BRUCKE">Brucke</option>
+                         <option value="REFORCEL">Reforcel</option>
                        </select>
                     </div>
                   </div>

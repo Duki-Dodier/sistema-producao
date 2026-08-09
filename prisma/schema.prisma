@@ -23,13 +23,13 @@ datasource db {
 /// Setor de produção (Tubo, Plasma Tubo, Plasma Chapa, Componente,
 /// Ponteira, Agrupamento, Solda, Pintura, Montagem).
 model Setor {
-  id           Int     @id @default(autoincrement())
-  nome         String  @unique
-  ordemPadrao  Int     @default(0) // ordem típica no fluxo, só para exibição
-  metaMensal   Int? // meta de peças/mês do setor — usada no cockpit de Monitoramento
+  id              Int     @id @default(autoincrement())
+  nome            String  @unique
+  ordemPadrao     Int     @default(0) // ordem típica no fluxo, só para exibição
+  metaMensal      Int? // meta de peças/mês do setor — usada no cockpit de Monitoramento
   mediaDiariaMeta Float? // média diária cadastrada para acompanhar o ritmo da meta
-  lider        String? // líder do setor — exibido no cockpit de Monitoramento
-  diasUteisMes Int? // dias úteis do mês (override do cálculo seg–sex automático)
+  lider           String? // líder do setor — exibido no cockpit de Monitoramento
+  diasUteisMes    Int? // dias úteis do mês (override do cálculo seg–sex automático)
 
   roteiros                ModeloRoteiro[]
   apontamentos            Apontamento[]
@@ -47,22 +47,22 @@ model Setor {
 /// as sugestões de soldador/abastecedor e, futuramente, escalas e metas
 /// individuais.
 model Funcionario {
-  id      Int     @id @default(autoincrement())
-  nome    String
-  setorId Int
-  ativo   Boolean @default(true)
-  pin     String? // PIN de 4 dígitos p/ apontar no kiosk e autorizar ajustes
+  id            Int     @id @default(autoincrement())
+  nome          String
+  setorId       Int
+  ativo         Boolean @default(true)
+  pin           String? // PIN de 4 dígitos p/ apontar no kiosk e autorizar ajustes
   papel         String  @default("OPERADOR") // OPERADOR | LIDER | PCP
   usuario       String? @unique
   senhaHash     String?
   administrador Boolean @default(false)
   bancada       String? // bancada/box fixa do soldador, editável em Configurações
 
-  setor                Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  setor               Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
   processosPermitidos FuncionarioProcesso[]
-  apontamentos         Apontamento[]
-  sessoes              OperadorSessao[]
-  ajustesAutorizados   AjusteApontamento[]
+  apontamentos        Apontamento[]
+  sessoes             OperadorSessao[]
+  ajustesAutorizados  AjusteApontamento[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -227,6 +227,7 @@ model Modelo {
   tamanhoPonteira String? // ex.: "P", "M", "G", "P-16mm" — só p/ removível
   imagemUrl       String? // foto do engate, ex.: "/api/uploads/AD1001/modelo/AD1001-xxx.jpg"
   estoqueMinimo   Int? // regulador de estoque — alerta quando o estoque pronto cair abaixo disso
+  linhaProduto    String  @default("BRUCKE") // "BRUCKE" | "REFORCEL"
 
   roteiro ModeloRoteiro[]
   ops     OP[]
@@ -255,25 +256,56 @@ model ModeloRoteiro {
 /// Ordem de Produção. A OP também é o lote. `numeroSequencia` (0–1000) é a
 /// prioridade de liberação, a mesma em todos os setores.
 model OP {
-  id              Int      @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   numeroSequencia Int // 0–1000, prioridade de liberação
-  lote            String?  @unique // lote único p/ rastreabilidade
+  lote            String?   @unique // lote único p/ rastreabilidade
   modeloId        Int
   quantidade      Int
-  status          String   @default("ABERTA") // "ABERTA" | "CONCLUIDA" | "CANCELADA"
-  dataLiberacao   DateTime @default(now())
+  status          String    @default("ABERTA") // "ABERTA" | "CONCLUIDA" | "CANCELADA"
+  dataLiberacao   DateTime  @default(now())
   dataFinalizacao DateTime? // preenchida automaticamente ao marcar a OP como CONCLUIDA
   previsaoEntrega DateTime? // impressa na capa do documento da OP
 
   modelo                  Modelo                   @relation(fields: [modeloId], references: [id], onDelete: Restrict)
   apontamentos            Apontamento[]
   recebimentosAgrupamento RecebimentoAgrupamento[]
+  entradasEstoque         EntradaEstoque[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([modeloId])
   @@index([numeroSequencia])
+}
+
+/// Fechamento diário da cabine de Pintura. A Pintura informa somente o total
+/// das duas linhas da empresa; a distribuição por OP acontece na liberação
+/// detalhada para a Montagem.
+model FechamentoPintura {
+  id                 Int      @id @default(autoincrement())
+  data               DateTime @unique
+  quantidadeBrucke   Int      @default(0)
+  quantidadeReforcel Int      @default(0)
+  refugoBrucke       Int      @default(0)
+  refugoReforcel     Int      @default(0)
+  usuario            String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+/// Entrada parcial de produto acabado no estoque. Uma OP pode gerar várias
+/// entradas até atingir sua quantidade total.
+model EntradaEstoque {
+  id         Int      @id @default(autoincrement())
+  opId       Int
+  quantidade Int
+  usuario    String
+  dataHora   DateTime @default(now())
+
+  op OP @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([opId])
+  @@index([dataHora])
 }
 
 /// Apontamento de produção: "na OP X, no setor Y, o líder produziu N boas / M refugo".
@@ -296,11 +328,11 @@ model Apontamento {
   roteiroEtapaId    Int? // etapa exata do roteiro entre setores
   origem            String   @default("OPERADOR") // OPERADOR | LEGADO
 
-  op           OP           @relation(fields: [opId], references: [id], onDelete: Cascade)
-  setor        Setor        @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  funcionario  Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
-  peca         Peca?        @relation(fields: [pecaId], references: [id], onDelete: SetNull)
-  roteiroEtapa PecaRoteiro? @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
+  op           OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
+  setor        Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  funcionario  Funcionario?        @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
+  peca         Peca?               @relation(fields: [pecaId], references: [id], onDelete: SetNull)
+  roteiroEtapa PecaRoteiro?        @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
   ajustes      AjusteApontamento[]
 
   @@index([opId])

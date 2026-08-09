@@ -12,10 +12,17 @@ import { exigirAdministrador } from "@/lib/auth-operador";
 
 const CURVAS_VALIDAS = new Set(["A", "B", "C"]);
 const TIPOS_VALIDOS = new Set(["FIXO", "REMOVIVEL"]);
+const LINHAS_VALIDAS = new Set(["BRUCKE", "REFORCEL"]);
 
 function validarClassificacao(curva: string, tipo: string) {
   if (!CURVAS_VALIDAS.has(curva) || !TIPOS_VALIDOS.has(tipo)) {
     throw new Error("Curva ou tipo de engate inválido.");
+  }
+}
+
+function validarLinhaProduto(linhaProduto: string) {
+  if (!LINHAS_VALIDAS.has(linhaProduto)) {
+    throw new Error("A linha do produto deve ser BRUCKE ou REFORCEL.");
   }
 }
 
@@ -25,10 +32,12 @@ export async function createModelo(formData: FormData) {
   const nome = String(formData.get("nome") ?? "").trim();
   const curva = String(formData.get("curva") ?? "A");
   const tipo = String(formData.get("tipo") ?? "FIXO");
+  const linhaProduto = String(formData.get("linhaProduto") ?? "BRUCKE").toUpperCase();
   const estoqueMinimoRaw = String(formData.get("estoqueMinimo") ?? "").trim();
 
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
+  validarLinhaProduto(linhaProduto);
   if (estoqueMinimoRaw && (!Number.isInteger(Number(estoqueMinimoRaw)) || Number(estoqueMinimoRaw) < 0)) {
     throw new Error("Estoque mínimo deve ser um número inteiro não negativo.");
   }
@@ -41,6 +50,7 @@ export async function createModelo(formData: FormData) {
       nome: nome || null,
       curva,
       tipo,
+      linhaProduto,
       estoqueMinimo: estoqueMinimoRaw ? Number(estoqueMinimoRaw) : null,
       imagemUrl,
     },
@@ -57,11 +67,13 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
   const nome = String(formData.get("nome") ?? "").trim();
   const curva = String(formData.get("curva") ?? "A");
   const tipo = String(formData.get("tipo") ?? "FIXO");
+  const linhaProduto = String(formData.get("linhaProduto") ?? "BRUCKE").toUpperCase();
   const tamanhoPonteira = String(formData.get("tamanhoPonteira") ?? "").trim();
   const estoqueMinimoRaw = String(formData.get("estoqueMinimo") ?? "").trim();
 
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
+  validarLinhaProduto(linhaProduto);
   if (estoqueMinimoRaw && (!Number.isInteger(Number(estoqueMinimoRaw)) || Number(estoqueMinimoRaw) < 0)) {
     throw new Error("Estoque mínimo deve ser um número inteiro não negativo.");
   }
@@ -75,6 +87,7 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
       nome: nome || null,
       curva,
       tipo,
+      linhaProduto,
       tamanhoPonteira: tamanhoPonteira || null,
       estoqueMinimo: estoqueMinimoRaw ? Number(estoqueMinimoRaw) : null,
       ...(novaImagem ? { imagemUrl: novaImagem } : {}),
@@ -84,6 +97,15 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath("/registros");
   revalidatePath("/modelos");
+}
+
+export async function updateModeloLinhaProduto(modeloId: number, formData: FormData) {
+  await exigirAdministrador();
+  const linhaProduto = String(formData.get("linhaProduto") ?? "").toUpperCase();
+  validarLinhaProduto(linhaProduto);
+  await prisma.modelo.update({ where: { id: modeloId }, data: { linhaProduto } });
+  revalidatePath("/modelos");
+  revalidatePath("/pintura-montagem");
 }
 
 export async function deleteModelo(id: number) {
@@ -145,9 +167,11 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
   const nome = String(engate.get("nome") ?? "").trim();
   const curva = String(engate.get("curva") ?? "A");
   const tipo = String(engate.get("tipo") ?? "FIXO");
+  const linhaProduto = String(engate.get("linhaProduto") ?? "BRUCKE").toUpperCase();
   
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
+  validarLinhaProduto(linhaProduto);
   if (pecas.some((peca) => !Number.isInteger(peca.setorId) || !Number.isInteger(peca.quantidade) || peca.quantidade <= 0)) {
     throw new Error("Cada peça precisa ter setor e quantidade inteira positiva.");
   }
@@ -161,6 +185,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
         nome: nome || null,
         curva,
         tipo,
+        linhaProduto,
         imagemUrl,
       }
     });

@@ -150,6 +150,13 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
     if (!etapa && roteiroEtapaId === null) {
       throw new Error("O setor informado nao faz parte do roteiro desta OP.");
     }
+    if (
+      roteiroEtapaId === null &&
+      etapa &&
+      (ehSetor(etapa.setor.nome, "Pintura") || ehSetor(etapa.setor.nome, "Montagem"))
+    ) {
+      throw new Error("Use a página Pintura / Montagem para registrar esta etapa.");
+    }
 
     const pecasDoSetor = op.modelo.pecas.filter((item) => item.peca.setorId === setorId);
     const etapaSolda = etapa ? ehSetor(etapa.setor.nome, "Solda") : false;
@@ -347,4 +354,10 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
         : "Nao foi possivel registrar o apontamento. Tente novamente.",
     };
   }
+}
+
+/** Adaptador para formulários server-side que não consomem o retorno estruturado. */
+export async function createApontamentoForm(formData: FormData): Promise<void> {
+  const resultado = await createApontamento(formData);
+  if (!resultado.ok) throw new Error(resultado.error);
 }

@@ -91,9 +91,7 @@ function chaveSetor(nome: string) {
   return ALIASES_SETOR[normalizado] ?? normalizado;
 }
 
-export const SETORES_FINAIS = SETORES_PADRAO
-  .filter((setor) => setor.grupo === "FLUXO_FINAL")
-  .map((setor) => setor.nome) as readonly ["Agrupamento", "Solda", "Pintura", "Montagem"];
+export const SETORES_FINAIS = ["Agrupamento", "Solda", "Pintura", "Montagem"] as const;
 
 export const SETORES_COMPONENTES = [
   "Componente Barra Chata e Cantoneira",

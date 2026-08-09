@@ -5,6 +5,8 @@ import { Card, CardHeader } from "@/components/card";
 import { Badge } from "@/components/badge";
 import { CURVA_VARIANT, TIPO_LABEL } from "@/lib/labels";
 import { FileText, Plus, Route } from "lucide-react";
+import { updateModeloLinhaProduto } from "@/lib/actions/modelos";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function ModelosPage() {
   const modelos = await prisma.modelo.findMany({
@@ -14,6 +16,7 @@ export default async function ModelosPage() {
       codigo: true,
       curva: true,
       tipo: true,
+      linhaProduto: true,
       _count: { select: { roteiro: true, ops: true } },
     },
   });
@@ -61,12 +64,14 @@ export default async function ModelosPage() {
 
       <Card>
         <CardHeader title={`Modelos cadastrados (${modelos.length})`} />
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] text-sm">
           <thead>
             <tr className="border-b border-white/5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-5 py-3">Código</th>
               <th className="px-5 py-3">Curva</th>
               <th className="px-5 py-3">Tipo</th>
+              <th className="px-5 py-3">Linha</th>
               <th className="px-5 py-3">Fluxo de produção</th>
               <th className="px-5 py-3">OPs</th>
               <th className="px-5 py-3" />
@@ -85,6 +90,21 @@ export default async function ModelosPage() {
                 </td>
                 <td className="px-5 py-3 text-slate-400">
                   {TIPO_LABEL[m.tipo] ?? m.tipo}
+                </td>
+                <td className="px-5 py-3">
+                  <form action={updateModeloLinhaProduto.bind(null, m.id)} className="flex items-center gap-2">
+                    <select
+                      name="linhaProduto"
+                      defaultValue={m.linhaProduto}
+                      className="rounded-md border border-white/10 bg-[#1A222C] px-2.5 py-2 text-xs font-semibold text-slate-200 outline-none focus:border-blue-500"
+                    >
+                      <option value="BRUCKE">BRUCKE</option>
+                      <option value="REFORCEL">REFORCEL</option>
+                    </select>
+                    <SubmitButton pendingText="..." className="px-2.5 py-2 text-xs">
+                      Salvar
+                    </SubmitButton>
+                  </form>
                 </td>
                 <td className="px-5 py-3 text-slate-500">
                   {m._count.roteiro > 0
@@ -114,13 +134,14 @@ export default async function ModelosPage() {
             ))}
             {modelos.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
                   Nenhum modelo cadastrado ainda.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );

@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/ops", label: "Ordens de Produção", icon: OrdersIcon },
   { href: "/agrupamento", label: "Agrupamento (WIP)", icon: KittingIcon },
   { href: "/solda", label: "Soldagem", icon: WeldingIcon },
+  { href: "/pintura-montagem", label: "Pintura / Montagem", icon: FinalLineIcon },
   { href: "/apontamentos", label: "Apontamentos da Fábrica", icon: QualityIcon },
   { href: "/modelos", label: "Engenharia de Produto", icon: ConfigIcon },
   { href: "/configuracoes", label: "Configurações (Funcionários, Metas)", icon: SettingsIcon },
@@ -17,18 +18,23 @@ const NAV_ITEMS = [
 export function SidebarNav({
   administrador,
   papel,
+  setorNome,
 }: {
   administrador: boolean;
   papel: string;
+  setorNome: string;
 }) {
   const pathname = usePathname();
   const itensVisiveis = administrador
     ? NAV_ITEMS
     : papel === "OPERADOR"
-      ? NAV_ITEMS.filter((item) => item.href === "/apontamentos")
+      ? NAV_ITEMS.filter((item) =>
+          item.href === "/apontamentos" ||
+          (item.href === "/pintura-montagem" && /PINTURA|MONTAGEM/i.test(setorNome)),
+        )
       : papel === "LIDER"
         ? NAV_ITEMS.filter((item) =>
-            ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos"].includes(item.href),
+            ["/", "/monitoramento", "/agrupamento", "/solda", "/pintura-montagem", "/apontamentos"].includes(item.href),
           )
         : NAV_ITEMS.filter((item) => item.href !== "/configuracoes");
 
@@ -115,6 +121,17 @@ function WeldingIcon(props: React.SVGProps<SVGSVGElement>) {
       <path d="m9 10 5-5 5 5-5 5z" />
       <path d="M3 21h8" />
       <path d="M18 3v2M22 7h-2M20.5 4.5 19 6" />
+    </svg>
+  );
+}
+
+function FinalLineIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 4h8v6H4z" />
+      <path d="M12 7h4a4 4 0 0 1 4 4v1" />
+      <path d="M5 14h14v6H5z" />
+      <path d="m9 17 2 2 4-4" />
     </svg>
   );
 }
