@@ -274,8 +274,8 @@ export default async function DocumentoOPPage({
                   </h2>
                   <div className="flex items-start gap-2">
                     {setoresDaPeca.map((setorDaPeca) => (
-                      <div key={setorDaPeca.setorId} className="w-20 text-center">
-                        <div className="mx-auto h-16 w-16 rounded bg-white p-1 print:border print:border-slate-400">
+                      <div key={setorDaPeca.setorId} className="w-24 text-center">
+                        <div className="mx-auto h-20 w-20 rounded bg-white p-1 print:border print:border-slate-400">
                           <QrCode value={`${appOrigin}/apontamentos?origem=qrcode&op=${op.id}&setor=${setorDaPeca.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`} />
                         </div>
                         <span className="mt-1 block text-[7px] font-bold uppercase leading-tight text-slate-600">

@@ -21,6 +21,13 @@
 /dist
 /.wrangler
 
+# local data and generated artifacts
+/backups/
+/output/
+/tmp/
+/.pnpm-store/
+*.log
+
 # misc
 .DS_Store
 *.pem

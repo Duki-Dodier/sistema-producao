@@ -1,0 +1,17 @@
+services:
+  mes-engates:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: file:/data/mes-engates.db
+      # Popula a demonstração apenas quando o banco é criado pela primeira vez.
+      SEED_DATABASE: "true"
+    volumes:
+      - mes-engates-data:/data
+      - mes-engates-uploads:/app/public/uploads
+    restart: unless-stopped
+
+volumes:
+  mes-engates-data:
+  mes-engates-uploads:

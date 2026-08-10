@@ -191,12 +191,11 @@ export function podeAcessarRota(usuario: OperadorLogado, pathname: string) {
   if (pathname === "/login") return true;
   if (usuario.papel === "OPERADOR") {
     if (pathname.startsWith("/apontamentos")) return true;
-    if (pathname.startsWith("/estoque")) return ehSetor(usuario.setorNome, "Montagem");
     return pathname.startsWith("/pintura-montagem") &&
       (ehSetor(usuario.setorNome, "Pintura") || ehSetor(usuario.setorNome, "Montagem"));
   }
   if (usuario.papel === "LIDER") {
-    return ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos", "/pintura-montagem", "/estoque"].some(
+    return ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos", "/pintura-montagem"].some(
       (rota) => rota === "/" ? pathname === "/" : pathname.startsWith(rota),
     );
   }

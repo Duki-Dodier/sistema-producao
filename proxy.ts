@@ -27,7 +27,6 @@ export const config = {
     "/agrupamento/:path*",
     "/apontamentos/:path*",
     "/configuracoes/:path*",
-    "/estoque/:path*",
     "/modelos/:path*",
     "/monitoramento/:path*",
     "/ops/:path*",
