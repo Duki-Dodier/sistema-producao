@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { deleteModelo } from "@/lib/actions/modelos";
+import { deleteModelo, updateModeloFicha } from "@/lib/actions/modelos";
 import { addPecaToEngate, updatePecaMedidas, updatePecaProcessos } from "@/lib/actions/pecas";
 import { TIPO_MATERIAL_LABEL } from "@/lib/labels";
 import Link from "next/link";
@@ -26,6 +26,11 @@ export default async function FichaEngatePage({
         codigo: true,
         nome: true,
         curva: true,
+        tipo: true,
+        linhaProduto: true,
+        regulador: true,
+        tamanhoPonteira: true,
+        estoqueMinimo: true,
         imagemUrl: true,
         pecas: {
           select: {
@@ -67,6 +72,7 @@ export default async function FichaEngatePage({
 
   const boundAddPeca = addPecaToEngate.bind(null, modelo.id);
   const boundDeleteModelo = deleteModelo.bind(null, modelo.id);
+  const boundUpdateModeloFicha = updateModeloFicha.bind(null, modelo.id);
 
   return (
     <div className="flex h-[calc(100vh-80px)] w-full flex-col font-mono text-slate-300">
@@ -146,6 +152,88 @@ export default async function FichaEngatePage({
                   <a href={imagemModelo} target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:underline">Ver Foto</a>
                 )}
               </div>
+              <details className="mt-4 border-t border-white/5 pt-3">
+                <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-wider text-cyan-400 hover:text-cyan-300">
+                  Editar dados do produto
+                </summary>
+                <form action={boundUpdateModeloFicha} className="mt-3 space-y-2">
+                  <input
+                    name="codigo"
+                    required
+                    defaultValue={modelo.codigo}
+                    aria-label="Código do produto"
+                    className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 focus:border-cyan-500 focus:outline-none"
+                  />
+                  <input
+                    name="nome"
+                    defaultValue={modelo.nome ?? ""}
+                    placeholder="Nome / aplicação"
+                    aria-label="Nome do produto"
+                    className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      name="curva"
+                      required
+                      defaultValue={modelo.curva}
+                      aria-label="Curva do produto"
+                      className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 focus:border-cyan-500 focus:outline-none"
+                    >
+                      <option value="A">Curva A</option>
+                      <option value="B">Curva B</option>
+                      <option value="C">Curva C</option>
+                    </select>
+                    <select
+                      name="tipo"
+                      required
+                      defaultValue={modelo.tipo}
+                      aria-label="Tipo de engate"
+                      className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 focus:border-cyan-500 focus:outline-none"
+                    >
+                      <option value="FIXO">Fixo</option>
+                      <option value="REMOVIVEL">Removível</option>
+                    </select>
+                  </div>
+                  <div className="rounded-sm border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-300">
+                    Linha: <span className="font-bold">{modelo.linhaProduto}</span>
+                    <span className="ml-1 text-emerald-400/70">(definida no cadastro)</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      name="tamanhoPonteira"
+                      defaultValue={modelo.tamanhoPonteira ?? ""}
+                      placeholder="Ponteira"
+                      aria-label="Tamanho da ponteira"
+                      className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
+                    />
+                    <input
+                      name="regulador"
+                      type="number"
+                      min="0"
+                      step="1"
+                      defaultValue={modelo.regulador ?? ""}
+                      placeholder="Regulador"
+                      aria-label="Regulador"
+                      className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
+                    />
+                    <input
+                      name="estoqueMinimo"
+                      type="number"
+                      min="0"
+                      defaultValue={modelo.estoqueMinimo ?? ""}
+                      placeholder="Estoque mín."
+                      aria-label="Estoque mínimo"
+                      className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                  <SubmitButton
+                    pendingText="Salvando..."
+                    className="w-full rounded-sm border border-cyan-500/50 bg-cyan-500/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan-300 hover:bg-cyan-500/20"
+                  >
+                    Salvar dados e curva
+                  </SubmitButton>
+                </form>
+              </details>
             </div>
           </div>
 

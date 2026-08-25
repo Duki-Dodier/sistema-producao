@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { salvarImagem } from "@/lib/upload";
-import { SUFIXO_MATERIAL } from "@/lib/labels";
+import { proximoCodigoPeca } from "@/lib/codigos-peca";
 import { PROCESSOS, processosDoForm } from "@/lib/processos";
 import { etapasDoFormulario, roteiroPadraoDaPeca } from "@/lib/roteiro-peca";
 import { ehSetor } from "@/lib/setores";
@@ -73,14 +73,17 @@ export async function createPeca(formData: FormData) {
 
 export async function updatePeca(id: number, formData: FormData) {
   await exigirAdministrador();
-  const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();
   const setorId = Number(formData.get("setorId"));
   const tipoMaterial = String(formData.get("tipoMaterial") ?? "").trim();
+  const pecaAtual = await prisma.peca.findUnique({
+    where: { id },
+    select: { codigo: true },
+  });
 
-  if (!codigo || !nome || !setorId) {
-    throw new Error("Preencha código, nome e setor da peça.");
+  if (!pecaAtual || !nome || !setorId) {
+    throw new Error("Preencha nome e setor da peça.");
   }
 
   const novaImagem = await salvarImagem(formData.get("imagem"), "pecas");
@@ -116,7 +119,7 @@ export async function updatePeca(id: number, formData: FormData) {
     await tx.peca.update({
       where: { id },
       data: {
-        codigo,
+        codigo: pecaAtual.codigo,
         nome,
         medida: medida || null,
         setorId,
@@ -278,16 +281,16 @@ export async function addPecaToEngate(modeloId: number, formData: FormData) {
 
   const modelo = await prisma.modelo.findUnique({
     where: { id: modeloId },
-    include: { pecas: { include: { peca: true } } },
+    select: { id: true, codigo: true },
   });
   if (!modelo) throw new Error("Modelo não encontrado.");
 
-  const sufixo = SUFIXO_MATERIAL[tipoMaterial] ?? "OT";
-  const pecasDoMesmoTipo = modelo.pecas.filter((p) =>
-    p.peca.codigo.startsWith(`${modelo.codigo}-${sufixo}`)
+  const codigosExistentes = await prisma.peca.findMany({ select: { codigo: true } });
+  const codigoGerado = proximoCodigoPeca(
+    modelo.codigo,
+    tipoMaterial,
+    codigosExistentes.map((item) => item.codigo),
   );
-  const numero = pecasDoMesmoTipo.length > 0 ? pecasDoMesmoTipo.length + 1 : "";
-  const codigoGerado = `${modelo.codigo}-${sufixo}${numero}`;
 
   await prisma.$transaction(async (tx) => {
     const peca = await tx.peca.create({

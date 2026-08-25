@@ -560,7 +560,7 @@ function CabecalhoOP({
           <div className="flex items-center gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
-              src="/uploads/logo/logoBrucke.png" 
+              src="/uploads/logo/logoBrucke.jpg"
               alt="Brucke" 
               className="h-9 object-contain grayscale print:grayscale-0" 
             />

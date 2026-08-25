@@ -226,7 +226,8 @@ model Modelo {
   tipo            String // "FIXO" | "REMOVIVEL"
   tamanhoPonteira String? // ex.: "P", "M", "G", "P-16mm" — só p/ removível
   imagemUrl       String? // foto do engate, ex.: "/api/uploads/AD1001/modelo/AD1001-xxx.jpg"
-  estoqueMinimo   Int? // regulador de estoque — alerta quando o estoque pronto cair abaixo disso
+  estoqueMinimo   Int? // estoque mínimo — alerta quando o estoque pronto cair abaixo disso
+  regulador       Int? // código numérico do regulador usado no modelo
   linhaProduto    String  @default("BRUCKE") // "BRUCKE" | "REFORCEL"
 
   roteiro ModeloRoteiro[]

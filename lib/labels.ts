@@ -23,10 +23,10 @@ export const TIPO_MATERIAL_LABEL: Record<string, string> = {
 export const SUFIXO_MATERIAL: Record<string, string> = {
   TUBO: "TB",
   BARRA_CHATA: "BC",
-  CHAPA: "CH",
+  CHAPA: "PL",
   CANTONEIRA: "CT",
-  REFORCO: "RF",
-  PONTEIRA: "PT",
+  REFORCO: "RCB",
+  PONTEIRA: "CB",
   PLASMA: "PL",
   OUTRO: "OT",
 };

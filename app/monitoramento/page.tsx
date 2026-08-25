@@ -1328,11 +1328,8 @@ async function ProducaoGeral({
             Apontamento de linha final
           </h2>
           <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-            Registre aqui somente a Solda. Pintura, Montagem e Estoque possuem controle parcial próprio.
+            Registre aqui a produção da linha final por OP e responsável.
           </p>
-          <Link href="/pintura-montagem" className="mt-2 inline-flex text-xs font-bold text-cyan-300 hover:text-cyan-200">
-            Abrir Pintura / Montagem →
-          </Link>
         </div>
         <form
           action={createApontamentoForm}

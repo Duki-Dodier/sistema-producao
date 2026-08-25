@@ -66,8 +66,10 @@ export default async function EditarPecaPage({
               <input
                 name="codigo"
                 required
+                readOnly
                 defaultValue={peca.codigo}
-                className="rounded-md border border-white/5 px-3 py-2 text-sm font-mono shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                title="Código único gerado pelo sistema"
+                className="cursor-not-allowed rounded-md border border-white/5 bg-slate-950/40 px-3 py-2 text-sm font-mono text-slate-400 shadow-sm focus:outline-none"
               />
             </div>
             <div className="flex flex-col gap-1.5">

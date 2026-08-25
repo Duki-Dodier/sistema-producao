@@ -55,7 +55,6 @@ function exigirSetor(usuario: OperadorLogado, setor: "Pintura" | "Montagem") {
 }
 
 function revalidarLinhaFinal() {
-  revalidatePath("/pintura-montagem");
   revalidatePath("/monitoramento");
   revalidatePath("/apontamentos");
   revalidatePath("/ops");

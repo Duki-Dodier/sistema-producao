@@ -25,13 +25,14 @@ export default async function OpsPage() {
           select: {
             codigo: true,
             curva: true,
+            linhaProduto: true,
           },
         },
       },
     }),
     prisma.modelo.findMany({
       orderBy: { codigo: "asc" },
-      select: { id: true, codigo: true, curva: true },
+      select: { id: true, codigo: true, curva: true, linhaProduto: true, regulador: true },
     }),
   ]);
 
@@ -88,7 +89,7 @@ export default async function OpsPage() {
               </option>
               {modelos.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.codigo} · Curva {m.curva}
+                  {m.codigo} · Regulador {m.regulador ?? "—"} · {m.linhaProduto} · Curva {m.curva}
                 </option>
               ))}
             </select>
@@ -150,6 +151,7 @@ export default async function OpsPage() {
               <th className="px-5 py-3">Seq.</th>
               <th className="px-5 py-3">Lote</th>
               <th className="px-5 py-3">Modelo</th>
+              <th className="px-5 py-3">Regulador</th>
               <th className="px-5 py-3">Curva</th>
               <th className="px-5 py-3">Quantidade</th>
               <th className="px-5 py-3">Liberada em</th>
@@ -169,6 +171,9 @@ export default async function OpsPage() {
                 </td>
                 <td className="px-5 py-3 font-mono text-slate-300">
                   {op.modelo.codigo}
+                </td>
+                <td className="px-5 py-3">
+                  <span className="font-mono text-slate-300">{op.modelo.regulador ?? "—"}</span>
                 </td>
                 <td className="px-5 py-3">
                   <Badge
@@ -210,7 +215,7 @@ export default async function OpsPage() {
             ))}
             {ops.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
+                <td colSpan={10} className="px-5 py-8 text-center text-slate-400">
                   Nenhuma OP liberada ainda.
                 </td>
               </tr>

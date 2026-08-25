@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { ehSetor } from "@/lib/setores";
 
 const COOKIE_NAME = "mes_operador_session";
 const DURACAO_SESSAO_SEGUNDOS = 12 * 60 * 60;
@@ -180,9 +179,6 @@ export async function exigirAdministrador() {
 
 export function destinoInicial(usuario: OperadorLogado) {
   if (usuario.administrador || usuario.papel === "PCP") return "/";
-  if (ehSetor(usuario.setorNome, "Pintura") || ehSetor(usuario.setorNome, "Montagem")) {
-    return "/pintura-montagem";
-  }
   return `/apontamentos?setor=${usuario.setorId}`;
 }
 
@@ -190,12 +186,10 @@ export function podeAcessarRota(usuario: OperadorLogado, pathname: string) {
   if (usuario.administrador) return true;
   if (pathname === "/login") return true;
   if (usuario.papel === "OPERADOR") {
-    if (pathname.startsWith("/apontamentos")) return true;
-    return pathname.startsWith("/pintura-montagem") &&
-      (ehSetor(usuario.setorNome, "Pintura") || ehSetor(usuario.setorNome, "Montagem"));
+    return pathname.startsWith("/apontamentos");
   }
   if (usuario.papel === "LIDER") {
-    return ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos", "/pintura-montagem"].some(
+    return ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos"].some(
       (rota) => rota === "/" ? pathname === "/" : pathname.startsWith(rota),
     );
   }

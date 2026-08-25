@@ -18,7 +18,7 @@ export default async function RootLayout({
 }>) {
   const requestHeaders = await headers();
   const pathname = requestHeaders.get("x-mes-pathname") ?? "/";
-  const paginaApontamento = pathname.startsWith("/apontamentos") || pathname.startsWith("/pintura-montagem");
+  const paginaApontamento = pathname.startsWith("/apontamentos");
 
   if (pathname === "/login") {
     return (
@@ -51,7 +51,7 @@ export default async function RootLayout({
               </svg>
             </div>
             
-            <SidebarNav administrador={usuario.administrador} papel={usuario.papel} setorNome={usuario.setorNome} />
+            <SidebarNav administrador={usuario.administrador} papel={usuario.papel} />
             
             <div className="mt-auto flex h-14 items-center justify-center border-t border-white/5">
               <div className="group relative flex cursor-pointer items-center justify-center">

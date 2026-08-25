@@ -5,8 +5,6 @@ import { Card, CardHeader } from "@/components/card";
 import { Badge } from "@/components/badge";
 import { CURVA_VARIANT, TIPO_LABEL } from "@/lib/labels";
 import { FileText, Plus, Route } from "lucide-react";
-import { updateModeloLinhaProduto } from "@/lib/actions/modelos";
-import { SubmitButton } from "@/components/submit-button";
 
 export default async function ModelosPage() {
   const modelos = await prisma.modelo.findMany({
@@ -17,6 +15,7 @@ export default async function ModelosPage() {
       curva: true,
       tipo: true,
       linhaProduto: true,
+      regulador: true,
       _count: { select: { roteiro: true, ops: true } },
     },
   });
@@ -72,6 +71,7 @@ export default async function ModelosPage() {
               <th className="px-5 py-3">Curva</th>
               <th className="px-5 py-3">Tipo</th>
               <th className="px-5 py-3">Linha</th>
+              <th className="px-5 py-3">Regulador</th>
               <th className="px-5 py-3">Fluxo de produção</th>
               <th className="px-5 py-3">OPs</th>
               <th className="px-5 py-3" />
@@ -92,20 +92,12 @@ export default async function ModelosPage() {
                   {TIPO_LABEL[m.tipo] ?? m.tipo}
                 </td>
                 <td className="px-5 py-3">
-                  <form action={updateModeloLinhaProduto.bind(null, m.id)} className="flex items-center gap-2">
-                    <select
-                      name="linhaProduto"
-                      defaultValue={m.linhaProduto}
-                      className="rounded-md border border-white/10 bg-[#1A222C] px-2.5 py-2 text-xs font-semibold text-slate-200 outline-none focus:border-blue-500"
-                    >
-                      <option value="BRUCKE">BRUCKE</option>
-                      <option value="REFORCEL">REFORCEL</option>
-                    </select>
-                    <SubmitButton pendingText="..." className="px-2.5 py-2 text-xs">
-                      Salvar
-                    </SubmitButton>
-                  </form>
+                  <div className="flex flex-col items-start gap-1">
+                    <Badge variant="neutral">{m.linhaProduto}</Badge>
+                    <span className="text-[10px] text-slate-600">Definida no cadastro</span>
+                  </div>
                 </td>
+                <td className="px-5 py-3 font-mono text-slate-400">{m.regulador ?? "—"}</td>
                 <td className="px-5 py-3 text-slate-500">
                   {m._count.roteiro > 0
                     ? `${m._count.roteiro} etapas configuradas`
@@ -134,7 +126,7 @@ export default async function ModelosPage() {
             ))}
             {modelos.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
+                <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
                   Nenhum modelo cadastrado ainda.
                 </td>
               </tr>

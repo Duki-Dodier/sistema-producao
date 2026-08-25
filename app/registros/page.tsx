@@ -48,10 +48,11 @@ export default function NovoSKUPage() {
                      />
                   </div>
                   
-                  <div className="grid gap-6 sm:grid-cols-3">
+                  <div className="grid gap-6 sm:grid-cols-4">
                     <div className="flex flex-col gap-1.5">
                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Curva ABC</label>
-                       <select name="curva" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
+                       <select name="curva" required defaultValue="" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
+                         <option value="" disabled>Selecione a curva</option>
                          <option value="A">Curva A (Alta Saída)</option>
                          <option value="B">Curva B (Média Saída)</option>
                          <option value="C">Curva C (Baixa Saída)</option>
@@ -68,10 +69,24 @@ export default function NovoSKUPage() {
 
                     <div className="flex flex-col gap-1.5">
                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Linha do Produto</label>
-                       <select name="linhaProduto" required className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
+                       <select name="linhaProduto" required defaultValue="" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
+                         <option value="" disabled>Selecione a linha</option>
                          <option value="BRUCKE">Brucke</option>
                          <option value="REFORCEL">Reforcel</option>
                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Regulador</label>
+                       <input
+                         name="regulador"
+                         type="number"
+                         min="0"
+                         step="1"
+                         required
+                         placeholder="Ex: 5"
+                         className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none transition-colors"
+                       />
                     </div>
                   </div>
                </div>

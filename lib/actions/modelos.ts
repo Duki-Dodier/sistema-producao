@@ -9,6 +9,7 @@ import { ehSetorFinal } from "@/lib/setores";
 import { roteiroPadraoDaPeca } from "@/lib/roteiro-peca";
 import type { Processo } from "@/lib/processos";
 import { exigirAdministrador } from "@/lib/auth-operador";
+import { proximoCodigoPeca } from "@/lib/codigos-peca";
 
 const CURVAS_VALIDAS = new Set(["A", "B", "C"]);
 const TIPOS_VALIDOS = new Set(["FIXO", "REMOVIVEL"]);
@@ -26,13 +27,28 @@ function validarLinhaProduto(linhaProduto: string) {
   }
 }
 
+function parseRegulador(value: unknown, obrigatorio = false) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    if (obrigatorio) throw new Error("O regulador do produto é obrigatório.");
+    return null;
+  }
+
+  const regulador = Number(raw);
+  if (!Number.isInteger(regulador) || regulador < 0) {
+    throw new Error("O regulador deve ser um número inteiro não negativo.");
+  }
+  return regulador;
+}
+
 export async function createModelo(formData: FormData) {
   await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
-  const curva = String(formData.get("curva") ?? "A");
-  const tipo = String(formData.get("tipo") ?? "FIXO");
-  const linhaProduto = String(formData.get("linhaProduto") ?? "BRUCKE").toUpperCase();
+  const curva = String(formData.get("curva") ?? "").trim().toUpperCase();
+  const tipo = String(formData.get("tipo") ?? "").trim().toUpperCase();
+  const linhaProduto = String(formData.get("linhaProduto") ?? "").trim().toUpperCase();
+  const regulador = parseRegulador(formData.get("regulador"), true);
   const estoqueMinimoRaw = String(formData.get("estoqueMinimo") ?? "").trim();
 
   if (!codigo) throw new Error("Código do engate é obrigatório.");
@@ -51,12 +67,14 @@ export async function createModelo(formData: FormData) {
       curva,
       tipo,
       linhaProduto,
+      regulador,
       estoqueMinimo: estoqueMinimoRaw ? Number(estoqueMinimoRaw) : null,
       imagemUrl,
     },
   });
   revalidatePath("/registros");
   revalidatePath("/modelos");
+  revalidatePath("/ops");
   redirect(`/registros/${modelo.id}`);
 }
 
@@ -65,15 +83,14 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
   await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
-  const curva = String(formData.get("curva") ?? "A");
-  const tipo = String(formData.get("tipo") ?? "FIXO");
-  const linhaProduto = String(formData.get("linhaProduto") ?? "BRUCKE").toUpperCase();
+  const curva = String(formData.get("curva") ?? "").trim().toUpperCase();
+  const tipo = String(formData.get("tipo") ?? "").trim().toUpperCase();
   const tamanhoPonteira = String(formData.get("tamanhoPonteira") ?? "").trim();
+  const regulador = parseRegulador(formData.get("regulador"));
   const estoqueMinimoRaw = String(formData.get("estoqueMinimo") ?? "").trim();
 
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
-  validarLinhaProduto(linhaProduto);
   if (estoqueMinimoRaw && (!Number.isInteger(Number(estoqueMinimoRaw)) || Number(estoqueMinimoRaw) < 0)) {
     throw new Error("Estoque mínimo deve ser um número inteiro não negativo.");
   }
@@ -87,8 +104,8 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
       nome: nome || null,
       curva,
       tipo,
-      linhaProduto,
       tamanhoPonteira: tamanhoPonteira || null,
+      regulador,
       estoqueMinimo: estoqueMinimoRaw ? Number(estoqueMinimoRaw) : null,
       ...(novaImagem ? { imagemUrl: novaImagem } : {}),
     },
@@ -97,15 +114,7 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath("/registros");
   revalidatePath("/modelos");
-}
-
-export async function updateModeloLinhaProduto(modeloId: number, formData: FormData) {
-  await exigirAdministrador();
-  const linhaProduto = String(formData.get("linhaProduto") ?? "").toUpperCase();
-  validarLinhaProduto(linhaProduto);
-  await prisma.modelo.update({ where: { id: modeloId }, data: { linhaProduto } });
-  revalidatePath("/modelos");
-  revalidatePath("/pintura-montagem");
+  revalidatePath("/ops");
 }
 
 export async function deleteModelo(id: number) {
@@ -165,9 +174,10 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
   await exigirAdministrador();
   const codigo = String(engate.get("codigo") ?? "").trim();
   const nome = String(engate.get("nome") ?? "").trim();
-  const curva = String(engate.get("curva") ?? "A");
-  const tipo = String(engate.get("tipo") ?? "FIXO");
-  const linhaProduto = String(engate.get("linhaProduto") ?? "BRUCKE").toUpperCase();
+  const curva = String(engate.get("curva") ?? "").trim().toUpperCase();
+  const tipo = String(engate.get("tipo") ?? "").trim().toUpperCase();
+  const linhaProduto = String(engate.get("linhaProduto") ?? "").trim().toUpperCase();
+  const regulador = parseRegulador(engate.get("regulador"), true);
   
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
@@ -177,6 +187,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
   }
 
   const imagemUrl = await salvarImagem(engate.get("imagem"), "modelos");
+  const codigosExistentes = await prisma.peca.findMany({ select: { codigo: true } });
 
   await prisma.$transaction(async (tx) => {
     const modelo = await tx.modelo.create({
@@ -186,6 +197,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
         curva,
         tipo,
         linhaProduto,
+        regulador,
         imagemUrl,
       }
     });
@@ -199,9 +211,11 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
       Reto: "CORTE",
     };
 
+    const codigosGerados = codigosExistentes.map((peca) => peca.codigo);
     for (let i = 0; i < pecas.length; i++) {
       const p = pecas[i];
-      const pecaCodigo = `${codigo}-${p.materialId}-${i + 1}`;
+      const pecaCodigo = proximoCodigoPeca(codigo, p.materialId, codigosGerados);
+      codigosGerados.push(pecaCodigo);
       
       let dimText = "";
       if (p.materialId === "PLASMA") {
@@ -285,6 +299,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
 
   revalidatePath("/registros");
   revalidatePath("/modelos");
+  revalidatePath("/ops");
   revalidatePath("/agrupamento");
   revalidatePath("/monitoramento");
 }
