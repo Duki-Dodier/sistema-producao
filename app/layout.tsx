@@ -9,6 +9,11 @@ import { buscarOperadorLogado, destinoInicial, podeAcessarRota } from "@/lib/aut
 export const metadata: Metadata = {
   title: "MES – Fábrica de Engates",
   description: "Sistema de execução de manufatura – Torre de Controle do PCP",
+  icons: {
+    icon: "/uploads/logo/logoBrucke.jpg",
+    shortcut: "/uploads/logo/logoBrucke.jpg",
+    apple: "/uploads/logo/logoBrucke.jpg",
+  },
 };
 
 export default async function RootLayout({
