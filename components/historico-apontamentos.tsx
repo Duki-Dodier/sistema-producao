@@ -16,6 +16,8 @@ type HistoricoItem = {
   processo: string | null;
   processoLabel: string;
   usuario: string;
+  maquinaCodigo: string | null;
+  tempoSegundos: number | null;
   quantidadeBoa: number;
   setorId: number;
   setorNome: string;
@@ -146,6 +148,8 @@ export function HistoricoApontamentos({
                   <th className="px-4 py-3">Peça</th>
                   <th className="px-4 py-3">Processo</th>
                   <th className="px-4 py-3">Operador</th>
+                  <th className="px-4 py-3">Máquina</th>
+                  <th className="px-4 py-3">Tempo</th>
                   <th className="px-4 py-3 text-right">Quantidade</th>
                   <th className="px-4 py-3 text-right">Correção</th>
                 </tr>
@@ -158,6 +162,10 @@ export function HistoricoApontamentos({
                     <td className="px-4 py-3 text-slate-300">{item.pecaCodigo ? `${item.pecaCodigo} · ${item.pecaNome}` : "Produção do setor"}</td>
                     <td className="px-4 py-3 text-slate-400">{item.processoLabel}</td>
                     <td className="px-4 py-3 text-slate-400">{item.usuario}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-cyan-200">{item.maquinaCodigo ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                      {item.tempoSegundos ? formatDuracao(item.tempoSegundos) : "—"}
+                    </td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-400">
                       {item.quantidadeBoa}
                       {item.ultimoAjuste && <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400" title={`Ajustado de ${item.ultimoAjuste.valorAnterior} para ${item.ultimoAjuste.valorNovo} por ${item.ultimoAjuste.autorizadoPor} — ${item.ultimoAjuste.motivo}`}>ajustado</span>}
@@ -177,7 +185,7 @@ export function HistoricoApontamentos({
                     </td>
                   </tr>
                 ))}
-                {filtrados.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Nenhum registro encontrado com esses filtros.</td></tr>}
+                {filtrados.length === 0 && <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">Nenhum registro encontrado com esses filtros.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -185,4 +193,13 @@ export function HistoricoApontamentos({
       )}
     </section>
   );
+}
+
+function formatDuracao(segundos: number) {
+  const horas = Math.floor(segundos / 3600);
+  const minutos = Math.floor((segundos % 3600) / 60);
+  const resto = segundos % 60;
+  return horas > 0
+    ? `${horas}h ${String(minutos).padStart(2, "0")}min`
+    : `${minutos}min ${String(resto).padStart(2, "0")}s`;
 }

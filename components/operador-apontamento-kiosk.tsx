@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createApontamento } from "@/lib/actions/apontamentos";
 import { sairSistema } from "@/lib/actions/auth";
 
@@ -34,11 +34,18 @@ type OperadorKiosk = {
   processosPermitidos: string[];
 };
 
+type MaquinaKiosk = {
+  id: number;
+  codigo: string;
+  nome: string;
+};
+
 export function OperadorApontamentoKiosk({
   setorId,
   setorNome,
   operadores,
   sessao,
+  maquinas,
   itens,
   opIdInicial,
   pecaIdInicial,
@@ -49,6 +56,7 @@ export function OperadorApontamentoKiosk({
   setorNome: string;
   operadores: OperadorKiosk[];
   sessao?: OperadorKiosk;
+  maquinas: MaquinaKiosk[];
   itens: ItemApontamentoOperador[];
   opIdInicial?: number | null;
   pecaIdInicial?: number | null;
@@ -64,6 +72,9 @@ export function OperadorApontamentoKiosk({
   const [busca, setBusca] = useState("");
   const [operador, setOperador] = useState(String(sessao?.id ?? ""));
   const [pin, setPin] = useState("");
+  const [maquinaId, setMaquinaId] = useState(String(maquinas[0]?.id ?? ""));
+  const [tempoDecorrido, setTempoDecorrido] = useState(0);
+  const [inicioProducao, setInicioProducao] = useState<number | null>(null);
   const [selecionado, setSelecionado] = useState<string | null>(
     itemInicial?.chave ?? null,
   );
@@ -97,7 +108,20 @@ export function OperadorApontamentoKiosk({
 
   const item = itensPermitidos.find((opcao) => opcao.chave === selecionado) ?? null;
 
+  useEffect(() => {
+    if (!item || item.concluido || inicioProducao === null) return;
+    const timer = window.setInterval(() => {
+      setTempoDecorrido(Math.max(0, Math.floor((Date.now() - inicioProducao) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [inicioProducao, item]);
+
+  const iniciarCronometro = () => {
+    setInicioProducao((atual) => atual ?? Date.now());
+  };
+
   const digitar = (valor: string) => {
+    iniciarCronometro();
     setQuantidade((atual) => {
       const proximo = `${atual}${valor}`.replace(/^0+(?=\d)/, "");
       return proximo.slice(0, 7);
@@ -118,6 +142,8 @@ export function OperadorApontamentoKiosk({
         `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}.`,
       );
       setQuantidade("");
+      setInicioProducao(null);
+      setTempoDecorrido(0);
       if (modoQr) {
         window.setTimeout(() => window.location.assign("/apontamentos/scanner"), 3000);
       }
@@ -172,6 +198,8 @@ export function OperadorApontamentoKiosk({
                 setPin("");
                 setSelecionado(primeiroItem?.chave ?? null);
                 setQuantidade("");
+                setInicioProducao(null);
+                setTempoDecorrido(0);
                 setErro(null);
                 setSucesso(null);
               }}
@@ -226,6 +254,8 @@ export function OperadorApontamentoKiosk({
                 onClick={() => {
                   setSelecionado(opcao.chave);
                   setQuantidade("");
+                  setInicioProducao(null);
+                  setTempoDecorrido(0);
                   setErro(null);
                   setSucesso(null);
                 }}
@@ -304,6 +334,7 @@ export function OperadorApontamentoKiosk({
             <input type="hidden" name="usarSessao" value={sessao ? "1" : ""} />
             <input type="hidden" name="soldador" value={item.soldador ?? ""} />
             <input type="hidden" name="quantidadeBoa" value={quantidade} />
+            <input type="hidden" name="tempoSegundos" value={tempoDecorrido || ""} />
 
             <div className="rounded-lg border border-[#2d3449] bg-[#0b1326] p-3 sm:p-4">
               {Number.isInteger(opIdInicial) && (
@@ -318,7 +349,7 @@ export function OperadorApontamentoKiosk({
               {modoQr && sessao && (
                 <p className="mt-2 text-xs text-emerald-300">Operador: {sessao.nome}</p>
               )}
-              <div className="mt-4 flex items-center justify-between gap-4">
+            <div className="mt-4 flex items-center justify-between gap-4">
                 <div>
                   <div className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Processo a apontar</div>
                   <div className="mt-1 text-lg font-bold text-amber-300">{item.proximoLabel}</div>
@@ -330,6 +361,36 @@ export function OperadorApontamentoKiosk({
               </div>
             </div>
 
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <label className="flex flex-col gap-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Máquina usada
+                </span>
+                {maquinas.length > 0 ? (
+                  <select
+                    name="maquinaId"
+                    required
+                    value={maquinaId}
+                    onChange={(event) => setMaquinaId(event.target.value)}
+                    className="w-full rounded-xl border border-[#3d494c] bg-[#060e20] px-4 py-3 text-sm font-semibold text-white outline-none focus:border-[#4cd7f6]"
+                  >
+                    <option value="" disabled>Selecione a máquina...</option>
+                    {maquinas.map((maquina) => (
+                      <option key={maquina.id} value={maquina.id}>{maquina.nome}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="rounded-xl border border-slate-700 bg-[#060e20] px-4 py-3 text-sm text-slate-500">
+                    Sem máquina cadastrada para este setor
+                  </span>
+                )}
+              </label>
+              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-right">
+                <div className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Tempo em produção</div>
+                <div className="mt-1 font-mono text-xl font-bold text-cyan-200">{formatTempo(tempoDecorrido)}</div>
+              </div>
+            </div>
+
             <div className="mt-4 grid gap-3 sm:mt-5 sm:gap-4 md:grid-cols-[1fr_280px]">
               <div>
                 <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -338,13 +399,19 @@ export function OperadorApontamentoKiosk({
                 <input
                   inputMode="numeric"
                   value={quantidade}
-                  onChange={(event) => setQuantidade(event.target.value.replace(/\D/g, "").slice(0, 7))}
+                  onChange={(event) => {
+                    iniciarCronometro();
+                    setQuantidade(event.target.value.replace(/\D/g, "").slice(0, 7));
+                  }}
                   placeholder="0"
                   className="mt-2 w-full rounded-xl border border-[#3d494c] bg-[#060e20] px-5 py-4 text-center font-mono text-4xl font-bold text-white outline-none focus:border-[#4cd7f6] sm:py-6 sm:text-5xl"
                 />
                 <button
                   type="button"
-                  onClick={() => setQuantidade(String(item.restante))}
+                  onClick={() => {
+                    iniciarCronometro();
+                    setQuantidade(String(item.restante));
+                  }}
                   className="mt-3 w-full rounded-lg border border-[#4cd7f6]/40 bg-[#4cd7f6]/10 py-3 font-mono text-xs font-bold uppercase tracking-wider text-[#4cd7f6]"
                 >
                   Usar toda a quantidade pendente ({item.restante})
@@ -385,7 +452,7 @@ export function OperadorApontamentoKiosk({
 
             <button
               type="submit"
-              disabled={!operador || pinPendente || !quantidade || enviando}
+              disabled={!operador || pinPendente || !quantidade || enviando || (maquinas.length > 0 && !maquinaId)}
               className={`mt-5 w-full rounded-xl bg-[#0ea5c9] py-4 font-mono text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[0_0_18px_rgba(14,165,201,0.25)] transition hover:bg-[#0891b2] disabled:cursor-not-allowed disabled:opacity-40 ${modoQr ? "sticky bottom-3 z-10" : ""}`}
             >
               {enviando
@@ -394,6 +461,8 @@ export function OperadorApontamentoKiosk({
                   ? "Selecione o operador"
                   : pinPendente
                     ? "Digite o PIN de 4 dígitos"
+                    : maquinas.length > 0 && !maquinaId
+                      ? "Selecione a máquina"
                     : "Confirmar apontamento"}
             </button>
           </form>
@@ -401,4 +470,11 @@ export function OperadorApontamentoKiosk({
       </section>
     </div>
   );
+}
+
+function formatTempo(segundos: number) {
+  const horas = Math.floor(segundos / 3600);
+  const minutos = Math.floor((segundos % 3600) / 60);
+  const resto = segundos % 60;
+  return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}:${String(resto).padStart(2, "0")}`;
 }

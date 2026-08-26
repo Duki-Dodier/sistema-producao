@@ -16,6 +16,7 @@ import { ehSetor } from "@/lib/setores";
 import { calcularRastreamento } from "@/lib/rastreamento";
 import { OPTrackingBoard } from "@/components/op-tracking-board";
 import { processosDaPeca } from "@/lib/processos";
+import { MonitorProducaoTable } from "@/components/monitor-producao-table";
 
 // Paleta "Cyber-Industrial" (DESIGN.md): fundo deep slate, ciano neon p/ dados
 // vivos, laranja p/ atenção, esmeralda p/ concluído. Números sempre em mono.
@@ -143,7 +144,7 @@ async function CockpitSetor({
   });
   const monitorandoSolda = ehSetor(setor.nome, "Solda");
 
-  const [apontamentos, funcionarios, opsDoSetor] = await Promise.all([
+  const [apontamentos, funcionarios, opsDoSetor, maquinas] = await Promise.all([
     prisma.apontamento.findMany({
       where: {
         setorId: setor.id,
@@ -154,14 +155,20 @@ async function CockpitSetor({
         ...(monitorandoSolda ? { soldador: null } : {}),
       },
       select: {
+        id: true,
         opId: true,
         pecaId: true,
         processo: true,
         usuario: true,
         quantidadeBoa: true,
         dataHora: true,
+        tempoSegundos: true,
+        op: { select: { numeroSequencia: true, lote: true, modelo: { select: { codigo: true } } } },
+        maquina: { select: { codigo: true } },
         peca: {
           select: {
+            codigo: true,
+            nome: true,
             processos: true,
             tipoMaterial: true,
             setor: { select: { nome: true } },
@@ -182,6 +189,11 @@ async function CockpitSetor({
       where: { setorId: setor.id, ativo: true },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
+    }),
+    prisma.maquina.findMany({
+      where: { setorId: setor.id, ativo: true },
+      select: { id: true, codigo: true, nome: true },
+      orderBy: { codigo: "asc" },
     }),
     prisma.oP.findMany({
       where: { status: "ABERTA", modelo: { roteiro: { some: { setorId: setor.id } } } },
@@ -276,6 +288,21 @@ async function CockpitSetor({
     meta && operadores.length > 0 ? Math.ceil(meta / operadores.length) : null;
   const pctMeta = meta ? Math.round((producaoMes / meta) * 100) : null;
 
+  const registrosMonitoramento = apontamentos.map((apontamento) => ({
+    id: apontamento.id,
+    dataHora: apontamento.dataHora.toISOString(),
+    opNumero: apontamento.op.numeroSequencia,
+    lote: apontamento.op.lote,
+    modeloCodigo: apontamento.op.modelo.codigo,
+    pecaCodigo: apontamento.peca?.codigo ?? null,
+    pecaNome: apontamento.peca?.nome ?? null,
+    processo: apontamento.processo,
+    usuario: apontamento.usuario,
+    maquinaCodigo: apontamento.maquina?.codigo ?? null,
+    quantidadeBoa: apontamento.quantidadeBoa,
+    tempoSegundos: apontamento.tempoSegundos,
+  }));
+
   const boundConfig = updateSetorConfig.bind(null, setor.id);
 
   return (
@@ -364,6 +391,7 @@ async function CockpitSetor({
         setorId={setor.id}
         setorNome={setor.nome}
         operadores={funcionarios}
+        maquinas={maquinas}
         ops={opsDoSetor}
       />
 
@@ -557,6 +585,8 @@ async function CockpitSetor({
           </div>
         )}
       </div>
+
+      <MonitorProducaoTable registros={registrosMonitoramento} />
 
       {/* CONFIG DO SETOR (meta + líder) */}
       <details

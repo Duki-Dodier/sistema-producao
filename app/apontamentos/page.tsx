@@ -74,7 +74,7 @@ export default async function ApontamentosPage({
   }
 
   const setorSolda = ehSetor(setor.nome, "Solda");
-  const [funcionarios, autorizadores, opsAbertas, recentes] = await Promise.all([
+  const [funcionarios, autorizadores, opsAbertas, maquinas, recentes] = await Promise.all([
     prisma.funcionario.findMany({
       where: {
         setorId: setor.id,
@@ -173,6 +173,11 @@ export default async function ApontamentosPage({
         },
       },
     }),
+    prisma.maquina.findMany({
+      where: { setorId: setor.id, ativo: true },
+      select: { id: true, codigo: true, nome: true },
+      orderBy: { codigo: "asc" },
+    }),
     prisma.apontamento.findMany({
       where: { setorId: setor.id },
       orderBy: { dataHora: "desc" },
@@ -181,6 +186,7 @@ export default async function ApontamentosPage({
         op: { include: { modelo: true } },
         setor: true,
         peca: true,
+        maquina: true,
         ajustes: {
           orderBy: { dataHora: "desc" },
           include: { autorizadoPor: { select: { nome: true } } },
@@ -376,6 +382,8 @@ export default async function ApontamentosPage({
       processo: apontamento.processo,
       processoLabel,
       usuario: apontamento.usuario,
+      maquinaCodigo: apontamento.maquina?.codigo ?? null,
+      tempoSegundos: apontamento.tempoSegundos,
       quantidadeBoa: apontamento.quantidadeBoa,
       setorId: apontamento.setorId,
       setorNome: apontamento.setor.nome,
@@ -441,6 +449,7 @@ export default async function ApontamentosPage({
             ? operadorLogado.processosPermitidos
             : [...PROCESSOS],
         } : undefined}
+        maquinas={maquinas}
         itens={itensVisiveis}
         opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
         pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}

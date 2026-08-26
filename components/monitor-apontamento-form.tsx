@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { PROCESSO_LABEL, processosDaPeca, type Processo } from "@/lib/processos";
 
 type Operador = { id: number; nome: string };
+type Maquina = { id: number; codigo: string; nome: string };
 type OpcaoOP = {
   id: number;
   numeroSequencia: number;
@@ -30,11 +31,13 @@ export function MonitorApontamentoForm({
   setorId,
   setorNome,
   operadores,
+  maquinas,
   ops,
 }: {
   setorId: number;
   setorNome: string;
   operadores: Operador[];
+  maquinas: Maquina[];
   ops: OpcaoOP[];
 }) {
   const [opId, setOpId] = useState("");
@@ -42,6 +45,8 @@ export function MonitorApontamentoForm({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pecaId, setPecaId] = useState("");
   const [processo, setProcesso] = useState("");
+  const [maquinaId, setMaquinaId] = useState(String(maquinas[0]?.id ?? ""));
+  const [tempoMinutos, setTempoMinutos] = useState("");
   
   const [usuario, setUsuario] = useState("");
   const [usuarioFixo, setUsuarioFixo] = useState(false);
@@ -116,8 +121,10 @@ export function MonitorApontamentoForm({
       setBuscaOp("");
       setPecaId("");
       setProcesso("");
+      setTempoMinutos("");
       setUsuarioFixo(false);
       setUsuario(""); // Reseta o usuário livre
+      setMaquinaId(String(maquinas[0]?.id ?? ""));
       formRef.current?.reset();
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível lançar a produção.");
@@ -160,6 +167,7 @@ export function MonitorApontamentoForm({
       <input type="hidden" name="setorId" value={setorId} />
       {usuarioFixo && <input type="hidden" name="usuario" value={usuario} />}
       <input type="hidden" name="opId" value={opId} />
+      <input type="hidden" name="funcionarioId" value={operadores.find((operador) => operador.nome === usuario)?.id ?? ""} />
       {isSolda && !exigePeca && <input type="hidden" name="processo" value="SOLDAGEM" />}
 
       <div>
@@ -291,6 +299,32 @@ export function MonitorApontamentoForm({
           required
           placeholder="Quantidade"
           className="w-28 rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-sm text-[#dae2fd] placeholder-slate-600 focus:border-[#4cd7f6] focus:outline-none"
+        />
+
+        {maquinas.length > 0 && (
+          <select
+            name="maquinaId"
+            required
+            value={maquinaId}
+            onChange={(event) => setMaquinaId(event.target.value)}
+            className="min-w-44 rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-sm text-[#dae2fd] focus:border-[#4cd7f6] focus:outline-none"
+          >
+            <option value="" disabled>Máquina...</option>
+            {maquinas.map((maquina) => (
+              <option key={maquina.id} value={maquina.id}>{maquina.nome}</option>
+            ))}
+          </select>
+        )}
+
+        <input
+          name="tempoMinutos"
+          type="number"
+          min={1}
+          step={1}
+          value={tempoMinutos}
+          onChange={(event) => setTempoMinutos(event.target.value)}
+          placeholder="Tempo (min)"
+          className="w-32 rounded border border-[#3d494c] bg-[#060e20] px-3 py-2 text-sm text-[#dae2fd] placeholder-slate-600 focus:border-[#4cd7f6] focus:outline-none"
         />
 
         <SubmitButton pendingText="Lançando..." className="h-9 bg-[#0ea5c9] px-4 font-bold text-white hover:bg-[#0891b2]">

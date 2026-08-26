@@ -74,6 +74,9 @@ export function OPTrackingBoard({ itens }: { itens: OPRastreada[] }) {
                   <Legend color="bg-slate-600" label="Pendente" />
                 </div>
                 <div className="flex items-center gap-3">
+                  <span className="rounded-md border border-cyan-400/20 bg-cyan-400/5 px-3 py-1.5 font-mono text-[10px] text-cyan-200">
+                    Tempo da OP: {formatTempoOP(item.op.dataLiberacao, item.op.dataFinalizacao)}
+                  </span>
                   {item.gargalo && (
                     <span className="rounded-md border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
                       Limitante: <strong>{item.gargalo.codigo}</strong> · faltam {item.gargalo.falta}
@@ -146,6 +149,21 @@ export function OPTrackingBoard({ itens }: { itens: OPRastreada[] }) {
       })}
     </div>
   );
+}
+
+function formatTempoOP(inicio: Date | string, fim: Date | string | null) {
+  const inicioMs = new Date(inicio).getTime();
+  const fimMs = fim ? new Date(fim).getTime() : Date.now();
+  const segundos = Math.max(0, Math.floor((fimMs - inicioMs) / 1000));
+  const dias = Math.floor(segundos / 86400);
+  const horas = Math.floor((segundos % 86400) / 3600);
+  const minutos = Math.floor((segundos % 3600) / 60);
+  const partes = [
+    dias > 0 ? `${dias}d` : "",
+    horas > 0 ? `${horas}h` : "",
+    `${minutos}min`,
+  ].filter(Boolean);
+  return fim ? partes.join(" ") : `em produção · ${partes.join(" ")}`;
 }
 
 function Legend({ color, label }: { color: string; label: string }) {

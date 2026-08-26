@@ -37,6 +37,16 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
   const roteiroEtapaRaw = String(formData.get("roteiroEtapaId") ?? "").trim();
   const roteiroEtapaId = roteiroEtapaRaw ? Number(roteiroEtapaRaw) : null;
   const quantidadeBoa = Number(formData.get("quantidadeBoa") ?? 0);
+  const maquinaIdRaw = String(formData.get("maquinaId") ?? "").trim();
+  const maquinaId = maquinaIdRaw ? Number(maquinaIdRaw) : null;
+  const tempoSegundosRaw = String(formData.get("tempoSegundos") ?? "").trim();
+  const tempoMinutosRaw = String(formData.get("tempoMinutos") ?? "").trim();
+  const tempoInformadoBruto = tempoSegundosRaw
+    ? Number(tempoSegundosRaw)
+    : tempoMinutosRaw
+      ? Number(tempoMinutosRaw) * 60
+      : null;
+  const tempoInformado = tempoInformadoBruto === 0 ? null : tempoInformadoBruto;
 
   // Identidade: preferimos funcionário + PIN (kiosk). O caminho por texto
   // livre (`usuario`) segue aceito como legado p/ formulários do PCP.
@@ -80,7 +90,8 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
     if (!funcionario || !funcionario.ativo) {
       throw new Error("Operador não encontrado ou inativo.");
     }
-    if (funcionario.pin && funcionario.pin !== pin) {
+    const podeLancarEmNomeDeOutro = usuarioAutenticado.papel !== "OPERADOR" && usuario === funcionario.nome;
+    if (funcionario.pin && funcionario.pin !== pin && !podeLancarEmNomeDeOutro) {
       throw new Error("PIN incorreto.");
     }
     if (funcionario.papel !== "PCP" && funcionario.setorId !== setorId) {
@@ -112,6 +123,38 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
   if (processo !== null && !PROCESSOS.includes(processo)) {
     throw new Error("Processo inválido.");
   }
+  if (maquinaId !== null && !Number.isInteger(maquinaId)) {
+    throw new Error("Máquina inválida.");
+  }
+  if (
+    tempoInformado !== null &&
+    (!Number.isFinite(tempoInformado) || !Number.isInteger(tempoInformado) || tempoInformado <= 0 || tempoInformado > 24 * 60 * 60)
+  ) {
+    throw new Error("O tempo de produção deve estar entre 1 segundo e 24 horas.");
+  }
+
+  const maquinasAtivas = await prisma.maquina.findMany({
+    where: { setorId, ativo: true },
+    select: { id: true },
+  });
+  if (maquinasAtivas.length > 0 && maquinaId === null) {
+    throw new Error("Selecione a máquina usada neste apontamento.");
+  }
+  if (maquinaId !== null && !maquinasAtivas.some((maquina) => maquina.id === maquinaId)) {
+    throw new Error("A máquina selecionada não pertence a este setor ou está inativa.");
+  }
+
+  const dadosRastreabilidade = () => {
+    const dataHora = new Date();
+    return {
+      maquinaId,
+      tempoSegundos: tempoInformado,
+      inicioEm: tempoInformado !== null
+        ? new Date(dataHora.getTime() - tempoInformado * 1000)
+        : null,
+      dataHora,
+    };
+  };
 
   // O adaptador Prisma do Cloudflare D1 não oferece transações interativas.
   // Este fluxo faz várias leituras de validação, mas somente uma gravação; por
@@ -243,6 +286,7 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
           pecaId,
           processo,
           roteiroEtapaId,
+          ...dadosRastreabilidade(),
           origem: "OPERADOR",
         },
       });
@@ -335,6 +379,7 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
         quantidadeBoa,
         pecaId,
         processo,
+        ...dadosRastreabilidade(),
         origem: "OPERADOR",
       },
     });

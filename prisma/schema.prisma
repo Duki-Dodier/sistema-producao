@@ -38,6 +38,7 @@ model Setor {
   roteirosPeca            PecaRoteiro[]
   funcionarios            Funcionario[]
   recebimentosAgrupamento RecebimentoAgrupamento[]
+  maquinas               Maquina[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -80,6 +81,25 @@ model FuncionarioProcesso {
 
   @@unique([funcionarioId, processo])
   @@index([processo])
+}
+
+/// Máquina/posto de produção disponível em um setor. Os códigos iniciais são
+/// fictícios e podem ser trocados pelos nomes reais sem alterar os registros.
+model Maquina {
+  id       Int     @id @default(autoincrement())
+  codigo   String
+  nome     String
+  setorId  Int
+  ativo    Boolean @default(true)
+
+  setor        Setor          @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  apontamentos Apontamento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([setorId, codigo])
+  @@index([setorId, ativo])
 }
 
 model OperadorSessao {
@@ -328,12 +348,16 @@ model Apontamento {
   processo          String? // CORTE | FURACAO | DOBRA | CORTE_GRAU
   roteiroEtapaId    Int? // etapa exata do roteiro entre setores
   origem            String   @default("OPERADOR") // OPERADOR | LEGADO
+  maquinaId         Int? // máquina/posto usado no apontamento
+  tempoSegundos     Int? // tempo efetivo informado pelo operador/monitor
+  inicioEm          DateTime? // início estimado do ciclo; dataHora é o fim
 
   op           OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
   setor        Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
   funcionario  Funcionario?        @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
   peca         Peca?               @relation(fields: [pecaId], references: [id], onDelete: SetNull)
   roteiroEtapa PecaRoteiro?        @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
+  maquina      Maquina?             @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
   ajustes      AjusteApontamento[]
 
   @@index([opId])
@@ -341,6 +365,7 @@ model Apontamento {
   @@index([funcionarioId])
   @@index([pecaId])
   @@index([roteiroEtapaId])
+  @@index([maquinaId])
   @@index([setorId, dataHora, origem])
 }
 

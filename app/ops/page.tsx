@@ -156,6 +156,7 @@ export default async function OpsPage() {
               <th className="px-5 py-3">Quantidade</th>
               <th className="px-5 py-3">Liberada em</th>
               <th className="px-5 py-3">Finalizada em</th>
+              <th className="px-5 py-3">Tempo total</th>
               <th className="px-5 py-3">Status</th>
               <th className="w-16 px-5 py-3" />
             </tr>
@@ -192,6 +193,9 @@ export default async function OpsPage() {
                 <td className="px-5 py-3 text-slate-500">
                   {op.dataFinalizacao ? formatDate(op.dataFinalizacao) : "—"}
                 </td>
+                <td className="px-5 py-3 font-mono text-xs text-cyan-200">
+                  {formatDuracaoOP(op.dataLiberacao, op.dataFinalizacao)}
+                </td>
                 <td className="px-5 py-3">
                   <StatusSelect opId={op.id} status={op.status} />
                 </td>
@@ -215,7 +219,7 @@ export default async function OpsPage() {
             ))}
             {ops.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-5 py-8 text-center text-slate-400">
+                <td colSpan={11} className="px-5 py-8 text-center text-slate-400">
                   Nenhuma OP liberada ainda.
                 </td>
               </tr>
@@ -226,4 +230,13 @@ export default async function OpsPage() {
       </Card>
     </div>
   );
+}
+
+function formatDuracaoOP(inicio: Date, fim: Date | null) {
+  if (!fim) return "Em produção";
+  const segundos = Math.max(0, Math.floor((fim.getTime() - inicio.getTime()) / 1000));
+  const dias = Math.floor(segundos / 86400);
+  const horas = Math.floor((segundos % 86400) / 3600);
+  const minutos = Math.floor((segundos % 3600) / 60);
+  return [dias > 0 ? `${dias}d` : "", horas > 0 ? `${horas}h` : "", `${minutos}min`].filter(Boolean).join(" ");
 }

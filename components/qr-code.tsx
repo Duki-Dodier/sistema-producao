@@ -3,8 +3,8 @@ import QRCode from "qrcode";
 export async function QrCode({ value }: { value: string }) {
   const svg = await QRCode.toString(value, {
     type: "svg",
-    errorCorrectionLevel: "M",
-    margin: 1,
+    errorCorrectionLevel: "H",
+    margin: 2,
     color: {
       dark: "#000000",
       light: "#ffffff",
