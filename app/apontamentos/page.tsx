@@ -7,6 +7,7 @@ import { processosDaPeca, PROCESSO_LABEL, PROCESSOS } from "@/lib/processos";
 import {
   OperadorApontamentoKiosk,
   type ItemApontamentoOperador,
+  type ProducaoAtivaKiosk,
 } from "@/components/operador-apontamento-kiosk";
 import { HistoricoApontamentos } from "@/components/historico-apontamentos";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
@@ -74,7 +75,7 @@ export default async function ApontamentosPage({
   }
 
   const setorSolda = ehSetor(setor.nome, "Solda");
-  const [funcionarios, autorizadores, opsAbertas, maquinas, recentes] = await Promise.all([
+  const [funcionarios, autorizadores, opsAbertas, maquinas, recentes, producaoAtiva] = await Promise.all([
     prisma.funcionario.findMany({
       where: {
         setorId: setor.id,
@@ -191,6 +192,22 @@ export default async function ApontamentosPage({
           orderBy: { dataHora: "desc" },
           include: { autorizadoPor: { select: { nome: true } } },
         },
+      },
+    }),
+    prisma.producaoEmAndamento.findFirst({
+      where: {
+        setorId: setor.id,
+        ...(operadorLogado ? { funcionarioId: operadorLogado.id } : {}),
+      },
+      orderBy: { iniciadoEm: "desc" },
+      select: {
+        id: true,
+        opId: true,
+        pecaId: true,
+        roteiroEtapaId: true,
+        maquinaId: true,
+        iniciadoEm: true,
+        quantidadePrevista: true,
       },
     }),
   ]);
@@ -450,6 +467,10 @@ export default async function ApontamentosPage({
             : [...PROCESSOS],
         } : undefined}
         maquinas={maquinas}
+        producaoAtiva={producaoAtiva ? {
+          ...producaoAtiva,
+          iniciadoEm: producaoAtiva.iniciadoEm.toISOString(),
+        } as ProducaoAtivaKiosk : null}
         itens={itensVisiveis}
         opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
         pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}

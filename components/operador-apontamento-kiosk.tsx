@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createApontamento } from "@/lib/actions/apontamentos";
+import { finalizarProducao, iniciarProducao } from "@/lib/actions/apontamentos";
 import { sairSistema } from "@/lib/actions/auth";
 
 export type ItemApontamentoOperador = {
@@ -40,12 +40,23 @@ type MaquinaKiosk = {
   nome: string;
 };
 
+export type ProducaoAtivaKiosk = {
+  id: number;
+  opId: number;
+  pecaId: number | null;
+  roteiroEtapaId: number | null;
+  maquinaId: number;
+  iniciadoEm: string;
+  quantidadePrevista: number | null;
+};
+
 export function OperadorApontamentoKiosk({
   setorId,
   setorNome,
   operadores,
   sessao,
   maquinas,
+  producaoAtiva,
   itens,
   opIdInicial,
   pecaIdInicial,
@@ -57,6 +68,7 @@ export function OperadorApontamentoKiosk({
   operadores: OperadorKiosk[];
   sessao?: OperadorKiosk;
   maquinas: MaquinaKiosk[];
+  producaoAtiva?: ProducaoAtivaKiosk | null;
   itens: ItemApontamentoOperador[];
   opIdInicial?: number | null;
   pecaIdInicial?: number | null;
@@ -69,18 +81,28 @@ export function OperadorApontamentoKiosk({
     (!Number.isInteger(pecaIdInicial) || item.pecaId === pecaIdInicial) &&
     (!sessao || sessao.processosPermitidos.includes(item.proximoProcesso ?? "PRODUCAO")),
   ) ?? null;
+  const itemAtivo = producaoAtiva
+    ? itens.find((item) => item.opId === producaoAtiva.opId && item.pecaId === producaoAtiva.pecaId) ?? null
+    : null;
+  const itemParaQuantidade = itemAtivo ?? itemInicial;
   const [busca, setBusca] = useState("");
   const [operador, setOperador] = useState(String(sessao?.id ?? ""));
   const [pin, setPin] = useState("");
-  const [maquinaId, setMaquinaId] = useState(String(maquinas[0]?.id ?? ""));
+  const [maquinaId, setMaquinaId] = useState(String(producaoAtiva?.maquinaId ?? maquinas[0]?.id ?? ""));
+  const [producaoId, setProducaoId] = useState<number | null>(producaoAtiva?.id ?? null);
   const [tempoDecorrido, setTempoDecorrido] = useState(0);
-  const [inicioProducao, setInicioProducao] = useState<number | null>(null);
+  const [inicioProducao, setInicioProducao] = useState<number | null>(
+    producaoAtiva ? Date.parse(producaoAtiva.iniciadoEm) : null,
+  );
+  const [emProducao, setEmProducao] = useState(Boolean(producaoAtiva));
   const [selecionado, setSelecionado] = useState<string | null>(
-    itemInicial?.chave ?? null,
+    (producaoAtiva
+      ? itens.find((item) => item.opId === producaoAtiva.opId && item.pecaId === producaoAtiva.pecaId)?.chave
+      : null) ?? itemInicial?.chave ?? null,
   );
   const [quantidade, setQuantidade] = useState(
-    itemInicial && typeof quantidadeInicial === "number" && Number.isInteger(quantidadeInicial) && quantidadeInicial > 0
-      ? String(Math.min(quantidadeInicial, itemInicial.restante))
+    itemParaQuantidade && typeof (producaoAtiva?.quantidadePrevista ?? quantidadeInicial) === "number" && Number.isInteger(producaoAtiva?.quantidadePrevista ?? quantidadeInicial) && (producaoAtiva?.quantidadePrevista ?? quantidadeInicial)! > 0
+      ? String(Math.min(producaoAtiva?.quantidadePrevista ?? quantidadeInicial ?? 0, itemParaQuantidade.restante))
       : "",
   );
   const [erro, setErro] = useState<string | null>(null);
@@ -109,39 +131,82 @@ export function OperadorApontamentoKiosk({
   const item = itensPermitidos.find((opcao) => opcao.chave === selecionado) ?? null;
 
   useEffect(() => {
-    if (!item || item.concluido || inicioProducao === null) return;
-    const timer = window.setInterval(() => {
+    if (!item || item.concluido || !emProducao || inicioProducao === null) return;
+    const atualizarTempo = () => {
       setTempoDecorrido(Math.max(0, Math.floor((Date.now() - inicioProducao) / 1000)));
+    };
+    atualizarTempo();
+    const timer = window.setInterval(() => {
+      atualizarTempo();
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [inicioProducao, item]);
-
-  const iniciarCronometro = () => {
-    setInicioProducao((atual) => atual ?? Date.now());
-  };
+  }, [emProducao, inicioProducao, item]);
 
   const digitar = (valor: string) => {
-    iniciarCronometro();
     setQuantidade((atual) => {
       const proximo = `${atual}${valor}`.replace(/^0+(?=\d)/, "");
       return proximo.slice(0, 7);
     });
   };
 
-  const confirmar = async (formData: FormData) => {
+  const iniciar = async () => {
+    if (!item) return;
     setErro(null);
     setSucesso(null);
     setEnviando(true);
     try {
-      const resultado = await createApontamento(formData);
+      const dados = new FormData();
+      dados.set("setorId", String(setorId));
+      dados.set("opId", String(item.opId));
+      dados.set("pecaId", item.pecaId === null ? "" : String(item.pecaId));
+      dados.set("roteiroEtapaId", item.roteiroEtapaId === null ? "" : String(item.roteiroEtapaId));
+      dados.set("processo", item.proximoProcesso ?? "");
+      dados.set("funcionarioId", operador);
+      dados.set("pin", pin);
+      dados.set("usarSessao", sessao ? "1" : "");
+      dados.set("soldador", item.soldador ?? "");
+      dados.set("maquinaId", maquinaId);
+      dados.set("quantidadePrevista", quantidade);
+      const resultado = await iniciarProducao(dados);
+      if (!resultado.ok) {
+        setErro(resultado.error);
+        return;
+      }
+      setProducaoId(resultado.id);
+      setInicioProducao(new Date(resultado.iniciadoEm).getTime());
+      setTempoDecorrido(0);
+      setEmProducao(true);
+      setSucesso("Processo iniciado. Finalize quando a produção da peça terminar.");
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Não foi possível iniciar a produção.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const confirmar = async () => {
+    setErro(null);
+    setSucesso(null);
+    setEnviando(true);
+    try {
+      if (producaoId === null) {
+        setErro("Inicie o processo antes de finalizar o apontamento.");
+        return;
+      }
+      const dados = new FormData();
+      dados.set("producaoId", String(producaoId));
+      dados.set("quantidadeBoa", quantidade);
+      const resultado = await finalizarProducao(dados);
       if (!resultado.ok) {
         setErro(resultado.error);
         return;
       }
       setSucesso(
-        `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}.`,
+        `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}. Tempo registrado: ${formatTempo(resultado.tempoSegundos)}.`,
       );
       setQuantidade("");
+      setProducaoId(null);
+      setEmProducao(false);
       setInicioProducao(null);
       setTempoDecorrido(0);
       if (modoQr) {
@@ -188,6 +253,7 @@ export function OperadorApontamentoKiosk({
             </label>
             <select
               value={operador}
+              disabled={emProducao}
               onChange={(event) => {
                 const proximoOperador = operadores.find((opcao) => String(opcao.id) === event.target.value);
                 const permitidos = new Set(proximoOperador?.processosPermitidos ?? []);
@@ -197,9 +263,7 @@ export function OperadorApontamentoKiosk({
                 setOperador(event.target.value);
                 setPin("");
                 setSelecionado(primeiroItem?.chave ?? null);
-                setQuantidade("");
-                setInicioProducao(null);
-                setTempoDecorrido(0);
+      setQuantidade("");
                 setErro(null);
                 setSucesso(null);
               }}
@@ -219,6 +283,7 @@ export function OperadorApontamentoKiosk({
               type="password"
               inputMode="numeric"
               value={pin}
+              disabled={emProducao}
               onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
               placeholder="••••"
               className="w-full rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-3 text-center font-mono text-base tracking-[0.4em] text-white outline-none placeholder:text-slate-600 focus:border-[#4cd7f6]"
@@ -251,6 +316,7 @@ export function OperadorApontamentoKiosk({
               <button
                 key={opcao.chave}
                 type="button"
+                disabled={emProducao}
                 onClick={() => {
                   setSelecionado(opcao.chave);
                   setQuantidade("");
@@ -323,7 +389,7 @@ export function OperadorApontamentoKiosk({
             </p>
           </div>
         ) : (
-          <form action={confirmar}>
+          <form onSubmit={(event) => { event.preventDefault(); void confirmar(); }}>
             <input type="hidden" name="setorId" value={setorId} />
             <input type="hidden" name="opId" value={item.opId} />
             <input type="hidden" name="pecaId" value={item.pecaId ?? ""} />
@@ -371,6 +437,7 @@ export function OperadorApontamentoKiosk({
                     name="maquinaId"
                     required
                     value={maquinaId}
+                    disabled={emProducao}
                     onChange={(event) => setMaquinaId(event.target.value)}
                     className="w-full rounded-xl border border-[#3d494c] bg-[#060e20] px-4 py-3 text-sm font-semibold text-white outline-none focus:border-[#4cd7f6]"
                   >
@@ -385,8 +452,8 @@ export function OperadorApontamentoKiosk({
                   </span>
                 )}
               </label>
-              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-right">
-                <div className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Tempo em produção</div>
+              <div className={`rounded-xl border px-4 py-3 text-right ${emProducao ? "border-amber-400/30 bg-amber-400/10" : "border-cyan-400/20 bg-cyan-400/5"}`}>
+                <div className="font-mono text-[10px] uppercase tracking-wider text-slate-500">{emProducao ? "Processo em andamento" : "Tempo aguardando início"}</div>
                 <div className="mt-1 font-mono text-xl font-bold text-cyan-200">{formatTempo(tempoDecorrido)}</div>
               </div>
             </div>
@@ -394,13 +461,12 @@ export function OperadorApontamentoKiosk({
             <div className="mt-4 grid gap-3 sm:mt-5 sm:gap-4 md:grid-cols-[1fr_280px]">
               <div>
                 <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Quantidade executada
+                  {emProducao ? "Quantidade produzida" : "Quantidade prevista (opcional)"}
                 </label>
                 <input
                   inputMode="numeric"
                   value={quantidade}
                   onChange={(event) => {
-                    iniciarCronometro();
                     setQuantidade(event.target.value.replace(/\D/g, "").slice(0, 7));
                   }}
                   placeholder="0"
@@ -409,7 +475,6 @@ export function OperadorApontamentoKiosk({
                 <button
                   type="button"
                   onClick={() => {
-                    iniciarCronometro();
                     setQuantidade(String(item.restante));
                   }}
                   className="mt-3 w-full rounded-lg border border-[#4cd7f6]/40 bg-[#4cd7f6]/10 py-3 font-mono text-xs font-bold uppercase tracking-wider text-[#4cd7f6]"
@@ -450,20 +515,29 @@ export function OperadorApontamentoKiosk({
               </div>
             </div>
 
+            <p className="mt-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
+              {emProducao
+                ? "Quando terminar esta peça, informe a quantidade produzida e finalize o apontamento."
+                : "Selecione a máquina e clique em Iniciar processo. O tempo será contado até a finalização."}
+            </p>
+
             <button
-              type="submit"
-              disabled={!operador || pinPendente || !quantidade || enviando || (maquinas.length > 0 && !maquinaId)}
+              type={emProducao ? "submit" : "button"}
+              onClick={emProducao ? undefined : () => { void iniciar(); }}
+              disabled={!operador || pinPendente || enviando || (emProducao && !quantidade) || (maquinas.length > 0 && !maquinaId)}
               className={`mt-5 w-full rounded-xl bg-[#0ea5c9] py-4 font-mono text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[0_0_18px_rgba(14,165,201,0.25)] transition hover:bg-[#0891b2] disabled:cursor-not-allowed disabled:opacity-40 ${modoQr ? "sticky bottom-3 z-10" : ""}`}
             >
               {enviando
-                ? "Salvando..."
+                ? emProducao ? "Finalizando..." : "Iniciando..."
                 : !operador
                   ? "Selecione o operador"
                   : pinPendente
                     ? "Digite o PIN de 4 dígitos"
                     : maquinas.length > 0 && !maquinaId
                       ? "Selecione a máquina"
-                    : "Confirmar apontamento"}
+                    : emProducao
+                      ? "Finalizar e apontar produção"
+                      : "Iniciar processo"}
             </button>
           </form>
         )}

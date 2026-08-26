@@ -189,7 +189,7 @@ export function podeAcessarRota(usuario: OperadorLogado, pathname: string) {
     return pathname.startsWith("/apontamentos");
   }
   if (usuario.papel === "LIDER") {
-    return ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos"].some(
+    return ["/", "/monitoramento", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].some(
       (rota) => rota === "/" ? pathname === "/" : pathname.startsWith(rota),
     );
   }

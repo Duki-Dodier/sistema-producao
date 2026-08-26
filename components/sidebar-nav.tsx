@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/", label: "Painel Geral", icon: DashboardIcon },
   { href: "/monitoramento", label: "Monitoramento (Produção Geral)", icon: MonitorIcon },
+  { href: "/relatorios", label: "Relatórios de Produção", icon: ReportsIcon },
   { href: "/ops", label: "Ordens de Produção", icon: OrdersIcon },
   { href: "/agrupamento", label: "Agrupamento (WIP)", icon: KittingIcon },
   { href: "/solda", label: "Soldagem", icon: WeldingIcon },
@@ -30,7 +31,7 @@ export function SidebarNav({
       )
       : papel === "LIDER"
         ? NAV_ITEMS.filter((item) =>
-            ["/", "/monitoramento", "/agrupamento", "/solda", "/apontamentos"].includes(item.href),
+            ["/", "/monitoramento", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].includes(item.href),
           )
         : NAV_ITEMS.filter((item) => item.href !== "/configuracoes");
 
@@ -82,6 +83,18 @@ function MonitorIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  );
+}
+
+function ReportsIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 19V5" />
+      <path d="M4 19h17" />
+      <rect x="7" y="12" width="3" height="4" rx=".5" />
+      <rect x="12" y="9" width="3" height="7" rx=".5" />
+      <rect x="17" y="6" width="3" height="10" rx=".5" />
     </svg>
   );
 }

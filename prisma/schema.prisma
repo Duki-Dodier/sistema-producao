@@ -39,6 +39,7 @@ model Setor {
   funcionarios            Funcionario[]
   recebimentosAgrupamento RecebimentoAgrupamento[]
   maquinas               Maquina[]
+  producoesEmAndamento   ProducaoEmAndamento[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -64,6 +65,7 @@ model Funcionario {
   apontamentos        Apontamento[]
   sessoes             OperadorSessao[]
   ajustesAutorizados  AjusteApontamento[]
+  producoesEmAndamento ProducaoEmAndamento[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -94,6 +96,7 @@ model Maquina {
 
   setor        Setor          @relation(fields: [setorId], references: [id], onDelete: Restrict)
   apontamentos Apontamento[]
+  producoesEmAndamento ProducaoEmAndamento[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -157,6 +160,7 @@ model Peca {
   setor        Setor         @relation(fields: [setorId], references: [id], onDelete: Restrict)
   modelos      ModeloPeca[]
   apontamentos Apontamento[]
+  producoesEmAndamento ProducaoEmAndamento[]
   roteiro      PecaRoteiro[]
   curvas       PecaCurva[]
 
@@ -231,6 +235,7 @@ model PecaRoteiro {
   peca         Peca          @relation(fields: [pecaId], references: [id], onDelete: Cascade)
   setor        Setor         @relation(fields: [setorId], references: [id], onDelete: Restrict)
   apontamentos Apontamento[]
+  producoesEmAndamento ProducaoEmAndamento[]
 
   @@unique([pecaId, ordem])
   @@index([setorId])
@@ -291,6 +296,7 @@ model OP {
   apontamentos            Apontamento[]
   recebimentosAgrupamento RecebimentoAgrupamento[]
   entradasEstoque         EntradaEstoque[]
+  producoesEmAndamento    ProducaoEmAndamento[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -367,6 +373,37 @@ model Apontamento {
   @@index([roteiroEtapaId])
   @@index([maquinaId])
   @@index([setorId, dataHora, origem])
+}
+
+/// Ciclo iniciado pelo operador e finalizado somente quando a produção foi
+/// concluída. A linha vira um Apontamento no encerramento, preservando o
+/// horário real de início e o tempo efetivo do processo.
+model ProducaoEmAndamento {
+  id              Int      @id @default(autoincrement())
+  opId            Int
+  setorId         Int
+  funcionarioId   Int
+  pecaId          Int?
+  roteiroEtapaId  Int?
+  processo        String?
+  maquinaId       Int
+  usuario         String
+  iniciadoEm      DateTime @default(now())
+  quantidadePrevista Int?
+
+  op           OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
+  setor        Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  funcionario  Funcionario         @relation(fields: [funcionarioId], references: [id], onDelete: Restrict)
+  peca         Peca?               @relation(fields: [pecaId], references: [id], onDelete: SetNull)
+  roteiroEtapa PecaRoteiro?        @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
+  maquina      Maquina             @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([funcionarioId, iniciadoEm])
+  @@index([setorId, iniciadoEm])
+  @@index([opId])
 }
 
 /// Fechamento diario informado pelo PCP. O total conferido nao substitui nem
