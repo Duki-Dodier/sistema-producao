@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "MES – Fábrica de Engates",
   description: "Sistema de execução de manufatura – Torre de Controle do PCP",
   icons: {
+    // Mantém o ícone da aba igual à logo apresentada no login.
     icon: "/uploads/logo/logoBrucke.jpg",
     shortcut: "/uploads/logo/logoBrucke.jpg",
     apple: "/uploads/logo/logoBrucke.jpg",
