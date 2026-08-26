@@ -19,6 +19,24 @@ type ImagensOrganizadas = {
   pecas: Map<string, string>;
 };
 
+type ImagemManifestada = {
+  key: string;
+  uploaded: number;
+};
+
+async function listarImagensLocais(codigoModelo: string) {
+  try {
+    const resposta = await env.ASSETS.fetch(new Request("https://assets.local/uploads-manifest.json"));
+    if (!resposta.ok) return null;
+    const manifesto = await resposta.json() as ImagemManifestada[];
+    return manifesto
+      .filter((objeto) => objeto.key.startsWith(`${codigoModelo}/`))
+      .map((objeto) => ({ key: objeto.key, uploaded: new Date(objeto.uploaded) }));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Recupera imagens organizadas que ainda existem no R2 mesmo quando uma
  * referência antiga do banco foi removida. Uma única listagem atende o modelo
@@ -29,20 +47,23 @@ export async function buscarImagensOrganizadas(
   codigosPecas: string[],
 ): Promise<ImagensOrganizadas> {
   const pastaModelo = segmentoSeguro(codigoModelo, "MODELO");
-  const objetos: Array<{ key: string; uploaded: Date }> = [];
-  let cursor: string | undefined;
+  const objetosLocais = await listarImagensLocais(codigoModelo);
+  const objetos: Array<{ key: string; uploaded: Date }> = objetosLocais ?? [];
 
-  do {
-    const pagina = await env.UPLOADS.list({
-      prefix: `${codigoModelo}/`,
-      cursor,
-    });
-    objetos.push(...pagina.objects.map((objeto) => ({
-      key: objeto.key,
-      uploaded: objeto.uploaded,
-    })));
-    cursor = pagina.truncated ? pagina.cursor : undefined;
-  } while (cursor);
+  if (!objetosLocais) {
+    let cursor: string | undefined;
+    do {
+      const pagina = await env.UPLOADS.list({
+        prefix: `${codigoModelo}/`,
+        cursor,
+      });
+      objetos.push(...pagina.objects.map((objeto) => ({
+        key: objeto.key,
+        uploaded: objeto.uploaded,
+      })));
+      cursor = pagina.truncated ? pagina.cursor : undefined;
+    } while (cursor);
+  }
 
   const maisRecente = (prefixo: string) => {
     const encontrado = objetos

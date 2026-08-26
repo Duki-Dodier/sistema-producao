@@ -7,9 +7,18 @@ export async function GET(
 ) {
   if (!(await buscarOperadorLogado())) return new Response("Nao autorizado", { status: 401 });
   const { path } = await params;
-  const object = await env.UPLOADS.get(path.join("/"));
+  const key = path.join("/");
+  const object = await env.UPLOADS.get(key);
 
-  if (!object) return new Response("Imagem não encontrada", { status: 404 });
+  if (!object) {
+    const asset = await env.ASSETS.fetch(new Request(new URL(`/uploads/${key}`, _request.url)));
+    if (asset.ok) {
+      const headers = new Headers(asset.headers);
+      headers.set("cache-control", "private, max-age=3600");
+      return new Response(asset.body, { status: asset.status, headers });
+    }
+    return new Response("Imagem não encontrada", { status: 404 });
+  }
 
   const headers = new Headers();
   object.writeHttpMetadata(headers);
