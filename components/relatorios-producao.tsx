@@ -18,6 +18,7 @@ export type RegistroRelatorio = {
   quantidadeBoa: number;
   tempoSegundos: number | null;
   dataHora: string;
+  origem: string;
 };
 
 export type ProdutoRelatorio = {
@@ -442,7 +443,7 @@ export function RelatoriosProducao({
             <tbody>{registrosFiltrados.map((registro) => (
               <tr key={registro.id} className="border-b border-white/5 last:border-0">
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">{formatData(registro.dataHora)}</td>
-                <td className="px-4 py-3"><div className="font-mono text-cyan-300">OP {registro.opNumero} · {registro.modeloCodigo}</div><div className="text-xs text-slate-300">{registro.pecaCodigo ? `${registro.pecaCodigo} · ${registro.pecaNome}` : "Produto principal"}</div></td>
+                <td className="px-4 py-3"><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-cyan-300">OP {registro.opNumero} · {registro.modeloCodigo}</span>{registro.origem === "TESTE" && <span className="rounded bg-violet-400/15 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-violet-200">Demonstração</span>}</div><div className="text-xs text-slate-300">{registro.pecaCodigo ? `${registro.pecaCodigo} · ${registro.pecaNome}` : "Produto principal"}</div></td>
                 <td className="px-4 py-3 text-slate-400">{registro.processo ?? "Produção"}</td>
                 <td className="px-4 py-3 text-slate-200">{registro.usuario}</td>
                 <td className="px-4 py-3 font-mono text-amber-200">{registro.maquinaCodigo ?? "—"}</td>
@@ -485,6 +486,13 @@ function formatDuracao(segundos: number | null) {
   if (dias > 0) return `${dias}d ${horas}h ${minutos}min`;
   if (horas > 0) return `${horas}h ${minutos}min`;
   return `${minutos}min ${segundos % 60}s`;
+}
+
+function media(valores: number[]) {
+  const validos = valores.filter((valor) => Number.isFinite(valor) && valor > 0);
+  return validos.length > 0
+    ? Math.round(validos.reduce((total, valor) => total + valor, 0) / validos.length)
+    : 0;
 }
 
 function formatData(valor: string) {

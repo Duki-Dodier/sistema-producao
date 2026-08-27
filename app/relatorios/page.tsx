@@ -21,6 +21,7 @@ export default async function RelatoriosPage() {
         usuario: true,
         quantidadeBoa: true,
         tempoSegundos: true,
+        origem: true,
         setor: { select: { nome: true } },
         maquina: { select: { codigo: true } },
         peca: { select: { codigo: true, nome: true } },
@@ -78,6 +79,7 @@ export default async function RelatoriosPage() {
     quantidadeBoa: registro.quantidadeBoa,
     tempoSegundos: registro.tempoSegundos,
     dataHora: registro.dataHora.toISOString(),
+    origem: registro.origem,
   }));
 
   const produtosRelatorio: ProdutoRelatorio[] = produtos.map((produto) => ({
