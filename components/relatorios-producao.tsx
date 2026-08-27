@@ -57,6 +57,8 @@ export function RelatoriosProducao({
   const [operador, setOperador] = useState("");
   const [maquina, setMaquina] = useState("");
   const [setor, setSetor] = useState("");
+  const [codigoPrincipal, setCodigoPrincipal] = useState("");
+  const [operadorRelatorio, setOperadorRelatorio] = useState("");
   const [agora, setAgora] = useState(0);
 
   useEffect(() => {
@@ -67,10 +69,11 @@ export function RelatoriosProducao({
   }, []);
 
   const opcoes = useMemo(() => ({
+    produtos: [...new Set(produtos.map((item) => item.modeloCodigo))].sort((a, b) => a.localeCompare(b, "pt-BR")),
     operadores: [...new Set(registros.map((item) => item.usuario))].sort((a, b) => a.localeCompare(b, "pt-BR")),
     maquinas: [...new Set(registros.map((item) => item.maquinaCodigo).filter((item): item is string => Boolean(item)))].sort((a, b) => a.localeCompare(b, "pt-BR")),
     setores: [...new Set(registros.map((item) => item.setorNome))].sort((a, b) => a.localeCompare(b, "pt-BR")),
-  }), [registros]);
+  }), [produtos, registros]);
 
   const registrosFiltrados = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase("pt-BR");
@@ -136,8 +139,183 @@ export function RelatoriosProducao({
   const tempoTotal = registrosFiltrados.reduce((total, item) => total + (item.tempoSegundos ?? 0), 0);
   const quantidadeTotal = registrosFiltrados.reduce((total, item) => total + item.quantidadeBoa, 0);
 
+  const resumoProduto = useMemo(() => {
+    if (!codigoPrincipal) return null;
+    const ops = produtos
+      .filter((produto) => produto.modeloCodigo === codigoPrincipal)
+      .sort((a, b) => new Date(b.inicio).getTime() - new Date(a.inicio).getTime());
+    const registrosDoProduto = registros.filter((registro) => registro.modeloCodigo === codigoPrincipal);
+    const pecasMap = new Map<string, {
+      pecaCodigo: string;
+      pecaNome: string;
+      setorNome: string;
+      tempoSegundos: number;
+      quantidade: number;
+      ops: Set<number>;
+    }>();
+    for (const registro of registrosDoProduto) {
+      if (!registro.pecaCodigo || !registro.pecaNome) continue;
+      const chave = `${registro.pecaCodigo}-${registro.setorNome}`;
+      const atual = pecasMap.get(chave) ?? {
+        pecaCodigo: registro.pecaCodigo,
+        pecaNome: registro.pecaNome,
+        setorNome: registro.setorNome,
+        tempoSegundos: 0,
+        quantidade: 0,
+        ops: new Set<number>(),
+      };
+      atual.tempoSegundos += registro.tempoSegundos ?? 0;
+      atual.quantidade += registro.quantidadeBoa;
+      atual.ops.add(registro.opId);
+      pecasMap.set(chave, atual);
+    }
+    const pecas = [...pecasMap.values()].sort((a, b) => a.pecaNome.localeCompare(b.pecaNome, "pt-BR"));
+    const ultimasOps = ops.slice(0, 3).map((op) => {
+      const registrosDaOp = registrosDoProduto.filter((registro) => registro.opId === op.opId);
+      return {
+        ...op,
+        tempoPecas: registrosDaOp.reduce((total, registro) => total + (registro.tempoSegundos ?? 0), 0),
+        quantidadeApontada: registrosDaOp.reduce((total, registro) => total + registro.quantidadeBoa, 0),
+      };
+    });
+    const tempoPecas = registrosDoProduto.reduce((total, registro) => total + (registro.tempoSegundos ?? 0), 0);
+    const quantidadeApontada = registrosDoProduto.reduce((total, registro) => total + registro.quantidadeBoa, 0);
+    return {
+      ops,
+      ultimasOps,
+      pecas,
+      tempoTotal: ops.reduce((total, op) => total + op.tempoOPSegundos, 0),
+      tempoMedioOP: media(ops.map((op) => op.tempoOPSegundos)),
+      tempoMedioUltimas3: media(ultimasOps.map((op) => op.tempoOPSegundos)),
+      tempoPecas,
+      tempoMedioPeca: media(pecas.map((peca) => peca.tempoSegundos)),
+      tempoPorUnidade: quantidadeApontada > 0 ? tempoPecas / quantidadeApontada : 0,
+      quantidadePlanejada: ops.reduce((total, op) => total + op.quantidade, 0),
+      quantidadeApontada,
+      concluidas: ops.filter((op) => op.status === "CONCLUIDA").length,
+      maquinas: [...new Set(registrosDoProduto.map((registro) => registro.maquinaCodigo).filter(Boolean))].join(", "),
+      setores: [...new Set(registrosDoProduto.map((registro) => registro.setorNome))].join(", "),
+    };
+  }, [codigoPrincipal, produtos, registros]);
+
+  const resumoOperador = useMemo(() => {
+    if (!operadorRelatorio) return null;
+    const registrosDoOperador = registros.filter((registro) => registro.usuario === operadorRelatorio);
+    const opsMap = new Map<number, { opNumero: number; modeloCodigo: string; tempoSegundos: number; quantidade: number; ultimaData: string }>();
+    for (const registro of registrosDoOperador) {
+      const atual = opsMap.get(registro.opId) ?? {
+        opNumero: registro.opNumero,
+        modeloCodigo: registro.modeloCodigo,
+        tempoSegundos: 0,
+        quantidade: 0,
+        ultimaData: registro.dataHora,
+      };
+      atual.tempoSegundos += registro.tempoSegundos ?? 0;
+      atual.quantidade += registro.quantidadeBoa;
+      if (new Date(registro.dataHora).getTime() > new Date(atual.ultimaData).getTime()) atual.ultimaData = registro.dataHora;
+      opsMap.set(registro.opId, atual);
+    }
+    const ultimasOps = [...opsMap.values()].sort((a, b) => new Date(b.ultimaData).getTime() - new Date(a.ultimaData).getTime()).slice(0, 3);
+    const pecasMap = new Map<string, number>();
+    for (const registro of registrosDoOperador) {
+      if (!registro.pecaCodigo) continue;
+      const chave = `${registro.pecaCodigo} · ${registro.pecaNome ?? "Peça"}`;
+      pecasMap.set(chave, (pecasMap.get(chave) ?? 0) + (registro.tempoSegundos ?? 0));
+    }
+    const tempoTotal = registrosDoOperador.reduce((total, registro) => total + (registro.tempoSegundos ?? 0), 0);
+    const quantidade = registrosDoOperador.reduce((total, registro) => total + registro.quantidadeBoa, 0);
+    return {
+      registros: registrosDoOperador.length,
+      ops: opsMap.size,
+      quantidade,
+      tempoTotal,
+      tempoMedioOP: media([...opsMap.values()].map((op) => op.tempoSegundos)),
+      tempoMedioUltimas3: media(ultimasOps.map((op) => op.tempoSegundos)),
+      tempoMedioPeca: media([...pecasMap.values()]),
+      tempoPorUnidade: quantidade > 0 ? tempoTotal / quantidade : 0,
+      ultimasOps,
+      maquinas: [...new Set(registrosDoOperador.map((registro) => registro.maquinaCodigo).filter(Boolean))].join(", "),
+      setores: [...new Set(registrosDoOperador.map((registro) => registro.setorNome))].join(", "),
+    };
+  }, [operadorRelatorio, registros]);
+
   return (
     <div className="flex flex-col gap-5">
+      <section className="overflow-hidden rounded-xl border border-cyan-400/25 bg-[#131b2e]">
+        <SectionTitle title="Gerar relatório por produto ou operador" subtitle="Escolha um código principal ou um operador para consultar médias, últimas OPs e produtividade." />
+        <div className="grid gap-4 p-4 md:grid-cols-2">
+          <label className="flex flex-col gap-2">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300">Produto principal</span>
+            <select value={codigoPrincipal} onChange={(event) => setCodigoPrincipal(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-3 text-sm font-semibold text-white outline-none focus:border-cyan-300">
+              <option value="">Escolha o código do produto, ex.: BM1000</option>
+              {opcoes.produtos.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">Operador</span>
+            <select value={operadorRelatorio} onChange={(event) => setOperadorRelatorio(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-3 text-sm font-semibold text-white outline-none focus:border-emerald-300">
+              <option value="">Escolha o operador</option>
+              {opcoes.operadores.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {resumoProduto && (
+          <div className="border-t border-white/10 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300">Relatório do produto principal</div>
+                <h2 className="mt-1 text-xl font-bold text-white">{codigoPrincipal}</h2>
+              </div>
+              <div className="text-right text-xs text-slate-400">{resumoProduto.ops.length} OP(s) analisada(s)<br />{resumoProduto.setores || "Setor ainda não informado"}</div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <Kpi label="Tempo total das OPs" value={formatDuracao(resumoProduto.tempoTotal)} tone="cyan" />
+              <Kpi label="Média por OP" value={formatDuracao(resumoProduto.tempoMedioOP)} tone="cyan" />
+              <Kpi label="Média últimas 3 OPs" value={formatDuracao(resumoProduto.tempoMedioUltimas3)} tone="amber" />
+              <Kpi label="Média das peças" value={formatDuracao(resumoProduto.tempoMedioPeca)} tone="amber" />
+              <Kpi label="Tempo por unidade" value={formatDuracao(resumoProduto.tempoPorUnidade)} tone="emerald" />
+              <Kpi label="OPs concluídas" value={`${resumoProduto.concluidas}/${resumoProduto.ops.length}`} tone="neutral" />
+            </div>
+            <div className="mt-4 grid gap-4 xl:grid-cols-2">
+              <div className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1326]">
+                <div className="border-b border-white/10 px-4 py-3"><h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-300">Últimas 3 OPs</h3><p className="mt-1 text-xs text-slate-500">A média acima é calculada pelo tempo completo de cada uma.</p></div>
+                <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-white/10 font-mono text-[10px] uppercase text-slate-500"><th className="px-4 py-3">OP</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3">Tempo da OP</th><th className="px-4 py-3">Tempo das peças</th></tr></thead><tbody>{resumoProduto.ultimasOps.map((op) => <tr key={op.opId} className="border-b border-white/5 last:border-0"><td className="px-4 py-3 font-mono text-cyan-300">OP {op.opNumero}<div className="text-[11px] text-slate-500">{op.lote ?? "Sem lote"}</div></td><td className="px-4 py-3 text-xs text-slate-300">{op.status === "CONCLUIDA" ? "Concluída" : "Em produção"}</td><td className="px-4 py-3 font-mono text-cyan-200">{formatDuracao(op.tempoOPSegundos)}</td><td className="px-4 py-3 font-mono text-amber-200">{formatDuracao(op.tempoPecas)}</td></tr>)}</tbody></table></div>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1326]">
+                <div className="border-b border-white/10 px-4 py-3"><h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-300">Peças do produto</h3><p className="mt-1 text-xs text-slate-500">Tempo médio por peça/OP e tempo aproximado por unidade.</p></div>
+                <div className="max-h-72 overflow-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-white/10 font-mono text-[10px] uppercase text-slate-500"><th className="px-4 py-3">Peça</th><th className="px-4 py-3">Setor</th><th className="px-4 py-3">Média peça/OP</th><th className="px-4 py-3">Quantidade</th></tr></thead><tbody>{resumoProduto.pecas.map((peca) => <tr key={`${peca.pecaCodigo}-${peca.setorNome}`} className="border-b border-white/5 last:border-0"><td className="px-4 py-3"><div className="font-semibold text-white">{peca.pecaCodigo}</div><div className="text-xs text-slate-400">{peca.pecaNome}</div></td><td className="px-4 py-3 text-xs text-slate-400">{peca.setorNome}</td><td className="px-4 py-3 font-mono text-amber-200">{formatDuracao(peca.tempoSegundos / peca.ops.size)}</td><td className="px-4 py-3 text-emerald-300">{peca.quantidade}</td></tr>)}</tbody></table></div>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">Máquinas utilizadas: {resumoProduto.maquinas || "ainda não informadas"}.</p>
+          </div>
+        )}
+
+        {resumoOperador && (
+          <div className="border-t border-white/10 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><div className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">Relatório do operador</div><h2 className="mt-1 text-xl font-bold text-white">{operadorRelatorio}</h2></div>
+              <div className="text-right text-xs text-slate-400">{resumoOperador.ops} OP(s) · {resumoOperador.registros} lançamento(s)<br />{resumoOperador.setores || "Setor ainda não informado"}</div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <Kpi label="Tempo total" value={formatDuracao(resumoOperador.tempoTotal)} tone="emerald" />
+              <Kpi label="Média por OP" value={formatDuracao(resumoOperador.tempoMedioOP)} tone="cyan" />
+              <Kpi label="Média últimas 3 OPs" value={formatDuracao(resumoOperador.tempoMedioUltimas3)} tone="amber" />
+              <Kpi label="Média por peça" value={formatDuracao(resumoOperador.tempoMedioPeca)} tone="amber" />
+              <Kpi label="Tempo por unidade" value={formatDuracao(resumoOperador.tempoPorUnidade)} tone="emerald" />
+              <Kpi label="Quantidade produzida" value={String(resumoOperador.quantidade)} tone="neutral" />
+            </div>
+            <div className="mt-4 overflow-hidden rounded-lg border border-white/10 bg-[#0b1326]">
+              <div className="border-b border-white/10 px-4 py-3"><h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-300">Últimas 3 OPs do operador</h3><p className="mt-1 text-xs text-slate-500">Tempo acumulado dos lançamentos feitos em cada OP.</p></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead><tr className="border-b border-white/10 font-mono text-[10px] uppercase text-slate-500"><th className="px-4 py-3">OP</th><th className="px-4 py-3">Produto</th><th className="px-4 py-3">Tempo</th><th className="px-4 py-3">Quantidade</th><th className="px-4 py-3">Último lançamento</th></tr></thead><tbody>{resumoOperador.ultimasOps.map((op) => <tr key={`${op.opNumero}-${op.modeloCodigo}-${op.ultimaData}`} className="border-b border-white/5 last:border-0"><td className="px-4 py-3 font-mono text-cyan-300">OP {op.opNumero}</td><td className="px-4 py-3 text-slate-200">{op.modeloCodigo}</td><td className="px-4 py-3 font-mono text-amber-200">{formatDuracao(op.tempoSegundos)}</td><td className="px-4 py-3 text-emerald-300">{op.quantidade}</td><td className="px-4 py-3 text-xs text-slate-400">{formatData(op.ultimaData)}</td></tr>)}</tbody></table></div>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">Máquinas utilizadas: {resumoOperador.maquinas || "ainda não informadas"}.</p>
+          </div>
+        )}
+
+        {!resumoProduto && !resumoOperador && <p className="border-t border-white/10 px-4 py-5 text-sm text-slate-500">Escolha um produto ou operador para gerar o relatório detalhado.</p>}
+      </section>
+
       <div className="rounded-xl border border-[#2d3449] bg-[#131b2e] p-4">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
