@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/badge";
 import { ProgressBar } from "@/components/progress-bar";
 import {
@@ -25,6 +25,7 @@ export type DashboardFlowItem = {
   percentual: number;
   setorAtual: string | null;
   faltaAtual: number | null;
+  liberadaEm: string;
   flowOp: FlowOP;
   flowSetores: FlowSector[];
   flowFinal: FlowFinal[];
@@ -32,6 +33,30 @@ export type DashboardFlowItem = {
 
 export function DashboardOPFlow({ itens }: { itens: DashboardFlowItem[] }) {
   const [aberta, setAberta] = useState<number | null>(null);
+  const [busca, setBusca] = useState("");
+  const [classe, setClasse] = useState("");
+  const [ordenacao, setOrdenacao] = useState<"sequencia" | "antigas" | "proximas" | "maior">("sequencia");
+  const [pagina, setPagina] = useState(1);
+
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return itens
+      .filter((item) => {
+        if (classe && item.curva !== classe) return false;
+        if (!termo) return true;
+        return `${item.sequencia} ${item.codigo} ${item.setorAtual ?? ""}`.toLowerCase().includes(termo);
+      })
+      .sort((a, b) => {
+        if (ordenacao === "antigas") return tempoAberto(b) - tempoAberto(a);
+        if (ordenacao === "proximas") return b.percentual - a.percentual || a.sequencia - b.sequencia;
+        if (ordenacao === "maior") return b.quantidade - a.quantidade || a.sequencia - b.sequencia;
+        return a.sequencia - b.sequencia;
+      });
+  }, [busca, classe, itens, ordenacao]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / 10));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const visiveis = filtrados.slice((paginaAtual - 1) * 10, paginaAtual * 10);
 
   if (itens.length === 0) {
     return (
@@ -43,8 +68,37 @@ export function DashboardOPFlow({ itens }: { itens: DashboardFlowItem[] }) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-white/10 bg-[#131b2e]">
+      <div className="flex flex-wrap items-end gap-3 border-b border-white/5 px-5 py-4">
+        <label className="flex min-w-[230px] flex-1 flex-col gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Buscar nesta lista</span>
+          <input
+            value={busca}
+            onChange={(event) => { setBusca(event.target.value); setPagina(1); }}
+            placeholder="Seq., código ou setor"
+            className="rounded-md border border-white/10 bg-[#0D1524] px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600 focus:border-cyan-400"
+          />
+        </label>
+        <label className="flex w-28 flex-col gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Classe</span>
+          <select value={classe} onChange={(event) => { setClasse(event.target.value); setPagina(1); }} className="rounded-md border border-white/10 bg-[#0D1524] px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-400">
+            <option value="">Todas</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+          </select>
+        </label>
+        <label className="flex min-w-[190px] flex-col gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Ordenar por</span>
+          <select value={ordenacao} onChange={(event) => { setOrdenacao(event.target.value as typeof ordenacao); setPagina(1); }} className="rounded-md border border-white/10 bg-[#0D1524] px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-400">
+            <option value="sequencia">Sequência</option>
+            <option value="antigas">Mais tempo aberta</option>
+            <option value="proximas">Mais próxima de concluir</option>
+            <option value="maior">Maior quantidade</option>
+          </select>
+        </label>
+      </div>
       <ul className="divide-y divide-white/5">
-        {itens.map((item) => {
+        {visiveis.map((item) => {
           const expandida = aberta === item.id;
           return (
             <Fragment key={item.id}>
@@ -106,7 +160,20 @@ export function DashboardOPFlow({ itens }: { itens: DashboardFlowItem[] }) {
             </Fragment>
           );
         })}
+        {visiveis.length === 0 && <li className="px-5 py-8 text-center text-sm text-slate-500">Nenhuma OP encontrada nesta lista.</li>}
       </ul>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 px-5 py-3">
+        <span className="text-[11px] text-slate-500">Mostrando {filtrados.length === 0 ? 0 : (paginaAtual - 1) * 10 + 1}–{Math.min(paginaAtual * 10, filtrados.length)} de {filtrados.length} · 10 por página</span>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={paginaAtual <= 1} onClick={() => setPagina(paginaAtual - 1)} className="rounded border border-white/10 px-3 py-1.5 text-xs text-slate-300 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/5">Anterior</button>
+          <span className="font-mono text-xs text-slate-500">{paginaAtual}/{totalPaginas}</span>
+          <button type="button" disabled={paginaAtual >= totalPaginas} onClick={() => setPagina(paginaAtual + 1)} className="rounded border border-white/10 px-3 py-1.5 text-xs text-slate-300 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/5">Próxima</button>
+        </div>
+      </div>
     </div>
   );
+}
+
+function tempoAberto(item: DashboardFlowItem) {
+  return Math.max(0, Math.floor((Date.now() - new Date(item.liberadaEm).getTime()) / 1000));
 }

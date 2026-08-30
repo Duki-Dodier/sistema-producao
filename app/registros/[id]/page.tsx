@@ -28,7 +28,6 @@ export default async function FichaEngatePage({
         curva: true,
         tipo: true,
         linhaProduto: true,
-        regulador: true,
         tamanhoPonteira: true,
         estoqueMinimo: true,
         imagemUrl: true,
@@ -192,37 +191,32 @@ export default async function FichaEngatePage({
                     >
                       <option value="FIXO">Fixo</option>
                       <option value="REMOVIVEL">Removível</option>
+                      <option value="PONTEIRA_MACHO">Ponteira macho</option>
                     </select>
                   </div>
                   <div className="rounded-sm border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-300">
                     Linha: <span className="font-bold">{modelo.linhaProduto}</span>
                     <span className="ml-1 text-emerald-400/70">(definida no cadastro)</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
                       name="tamanhoPonteira"
                       defaultValue={modelo.tamanhoPonteira ?? ""}
-                      placeholder="Ponteira"
                       aria-label="Tamanho da ponteira"
                       className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
-                    />
-                    <input
-                      name="regulador"
-                      type="number"
-                      min="0"
-                      step="1"
-                      defaultValue={modelo.regulador ?? ""}
-                      placeholder="Regulador"
-                      aria-label="Regulador"
-                      className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
-                    />
+                    >
+                      <option value="">Ponteira</option>
+                      <option value="PEQUENA">Pequena</option>
+                      <option value="MEDIA">Média</option>
+                      <option value="GRANDE">Grande</option>
+                    </select>
                     <input
                       name="estoqueMinimo"
                       type="number"
                       min="0"
                       defaultValue={modelo.estoqueMinimo ?? ""}
-                      placeholder="Estoque mín."
-                      aria-label="Estoque mínimo"
+                      placeholder="Estoque regulador"
+                      aria-label="Estoque regulador"
                       className="w-full rounded-sm border border-white/10 bg-[#0B101E] px-2 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
                     />
                   </div>

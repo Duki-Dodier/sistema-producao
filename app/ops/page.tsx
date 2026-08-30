@@ -9,10 +9,33 @@ import { StatusSelect } from "@/components/status-select";
 import { CURVA_VARIANT } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 
-export default async function OpsPage() {
-  const [ops, modelos] = await Promise.all([
+export default async function OpsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const sp = await searchParams;
+  const busca = (sp.busca ?? "").trim();
+  const status = ["ABERTA", "CONCLUIDA", "CANCELADA"].includes(sp.status ?? "") ? sp.status : "";
+  const ordenar = ["sequencia", "liberacao", "status"].includes(sp.ordenar ?? "") ? sp.ordenar : "sequencia";
+  const pagina = Math.max(1, Number(sp.pagina) || 1);
+  const porPagina = 25;
+  const where = {
+    ...(status ? { status } : {}),
+    ...(busca ? { OR: [{ lote: { contains: busca } }, { modelo: { OR: [{ codigo: { contains: busca } }, { nome: { contains: busca } }] } }] } : {}),
+  };
+  const orderBy = ordenar === "liberacao"
+    ? { dataLiberacao: "desc" as const }
+    : ordenar === "status"
+      ? { status: "asc" as const }
+      : { numeroSequencia: "asc" as const };
+  const [totalOps, ops, modelos] = await Promise.all([
+    prisma.oP.count({ where }),
     prisma.oP.findMany({
-      orderBy: { numeroSequencia: "asc" },
+      where,
+      orderBy,
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
       select: {
         id: true,
         numeroSequencia: true,
@@ -24,23 +47,35 @@ export default async function OpsPage() {
         modelo: {
           select: {
             codigo: true,
+            tipo: true,
+            tamanhoPonteira: true,
             curva: true,
             linhaProduto: true,
+            estoqueMinimo: true,
           },
         },
       },
     }),
     prisma.modelo.findMany({
       orderBy: { codigo: "asc" },
-      select: { id: true, codigo: true, curva: true, linhaProduto: true, regulador: true },
+      select: { id: true, codigo: true, curva: true, linhaProduto: true, estoqueMinimo: true, tipo: true, tamanhoPonteira: true },
     }),
   ]);
+  const totalPaginas = Math.max(1, Math.ceil(totalOps / porPagina));
+  const query = (nextPagina: number) => {
+    const params = new URLSearchParams();
+    if (busca) params.set("busca", busca);
+    if (status) params.set("status", status);
+    if (ordenar !== "sequencia") params.set("ordenar", ordenar);
+    params.set("pagina", String(nextPagina));
+    return `/ops?${params.toString()}`;
+  };
 
   return (
     <div className="flex w-full flex-col gap-6 p-3 sm:p-6">
       <PageHeader
         title="Ordens de Produção"
-        subtitle="A OP percorre os setores de preparação, passa pelo Agrupamento e segue para Solda, Pintura e Montagem."
+        subtitle="A OP segue o roteiro do modelo. Engates e ponteiras macho podem ser liberados com fluxos próprios."
       />
 
       <Card>
@@ -89,7 +124,7 @@ export default async function OpsPage() {
               </option>
               {modelos.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.codigo} · Regulador {m.regulador ?? "—"} · {m.linhaProduto} · Curva {m.curva}
+                  {m.tipo === "PONTEIRA_MACHO" ? `${m.codigo} · Ponteira macho ${m.tamanhoPonteira ?? ""}` : `${m.codigo} · Estoque regulador ${m.estoqueMinimo ?? "—"} · ${m.linhaProduto} · Curva ${m.curva}`}
                 </option>
               ))}
             </select>
@@ -143,7 +178,12 @@ export default async function OpsPage() {
       </Card>
 
       <Card>
-        <CardHeader title={`OPs (${ops.length})`} subtitle="Altere o status conforme a situação real da ordem." />
+        <CardHeader title={`OPs (${totalOps})`} subtitle="Altere o status conforme a situação real da ordem." />
+        <form method="get" className="grid gap-3 border-b border-white/5 bg-[#1a222c] p-4 md:grid-cols-4">
+          <input name="busca" defaultValue={busca} placeholder="Buscar lote, código ou descrição" className="rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200 placeholder-slate-500 md:col-span-2" />
+          <select name="status" defaultValue={status} className="rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200"><option value="">Todos os status</option><option value="ABERTA">Abertas</option><option value="CONCLUIDA">Concluídas</option><option value="CANCELADA">Canceladas</option></select>
+          <div className="flex gap-2"><select name="ordenar" defaultValue={ordenar} className="min-w-0 flex-1 rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200"><option value="sequencia">Sequência</option><option value="liberacao">Liberação recente</option><option value="status">Status</option></select><button className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500">Filtrar</button></div>
+        </form>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-sm">
           <thead>
@@ -151,7 +191,7 @@ export default async function OpsPage() {
               <th className="px-5 py-3">Seq.</th>
               <th className="px-5 py-3">Lote</th>
               <th className="px-5 py-3">Modelo</th>
-              <th className="px-5 py-3">Regulador</th>
+              <th className="px-5 py-3">Estoque regulador</th>
               <th className="px-5 py-3">Curva</th>
               <th className="px-5 py-3">Quantidade</th>
               <th className="px-5 py-3">Liberada em</th>
@@ -174,7 +214,7 @@ export default async function OpsPage() {
                   {op.modelo.codigo}
                 </td>
                 <td className="px-5 py-3">
-                  <span className="font-mono text-slate-300">{op.modelo.regulador ?? "—"}</span>
+                  <span className="font-mono text-slate-300">{op.modelo.estoqueMinimo ?? "—"}</span>
                 </td>
                 <td className="px-5 py-3">
                   <Badge
@@ -226,6 +266,10 @@ export default async function OpsPage() {
             )}
           </tbody>
           </table>
+        </div>
+        <div className="flex items-center justify-between border-t border-white/5 px-5 py-4 text-xs text-slate-400">
+          <span>Página {Math.min(pagina, totalPaginas)} de {totalPaginas} · 25 por página</span>
+          <div className="flex gap-2"><Link aria-disabled={pagina <= 1} className={`rounded border border-white/10 px-3 py-1.5 ${pagina <= 1 ? "pointer-events-none opacity-40" : "hover:bg-white/5"}`} href={query(Math.max(1, pagina - 1))}>Anterior</Link><Link aria-disabled={pagina >= totalPaginas} className={`rounded border border-white/10 px-3 py-1.5 ${pagina >= totalPaginas ? "pointer-events-none opacity-40" : "hover:bg-white/5"}`} href={query(Math.min(totalPaginas, pagina + 1))}>Próxima</Link></div>
         </div>
       </Card>
     </div>

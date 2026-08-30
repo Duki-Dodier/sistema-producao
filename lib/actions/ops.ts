@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirAdministrador, exigirUsuarioLogado } from "@/lib/auth-operador";
+import { registrarAlteracao } from "@/lib/auditoria";
 
 const STATUS_OP = new Set(["ABERTA", "CONCLUIDA", "CANCELADA"]);
 
@@ -42,7 +43,7 @@ function revalidarOPs() {
 }
 
 export async function createOP(formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const sequenciaInformada = String(formData.get("numeroSequencia") ?? "").trim();
   const modeloId = Number(formData.get("modeloId"));
   const quantidade = Number(formData.get("quantidade"));
@@ -63,7 +64,7 @@ export async function createOP(formData: FormData) {
   validarDadosOP(numeroSequencia, modeloId, quantidade, lote);
 
   try {
-    await prisma.oP.create({
+    const op = await prisma.oP.create({
       data: {
         numeroSequencia,
         lote,
@@ -73,6 +74,7 @@ export async function createOP(formData: FormData) {
         previsaoEntrega: previsaoInformada ? new Date(`${previsaoInformada}T12:00:00`) : undefined,
       },
     });
+    await registrarAlteracao({ entidade: "OP", entidadeId: op.id, acao: "CRIADO", descricao: `OP ${lote} liberada.`, usuario: usuario.nome, dadosDepois: { numeroSequencia, modeloId, quantidade, lote } });
   } catch (error: unknown) {
     if (ehErroDeLoteDuplicado(error)) {
       throw new Error(`Já existe uma OP cadastrada com o lote "${lote}".`);
@@ -110,6 +112,7 @@ export async function updateStatusOP(
           status === "CONCLUIDA" ? opAtual.dataFinalizacao ?? new Date() : null,
       },
     });
+    await registrarAlteracao({ entidade: "OP", entidadeId: id, acao: "ATUALIZADO", descricao: `Status da OP ${id} alterado para ${status}.`, usuario: usuario.nome, dadosDepois: { status } });
   } catch (error) {
     console.error("Falha ao atualizar status da OP", error);
     return { error: "Não foi possível atualizar o status da OP." };
@@ -121,7 +124,7 @@ export async function updateStatusOP(
 }
 
 export async function updateOP(id: number, formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const numeroSequencia = Number(formData.get("numeroSequencia"));
   const modeloId = Number(formData.get("modeloId"));
   const quantidade = Number(formData.get("quantidade"));
@@ -154,6 +157,7 @@ export async function updateOP(id: number, formData: FormData) {
         previsaoEntrega: previsaoInformada ? new Date(`${previsaoInformada}T12:00:00`) : null,
       },
     });
+    await registrarAlteracao({ entidade: "OP", entidadeId: id, acao: "ATUALIZADO", descricao: `Dados da OP ${id} atualizados.`, usuario: usuario.nome, dadosDepois: { numeroSequencia, modeloId, quantidade, lote, status } });
   } catch (error: unknown) {
     if (ehErroDeLoteDuplicado(error)) {
       throw new Error(`Já existe uma OP cadastrada com o lote "${lote}".`);
@@ -191,6 +195,8 @@ export async function deleteOP(
     console.error("Falha ao excluir OP", error);
     return { error: "Não foi possível excluir esta OP. Atualize a página e tente novamente." };
   }
+
+  await registrarAlteracao({ entidade: "OP", entidadeId: id, acao: "EXCLUIDO", descricao: `OP ${id} excluída.`, usuario: usuario.nome });
 
   revalidarOPs();
   redirect("/ops");

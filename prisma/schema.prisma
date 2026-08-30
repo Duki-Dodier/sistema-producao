@@ -40,6 +40,7 @@ model Setor {
   recebimentosAgrupamento RecebimentoAgrupamento[]
   maquinas               Maquina[]
   producoesEmAndamento   ProducaoEmAndamento[]
+  nestsCorte             NestCorte[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -66,6 +67,9 @@ model Funcionario {
   sessoes             OperadorSessao[]
   ajustesAutorizados  AjusteApontamento[]
   producoesEmAndamento ProducaoEmAndamento[]
+  nestsProgramados     NestCorte[]       @relation("NestProgramador")
+  eventosNest          NestEvento[]
+  lancamentosNest      NestLancamento[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -97,6 +101,7 @@ model Maquina {
   setor        Setor          @relation(fields: [setorId], references: [id], onDelete: Restrict)
   apontamentos Apontamento[]
   producoesEmAndamento ProducaoEmAndamento[]
+  nestsCorte NestCorte[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -163,12 +168,63 @@ model Peca {
   producoesEmAndamento ProducaoEmAndamento[]
   roteiro      PecaRoteiro[]
   curvas       PecaCurva[]
+  itensNest    NestItem[]
+  configuracoesPonteiraComoTubo  ConfiguracaoPonteira[] @relation("PonteiraTubo")
+  configuracoesPonteiraComoChapa ConfiguracaoPonteira[] @relation("PonteiraChapa")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([setorId])
   @@index([tipoMaterial, medidaA, medidaB])
+}
+
+/// Define quais peças da BOM formam a ponteira de cada engate removível.
+/// A identificação é necessária porque uma OP pode possuir várias chapas,
+/// mas apenas uma delas pertence à ponteira.
+model ConfiguracaoPonteira {
+  id          Int @id @default(autoincrement())
+  modeloId    Int @unique
+  pecaTuboId  Int
+  pecaChapaId Int
+
+  modelo    Modelo @relation(fields: [modeloId], references: [id], onDelete: Cascade)
+  pecaTubo  Peca   @relation("PonteiraTubo", fields: [pecaTuboId], references: [id], onDelete: Restrict)
+  pecaChapa Peca   @relation("PonteiraChapa", fields: [pecaChapaId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pecaTuboId])
+  @@index([pecaChapaId])
+}
+
+/// Histórico geral de alterações para rastreabilidade de cadastros e produção.
+model HistoricoAlteracao {
+  id          Int      @id @default(autoincrement())
+  entidade    String   // MODELO | BOM | ROTEIRO | ESTOQUE | OP | NEST | FUNCIONARIO
+  entidadeId  Int?
+  acao        String   // CRIADO | ATUALIZADO | EXCLUIDO | MOVIMENTADO
+  descricao   String
+  usuario     String
+  dadosAntes  String?
+  dadosDepois String?
+  dataHora    DateTime @default(now())
+
+  @@index([entidade, entidadeId])
+  @@index([dataHora])
+}
+
+/// Saldo físico livre das ponteiras e dos componentes já cortados.
+/// Os saldos são separados das OPs, que têm o próprio rastreamento de produção.
+model EstoquePonteira {
+  id               Int @id @default(autoincrement())
+  tamanho          String @unique // PEQUENA | MEDIA | GRANDE
+  quantidadePronta Int @default(0)
+  tubosCortados    Int @default(0)
+  chapasCortadas   Int @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 /// Curva de dobra de uma peça (tabela "DOBRA" da folha do Tubo na OP
@@ -248,16 +304,17 @@ model Modelo {
   codigo          String  @unique
   nome            String? // nome comercial do engate
   curva           String // "A" | "B" | "C"
-  tipo            String // "FIXO" | "REMOVIVEL"
-  tamanhoPonteira String? // ex.: "P", "M", "G", "P-16mm" — só p/ removível
+  tipo            String // "FIXO" | "REMOVIVEL" | "PONTEIRA_MACHO"
+  tamanhoPonteira String? // PEQUENA | MEDIA | GRANDE — removíveis e ponteiras macho
   imagemUrl       String? // foto do engate, ex.: "/api/uploads/AD1001/modelo/AD1001-xxx.jpg"
   estoqueMinimo   Int? // estoque mínimo — alerta quando o estoque pronto cair abaixo disso
-  regulador       Int? // código numérico do regulador usado no modelo
+  regulador       Int? // legado: não é usado na operação; o valor vigente é estoqueMinimo
   linhaProduto    String  @default("BRUCKE") // "BRUCKE" | "REFORCEL"
 
   roteiro ModeloRoteiro[]
   ops     OP[]
   pecas   ModeloPeca[]
+  configuracaoPonteira ConfiguracaoPonteira?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,6 +354,7 @@ model OP {
   recebimentosAgrupamento RecebimentoAgrupamento[]
   entradasEstoque         EntradaEstoque[]
   producoesEmAndamento    ProducaoEmAndamento[]
+  itensNest               NestItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -365,6 +423,7 @@ model Apontamento {
   roteiroEtapa PecaRoteiro?        @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
   maquina      Maquina?             @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
   ajustes      AjusteApontamento[]
+  lancamentoNest NestLancamento?
 
   @@index([opId])
   @@index([setorId])
@@ -373,6 +432,108 @@ model Apontamento {
   @@index([roteiroEtapaId])
   @@index([maquinaId])
   @@index([setorId, dataHora, origem])
+}
+
+/// Programação de corte criada no Libellula (ou equivalente). Um nest pode
+/// aproveitar uma única chapa para atender peças de diversas OPs.
+model NestCorte {
+  id                    Int      @id @default(autoincrement())
+  codigo                String   @unique // Ex.: NEST3530
+  nomeArquivo           String?
+  arquivoPdfUrl         String?  // PDF de agrupamento exportado pelo Libellula
+  setorId               Int
+  maquinaId             Int
+  programadorId         Int
+  material              String   @default("Aço")
+  espessuraMm           Float?
+  larguraChapaMm        Float?
+  alturaChapaMm         Float?
+  pesoChapaKg           Float?
+  pesoPecasKg           Float?
+  pesoSobraKg           Float?
+  aproveitamentoPct     Float?
+  quantidadeChapas      Int      @default(1)
+  numeroPiercings       Int?
+  comprimentoCorteMm    Float?
+  comprimentoRapidoMm   Float?
+  tempoCorteSegundos    Int?
+  tempoDeslocamentoSegundos Int?
+  status                String   @default("PROGRAMADO") // PROGRAMADO | EM_CORTE | PAUSADO | CONCLUIDO | CANCELADO
+  iniciadoEm            DateTime?
+  finalizadoEm          DateTime?
+  observacao            String?
+
+  setor       Setor       @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  maquina     Maquina     @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
+  programador Funcionario @relation("NestProgramador", fields: [programadorId], references: [id], onDelete: Restrict)
+  itens       NestItem[]
+  eventos     NestEvento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([setorId, status])
+  @@index([maquinaId, createdAt])
+  @@index([programadorId, createdAt])
+}
+
+/// Peça planejada dentro de um nest, vinculada à OP que ela deve atender.
+model NestItem {
+  id                   Int @id @default(autoincrement())
+  nestId               Int
+  opId                 Int
+  pecaId               Int
+  quantidadePlanejada  Int
+
+  nest        NestCorte       @relation(fields: [nestId], references: [id], onDelete: Cascade)
+  op          OP              @relation(fields: [opId], references: [id], onDelete: Restrict)
+  peca        Peca            @relation(fields: [pecaId], references: [id], onDelete: Restrict)
+  lancamentos NestLancamento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([nestId, opId, pecaId])
+  @@index([opId, pecaId])
+}
+
+/// Linha de tempo operacional do nest: início, pausa, retorno, conclusão e
+/// cancelamento. Preserva a rastreabilidade mesmo sem apontar peças.
+model NestEvento {
+  id            Int      @id @default(autoincrement())
+  nestId        Int
+  funcionarioId Int
+  tipo          String   // PROGRAMADO | INICIO | PAUSA | RETORNO | FIM | CANCELAMENTO
+  descricao     String?
+  dataHora      DateTime @default(now())
+
+  nest        NestCorte   @relation(fields: [nestId], references: [id], onDelete: Cascade)
+  funcionario Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Restrict)
+
+  @@index([nestId, dataHora])
+  @@index([funcionarioId, dataHora])
+}
+
+/// Baixa por peça cortada no nest. A baixa também gera um Apontamento normal,
+/// mantendo os painéis e a rastreabilidade por OP sincronizados.
+model NestLancamento {
+  id               Int      @id @default(autoincrement())
+  nestItemId       Int
+  funcionarioId    Int
+  apontamentoId    Int?     @unique
+  tipo             String   @default("PRODUCAO") // PRODUCAO | RETRABALHO
+  quantidadeBoa    Int      @default(0)
+  quantidadeRefugo Int      @default(0)
+  motivoRefugo     String?
+  observacao       String?
+  dataHora         DateTime @default(now())
+
+  item        NestItem    @relation(fields: [nestItemId], references: [id], onDelete: Cascade)
+  funcionario Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Restrict)
+  apontamento Apontamento? @relation(fields: [apontamentoId], references: [id], onDelete: SetNull)
+
+  @@index([nestItemId, dataHora])
+  @@index([funcionarioId, dataHora])
 }
 
 /// Ciclo iniciado pelo operador e finalizado somente quando a produção foi

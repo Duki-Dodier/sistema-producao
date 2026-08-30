@@ -1,6 +1,7 @@
 export const TIPO_LABEL: Record<string, string> = {
   FIXO: "Fixo",
   REMOVIVEL: "Removível",
+  PONTEIRA_MACHO: "Ponteira macho",
 };
 
 export const CURVA_VARIANT = {

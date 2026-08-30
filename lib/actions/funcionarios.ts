@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PROCESSOS } from "@/lib/processos";
 import { criarSenhaHash, exigirUsuarioLogado, normalizarUsuario } from "@/lib/auth-operador";
+import { registrarAlteracao } from "@/lib/auditoria";
 
 export async function createFuncionario(formData: FormData) {
   const acesso = await exigirUsuarioLogado();
@@ -29,7 +30,7 @@ export async function createFuncionario(formData: FormData) {
     : null;
 
   try {
-    await prisma.funcionario.create({
+    const funcionario = await prisma.funcionario.create({
       data: {
         nome,
         setorId,
@@ -39,6 +40,7 @@ export async function createFuncionario(formData: FormData) {
         bancada,
       },
     });
+    await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: funcionario.id, acao: "CRIADO", descricao: `Funcionário ${nome} cadastrado.`, usuario: acesso.nome, dadosDepois: { nome, setorId, bancada } });
   } catch {
     throw new Error("Já existe um funcionário com esse nome neste setor.");
   }
@@ -72,18 +74,17 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
     throw new Error("Selecione ao menos um processo permitido para o operador.");
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.funcionario.update({
+  await prisma.funcionario.update({
       where: { id },
       data: { papel, setorId, pin: pinRaw || null, bancada: bancadaRaw || null },
     });
-    await tx.funcionarioProcesso.deleteMany({ where: { funcionarioId: id } });
-    if (processos.length > 0) {
-      await tx.funcionarioProcesso.createMany({
-        data: processos.map((processo) => ({ funcionarioId: id, processo })),
-      });
-    }
-  });
+  await prisma.funcionarioProcesso.deleteMany({ where: { funcionarioId: id } });
+  if (processos.length > 0) {
+    await prisma.funcionarioProcesso.createMany({
+      data: processos.map((processo) => ({ funcionarioId: id, processo })),
+    });
+  }
+  await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: id, acao: "ATUALIZADO", descricao: `Acesso do funcionário ${id} atualizado.`, usuario: acesso.nome, dadosDepois: { papel, setorId, bancada: bancadaRaw || null, processos } });
 
   revalidatePath("/configuracoes");
   revalidatePath("/apontamentos");
@@ -102,6 +103,7 @@ export async function toggleFuncionario(id: number) {
     where: { id },
     data: { ativo: !f.ativo },
   });
+  await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: id, acao: "ATUALIZADO", descricao: `Funcionário ${id} ${f.ativo ? "desativado" : "ativado"}.`, usuario: acesso.nome, dadosDepois: { ativo: !f.ativo } });
 
   revalidatePath("/configuracoes");
   revalidatePath("/agrupamento");
@@ -110,7 +112,9 @@ export async function toggleFuncionario(id: number) {
 export async function deleteFuncionario(id: number) {
   const acesso = await exigirUsuarioLogado();
   if (!acesso.administrador) throw new Error("Apenas o administrador pode excluir funcionarios.");
+  const anterior = await prisma.funcionario.findUnique({ where: { id }, select: { nome: true } });
   await prisma.funcionario.delete({ where: { id } });
+  await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: id, acao: "EXCLUIDO", descricao: `Funcionário ${anterior?.nome ?? id} excluído.`, usuario: acesso.nome });
   revalidatePath("/configuracoes");
   revalidatePath("/agrupamento");
 }

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { ehSetor } from "@/lib/setores";
 
 const COOKIE_NAME = "mes_operador_session";
 const DURACAO_SESSAO_SEGUNDOS = 12 * 60 * 60;
@@ -186,10 +187,13 @@ export function podeAcessarRota(usuario: OperadorLogado, pathname: string) {
   if (usuario.administrador) return true;
   if (pathname === "/login") return true;
   if (usuario.papel === "OPERADOR") {
+    if (pathname.startsWith("/plasma")) {
+      return ehSetor(usuario.setorNome, "Plasma Chapa") || ehSetor(usuario.setorNome, "Plasma Tubo");
+    }
     return pathname.startsWith("/apontamentos");
   }
   if (usuario.papel === "LIDER") {
-    return ["/", "/monitoramento", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].some(
+    return ["/", "/monitoramento", "/plasma", "/ponteiras", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].some(
       (rota) => rota === "/" ? pathname === "/" : pathname.startsWith(rota),
     );
   }

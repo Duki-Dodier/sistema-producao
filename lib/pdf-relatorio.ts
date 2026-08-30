@@ -2,6 +2,7 @@ type KpiPdf = { label: string; value: string };
 type SecaoPdf = {
   titulo: string;
   paginaNovaAntes?: boolean;
+  quebrarLinhas?: boolean;
   colunas: { titulo: string; largura: number; alinhar?: "left" | "right" }[];
   linhas: string[][];
 };
@@ -48,6 +49,34 @@ function escaparPdf(texto: string) {
 function limitar(texto: string, largura: number, tamanho: number) {
   const maximo = Math.max(3, Math.floor(largura / (tamanho * 0.51)));
   return texto.length <= maximo ? texto : `${texto.slice(0, maximo - 3)}...`;
+}
+
+function quebrarTexto(texto: string, largura: number, tamanho: number) {
+  const maximo = Math.max(4, Math.floor(largura / (tamanho * 0.51)));
+  if (!texto) return [""];
+  const linhas: string[] = [];
+  let atual = "";
+  for (const palavraOriginal of texto.split(/\s+/)) {
+    let palavra = palavraOriginal;
+    while (palavra.length > maximo) {
+      if (atual) {
+        linhas.push(atual);
+        atual = "";
+      }
+      linhas.push(palavra.slice(0, maximo));
+      palavra = palavra.slice(maximo);
+    }
+    if (!palavra) continue;
+    const candidata = atual ? `${atual} ${palavra}` : palavra;
+    if (candidata.length <= maximo) {
+      atual = candidata;
+    } else {
+      linhas.push(atual);
+      atual = palavra;
+    }
+  }
+  if (atual) linhas.push(atual);
+  return linhas.length ? linhas : [""];
 }
 
 class DocumentoPdf {
@@ -122,23 +151,31 @@ class DocumentoPdf {
       return;
     }
     secao.linhas.forEach((linha, indice) => {
-      if (this.y + 21 > this.alturaPagina - 42) {
+      const linhasCelula = secao.colunas.map((config, coluna) =>
+        secao.quebrarLinhas ? quebrarTexto(String(linha[coluna] ?? ""), config.largura - 10, 8.2) : [String(linha[coluna] ?? "")],
+      );
+      const alturaLinha = secao.quebrarLinhas
+        ? Math.max(20, 8 + Math.max(...linhasCelula.map((celula) => celula.length)) * 10)
+        : 20;
+      if (this.y + alturaLinha > this.alturaPagina - 42) {
         this.novaPagina();
         this.texto(`${secao.titulo} (continuação)`, MARGEM, this.y, 12, true, cor(15, 29, 52));
         this.y += 12;
         this.desenharCabecalho(secao);
       }
-      if (indice % 2 === 1) this.retangulo(MARGEM, this.y, this.larguraPagina - MARGEM * 2, 20, cor(248, 250, 252));
+      if (indice % 2 === 1) this.retangulo(MARGEM, this.y, this.larguraPagina - MARGEM * 2, alturaLinha, cor(248, 250, 252));
       let x = MARGEM;
       linha.forEach((valor, coluna) => {
         const config = secao.colunas[coluna];
         if (!config) return;
-        const texto = limitar(String(valor), config.largura - 10, 8.2);
-        this.texto(texto, x + 5, this.y + 13.5, 8.2, coluna === 0, cor(51, 65, 85), config.alinhar ?? "left", config.largura - 10);
+        const textos = linhasCelula[coluna] ?? [String(valor)];
+        textos.forEach((texto, linhaTexto) => {
+          this.texto(texto, x + 5, this.y + 12 + linhaTexto * 10, 8.2, coluna === 0, cor(51, 65, 85), config.alinhar ?? "left", config.largura - 10);
+        });
         x += config.largura;
       });
-      this.pagina.push(`${cor(226, 232, 240)} RG 0.35 w ${MARGEM} ${(this.alturaPagina - this.y - 20).toFixed(1)} ${this.larguraPagina - MARGEM * 2} 0 re S`);
-      this.y += 20;
+      this.pagina.push(`${cor(226, 232, 240)} RG 0.35 w ${MARGEM} ${(this.alturaPagina - this.y - alturaLinha).toFixed(1)} ${this.larguraPagina - MARGEM * 2} 0 re S`);
+      this.y += alturaLinha;
     });
     this.y += 18;
   }
@@ -147,9 +184,14 @@ class DocumentoPdf {
     this.garantir(28);
     this.retangulo(MARGEM, this.y, this.larguraPagina - MARGEM * 2, 24, cor(225, 234, 246));
     let x = MARGEM;
-    for (const coluna of secao.colunas) {
+    for (const [indice, coluna] of secao.colunas.entries()) {
       this.texto(limitar(coluna.titulo.toUpperCase(), coluna.largura - 10, 7.3), x + 5, this.y + 16, 7.3, true, cor(51, 65, 85), coluna.alinhar ?? "left", coluna.largura - 10);
       x += coluna.largura;
+      if (indice < secao.colunas.length - 1) {
+        const topo = this.alturaPagina - this.y;
+        const base = topo - 24;
+        this.pagina.push(`${cor(203, 213, 225)} RG 0.35 w ${x.toFixed(1)} ${base.toFixed(1)} m ${x.toFixed(1)} ${topo.toFixed(1)} l S`);
+      }
     }
     this.y += 24;
   }
@@ -158,7 +200,7 @@ class DocumentoPdf {
     if (this.pagina.length) this.paginas.push(this.pagina);
     this.paginas.forEach((pagina, indice) => {
       pagina.push(`${cor(203, 213, 225)} RG 0.5 w ${MARGEM} 28 ${this.larguraPagina - MARGEM * 2} 0 re S`);
-      pagina.push(`BT /F1 7.5 Tf ${cor(100, 116, 139)} rg 1 0 0 1 ${MARGEM} 16 Tm (MES - Fábrica de Engates) Tj ET`);
+      pagina.push(`BT /F1 7.5 Tf ${cor(100, 116, 139)} rg 1 0 0 1 ${MARGEM} 16 Tm (ENGATES BRUCKE - Sistema de Producao) Tj ET`);
       pagina.push(`BT /F1 7.5 Tf ${cor(100, 116, 139)} rg 1 0 0 1 ${this.larguraPagina - MARGEM - 55} 16 Tm (Página ${indice + 1}) Tj ET`);
     });
     return montarArquivoPdf(this.paginas, this.larguraPagina, this.alturaPagina);

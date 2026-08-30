@@ -6,19 +6,62 @@ import { Badge } from "@/components/badge";
 import { CURVA_VARIANT, TIPO_LABEL } from "@/lib/labels";
 import { FileText, Plus, Route } from "lucide-react";
 
-export default async function ModelosPage() {
-  const modelos = await prisma.modelo.findMany({
-    orderBy: { codigo: "asc" },
-    select: {
-      id: true,
-      codigo: true,
-      curva: true,
-      tipo: true,
-      linhaProduto: true,
-      regulador: true,
-      _count: { select: { roteiro: true, ops: true } },
-    },
-  });
+export default async function ModelosPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const sp = await searchParams;
+  const busca = (sp.busca ?? "").trim();
+  const curva = ["A", "B", "C"].includes(sp.curva ?? "") ? sp.curva : "";
+  const tipo = ["FIXO", "REMOVIVEL", "PONTEIRA_MACHO"].includes(sp.tipo ?? "") ? sp.tipo : "";
+  const linha = ["BRUCKE", "REFORCEL"].includes(sp.linha ?? "") ? sp.linha : "";
+  const ordenar = ["codigo", "estoque", "ops", "data"].includes(sp.ordenar ?? "") ? sp.ordenar : "codigo";
+  const pagina = Math.max(1, Number(sp.pagina) || 1);
+  const porPagina = 25;
+  const where = {
+    ...(busca ? { OR: [{ codigo: { contains: busca } }, { nome: { contains: busca } }] } : {}),
+    ...(curva ? { curva } : {}),
+    ...(tipo ? { tipo } : {}),
+    ...(linha ? { linhaProduto: linha } : {}),
+  };
+  const orderBy = ordenar === "estoque"
+    ? { estoqueMinimo: "desc" as const }
+    : ordenar === "ops"
+      ? { ops: { _count: "desc" as const } }
+    : ordenar === "data"
+      ? { updatedAt: "desc" as const }
+      : { codigo: "asc" as const };
+  const [totalModelos, modelos] = await Promise.all([
+    prisma.modelo.count({ where }),
+    prisma.modelo.findMany({
+      where,
+      orderBy,
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+      select: {
+        id: true,
+        codigo: true,
+        curva: true,
+        tipo: true,
+        linhaProduto: true,
+        estoqueMinimo: true,
+        updatedAt: true,
+        _count: { select: { ops: true } },
+      },
+    }),
+  ]);
+  const totalPaginas = Math.max(1, Math.ceil(totalModelos / porPagina));
+  const query = (nextPagina: number) => {
+    const params = new URLSearchParams();
+    if (busca) params.set("busca", busca);
+    if (curva) params.set("curva", curva);
+    if (tipo) params.set("tipo", tipo);
+    if (linha) params.set("linha", linha);
+    if (ordenar !== "codigo") params.set("ordenar", ordenar);
+    params.set("pagina", String(nextPagina));
+    return `/modelos?${params.toString()}`;
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,7 +105,14 @@ export default async function ModelosPage() {
       </div>
 
       <Card>
-        <CardHeader title={`Modelos cadastrados (${modelos.length})`} />
+        <CardHeader title={`Modelos cadastrados (${totalModelos})`} />
+        <form method="get" className="grid gap-3 border-b border-white/5 bg-[#1a222c] p-4 md:grid-cols-6">
+          <input name="busca" defaultValue={busca} placeholder="Buscar código ou descrição" className="rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200 placeholder-slate-500 md:col-span-2" />
+          <select name="curva" defaultValue={curva} className="rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200"><option value="">Todas as curvas</option><option value="A">Curva A</option><option value="B">Curva B</option><option value="C">Curva C</option></select>
+          <select name="tipo" defaultValue={tipo} className="rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200"><option value="">Todos os tipos</option><option value="FIXO">Fixo</option><option value="REMOVIVEL">Removível</option><option value="PONTEIRA_MACHO">Ponteira macho</option></select>
+          <select name="linha" defaultValue={linha} className="rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200"><option value="">Todas as linhas</option><option value="BRUCKE">Brucke</option><option value="REFORCEL">Reforcel</option></select>
+          <div className="flex gap-2"><select name="ordenar" defaultValue={ordenar} className="min-w-0 flex-1 rounded-md border border-white/10 bg-[#0b101e] px-3 py-2 text-sm text-slate-200"><option value="codigo">Código</option><option value="estoque">Estoque</option><option value="ops">OPs vinculadas</option><option value="data">Atualização</option></select><button className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500">Filtrar</button></div>
+        </form>
         <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-sm">
           <thead>
@@ -71,8 +121,7 @@ export default async function ModelosPage() {
               <th className="px-5 py-3">Curva</th>
               <th className="px-5 py-3">Tipo</th>
               <th className="px-5 py-3">Linha</th>
-              <th className="px-5 py-3">Regulador</th>
-              <th className="px-5 py-3">Fluxo de produção</th>
+              <th className="px-5 py-3">Estoque regulador</th>
               <th className="px-5 py-3">OPs</th>
               <th className="px-5 py-3" />
             </tr>
@@ -97,12 +146,7 @@ export default async function ModelosPage() {
                     <span className="text-[10px] text-slate-600">Definida no cadastro</span>
                   </div>
                 </td>
-                <td className="px-5 py-3 font-mono text-slate-400">{m.regulador ?? "—"}</td>
-                <td className="px-5 py-3 text-slate-500">
-                  {m._count.roteiro > 0
-                    ? `${m._count.roteiro} etapas configuradas`
-                    : "Fluxo não configurado"}
-                </td>
+                <td className="px-5 py-3 font-mono text-slate-400">{m.estoqueMinimo ?? "—"}</td>
                 <td className="px-5 py-3 text-slate-500">{m._count.ops}</td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex items-center justify-end gap-2 whitespace-nowrap">
@@ -126,13 +170,17 @@ export default async function ModelosPage() {
             ))}
             {modelos.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
                   Nenhum modelo cadastrado ainda.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
+        <div className="flex items-center justify-between border-t border-white/5 px-5 py-4 text-xs text-slate-400">
+          <span>Página {Math.min(pagina, totalPaginas)} de {totalPaginas} · 25 por página</span>
+          <div className="flex gap-2"><Link aria-disabled={pagina <= 1} className={`rounded border border-white/10 px-3 py-1.5 ${pagina <= 1 ? "pointer-events-none opacity-40" : "hover:bg-white/5"}`} href={query(Math.max(1, pagina - 1))}>Anterior</Link><Link aria-disabled={pagina >= totalPaginas} className={`rounded border border-white/10 px-3 py-1.5 ${pagina >= totalPaginas ? "pointer-events-none opacity-40" : "hover:bg-white/5"}`} href={query(Math.min(totalPaginas, pagina + 1))}>Próxima</Link></div>
         </div>
       </Card>
     </div>

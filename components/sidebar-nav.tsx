@@ -6,37 +6,44 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/", label: "Painel Geral", icon: DashboardIcon },
   { href: "/monitoramento", label: "Monitoramento (Produção Geral)", icon: MonitorIcon },
-  { href: "/relatorios", label: "Relatórios de Produção", icon: ReportsIcon },
+  { href: "/plasma", label: "Plasma", icon: PlasmaIcon },
+  { href: "/ponteiras", label: "Ponteiras Macho", icon: PonteiraIcon },
+  { href: "/relatorios", label: "Relatórios e Capacidade", icon: ReportsIcon },
   { href: "/ops", label: "Ordens de Produção", icon: OrdersIcon },
   { href: "/agrupamento", label: "Agrupamento (WIP)", icon: KittingIcon },
   { href: "/solda", label: "Soldagem", icon: WeldingIcon },
   { href: "/apontamentos", label: "Apontamentos da Fábrica", icon: QualityIcon },
   { href: "/modelos", label: "Engenharia de Produto", icon: ConfigIcon },
+  { href: "/pecas", label: "Peças e BOM", icon: PartsIcon },
+  { href: "/historico", label: "Histórico de alterações", icon: HistoryIcon },
   { href: "/configuracoes", label: "Configurações (Funcionários, Metas)", icon: SettingsIcon },
 ];
 
 export function SidebarNav({
   administrador,
   papel,
+  setorNome,
 }: {
   administrador: boolean;
   papel: string;
+  setorNome: string;
 }) {
   const pathname = usePathname();
+  const operadorDoPlasma = /PLASMA/i.test(setorNome);
   const itensVisiveis = administrador
     ? NAV_ITEMS
     : papel === "OPERADOR"
       ? NAV_ITEMS.filter((item) =>
-          item.href === "/apontamentos",
+          item.href === "/apontamentos" || (operadorDoPlasma && item.href === "/plasma"),
       )
       : papel === "LIDER"
         ? NAV_ITEMS.filter((item) =>
-            ["/", "/monitoramento", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].includes(item.href),
+            ["/", "/monitoramento", "/plasma", "/ponteiras", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].includes(item.href),
           )
         : NAV_ITEMS.filter((item) => item.href !== "/configuracoes");
 
   return (
-    <nav className="flex flex-1 flex-col items-center gap-4 py-4 w-full">
+    <nav className="flex w-full flex-1 flex-col items-center gap-3 px-2 py-4">
       {itensVisiveis.map((item) => {
         const active =
           item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -46,17 +53,22 @@ export function SidebarNav({
           <Link
             key={item.href}
             href={item.href}
-            title={item.label} // Tooltip nativo em Português
-            className={`group relative flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+            title={item.label}
+            aria-label={item.label}
+            className={`group/item relative flex h-10 w-10 items-center justify-center rounded-lg transition-all duration-200 group-hover/sidebar:w-full group-hover/sidebar:justify-start group-hover/sidebar:px-3 ${
               active
                 ? "bg-[#3B82F6] text-white shadow-md shadow-blue-500/20"
                 : "text-slate-400 hover:bg-slate-700/50 hover:text-white"
             }`}
           >
             <Icon className="h-5 w-5 shrink-0" />
-            
-            {/* Tooltip customizado (aparece ao passar o mouse) */}
-            <div className="pointer-events-none absolute left-14 z-50 flex hidden items-center opacity-0 transition-opacity group-hover:flex group-hover:opacity-100">
+
+            <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap text-left text-xs font-semibold opacity-0 transition-[max-width,margin,opacity] duration-200 group-hover/sidebar:ml-3 group-hover/sidebar:max-w-48 group-hover/sidebar:opacity-100">
+              {item.label}
+            </span>
+
+            {/* Tooltip enquanto a lateral estiver recolhida. */}
+            <div className="pointer-events-none absolute left-14 z-50 hidden items-center opacity-0 transition-opacity group-hover/item:flex group-hover/item:opacity-100 group-hover/sidebar:hidden">
               <div className="whitespace-nowrap rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white shadow-lg border border-slate-700">
                 {item.label}
               </div>
@@ -83,6 +95,25 @@ function MonitorIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  );
+}
+
+function PlasmaIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m13 2-8 11h6l-1 9 9-12h-6z" />
+      <path d="M4 4h3M17 5h3M3 19h3" opacity=".65" />
+    </svg>
+  );
+}
+
+function PonteiraIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M5 19 15 5l4 4L9 19z" />
+      <path d="m14 6 4 4" />
+      <path d="M4 20h8" />
     </svg>
   );
 }
@@ -150,6 +181,23 @@ function ConfigIcon(props: React.SVGProps<SVGSVGElement>) {
       <path d="M3 5h18v14H3z" />
       <path d="M7 8v8M10 8v8M14 8v8M17 8v8" />
       <path d="M5 8h14M5 16h14" />
+    </svg>
+  );
+}
+
+function PartsIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 5h16v14H4z" />
+      <path d="M8 9h8M8 13h5M8 17h8" />
+    </svg>
+  );
+}
+
+function HistoryIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 7v5l3 2" />
     </svg>
   );
 }

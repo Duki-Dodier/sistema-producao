@@ -1,0 +1,330 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { exigirUsuarioLogado, type OperadorLogado } from "@/lib/auth-operador";
+import { prisma } from "@/lib/prisma";
+import { ehSetor } from "@/lib/setores";
+import { salvarPdf } from "@/lib/upload";
+import { registrarAlteracao } from "@/lib/auditoria";
+
+const STATUS_NEST = ["PROGRAMADO", "EM_CORTE", "PAUSADO", "CONCLUIDO", "CANCELADO"] as const;
+const EVENTOS_NEST = ["INICIO", "PAUSA", "RETORNO", "FIM", "CANCELAMENTO"] as const;
+
+function texto(valor: FormDataEntryValue | null, limite: number) {
+  return String(valor ?? "").trim().slice(0, limite);
+}
+
+function inteiro(valor: FormDataEntryValue | null, campo: string, minimo = 0) {
+  const numero = Number(texto(valor, 32));
+  if (!Number.isInteger(numero) || numero < minimo) {
+    throw new Error(`${campo} deve ser um número inteiro ${minimo > 0 ? "maior que zero" : "não negativo"}.`);
+  }
+  return numero;
+}
+
+function decimalOpcional(valor: FormDataEntryValue | null, campo: string) {
+  const bruto = texto(valor, 32).replace(",", ".");
+  if (!bruto) return null;
+  const numero = Number(bruto);
+  if (!Number.isFinite(numero) || numero < 0) {
+    throw new Error(`${campo} deve ser um número não negativo.`);
+  }
+  return numero;
+}
+
+function segundosOpcional(valor: FormDataEntryValue | null, campo: string) {
+  const bruto = texto(valor, 32);
+  if (!bruto) return null;
+  const numero = Number(bruto);
+  if (!Number.isInteger(numero) || numero < 0) {
+    throw new Error(`${campo} deve ser informado em segundos.`);
+  }
+  return numero;
+}
+
+function inteiroOpcional(valor: FormDataEntryValue | null, campo: string) {
+  const bruto = texto(valor, 32);
+  if (!bruto) return null;
+  return inteiro(bruto, campo);
+}
+
+function setorEhPlasma(nome: string) {
+  return ehSetor(nome, "Plasma Chapa") || ehSetor(nome, "Plasma Tubo");
+}
+
+function validarAcessoAoSetor(usuario: OperadorLogado, setor: { id: number; nome: string }) {
+  if (!setorEhPlasma(setor.nome)) {
+    throw new Error("O nest deve pertencer ao Plasma Chapa ou ao Plasma Tubo.");
+  }
+  if (!usuario.administrador && usuario.papel === "OPERADOR" && usuario.setorId !== setor.id) {
+    throw new Error("O operador só pode registrar atividades do seu próprio setor.");
+  }
+}
+
+function revalidarNests() {
+  revalidatePath("/plasma");
+  revalidatePath("/apontamentos");
+  revalidatePath("/monitoramento");
+  revalidatePath("/ponteiras");
+}
+
+type ItemInformado = { opId: number; pecaId: number; quantidadePlanejada: number };
+
+function lerItens(formData: FormData) {
+  const referencias = formData.getAll("itemRef");
+  const quantidades = formData.getAll("itemQuantidade");
+  const itens = new Map<string, ItemInformado>();
+
+  referencias.forEach((referencia, indice) => {
+    const valor = String(referencia);
+    if (!valor) return;
+    const [opRaw, pecaRaw] = valor.split(":");
+    const opId = Number(opRaw);
+    const pecaId = Number(pecaRaw);
+    const quantidadePlanejada = inteiro(quantidades[indice] ?? null, "Quantidade planejada", 1);
+    if (!Number.isInteger(opId) || !Number.isInteger(pecaId)) {
+      throw new Error("Há uma peça inválida na programação do nest.");
+    }
+    const chave = `${opId}:${pecaId}`;
+    const atual = itens.get(chave);
+    itens.set(chave, {
+      opId,
+      pecaId,
+      quantidadePlanejada: (atual?.quantidadePlanejada ?? 0) + quantidadePlanejada,
+    });
+  });
+
+  if (!itens.size) throw new Error("Inclua pelo menos uma peça de uma OP aberta no nest.");
+  return [...itens.values()];
+}
+
+export async function criarNestCorte(formData: FormData) {
+  const usuario = await exigirUsuarioLogado();
+  const codigo = texto(formData.get("codigo"), 80).toUpperCase();
+  const setorId = inteiro(formData.get("setorId"), "Setor", 1);
+  const maquinaIdInformada = texto(formData.get("maquinaId"), 32);
+  const maquinaId = maquinaIdInformada ? Number(maquinaIdInformada) : null;
+  const itens = lerItens(formData);
+
+  if (!codigo) throw new Error("Informe o código do nest, por exemplo NEST3530.");
+
+  const setor = await prisma.setor.findUnique({ where: { id: setorId }, select: { id: true, nome: true } });
+  if (!setor) throw new Error("Setor não encontrado.");
+  validarAcessoAoSetor(usuario, setor);
+
+  let maquina = maquinaId && Number.isInteger(maquinaId)
+    ? await prisma.maquina.findFirst({ where: { id: maquinaId, setorId, ativo: true }, select: { id: true } })
+    : null;
+  if (!maquina) {
+    const codigoImportado = texto(formData.get("maquinaImportada"), 80);
+    if (!codigoImportado) throw new Error("Selecione uma máquina ou importe um PDF com a máquina informada.");
+    const existente = await prisma.maquina.findFirst({
+      where: { setorId, OR: [{ codigo: codigoImportado }, { nome: codigoImportado }] },
+      select: { id: true },
+    });
+    maquina = existente ?? await prisma.maquina.create({
+      data: { codigo: codigoImportado, nome: codigoImportado, setorId, ativo: true },
+      select: { id: true },
+    });
+  }
+
+  const ops = await prisma.oP.findMany({
+    where: { id: { in: itens.map((item) => item.opId) }, status: "ABERTA" },
+    select: {
+      id: true,
+      modelo: {
+        select: {
+          pecas: {
+            select: {
+              pecaId: true,
+              peca: {
+                select: {
+                  setorId: true,
+                  roteiro: { select: { setorId: true, processo: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (ops.length !== new Set(itens.map((item) => item.opId)).size) {
+    throw new Error("Todas as peças precisam pertencer a OPs abertas.");
+  }
+
+  for (const item of itens) {
+    const op = ops.find((registro) => registro.id === item.opId);
+    const componente = op?.modelo.pecas.find((peca) => peca.pecaId === item.pecaId)?.peca;
+    const previstoNoSetor = componente?.setorId === setorId || componente?.roteiro.some(
+      (etapa) => etapa.setorId === setorId && etapa.processo.toUpperCase().includes("CORTE"),
+    );
+    if (!previstoNoSetor) {
+      throw new Error("Uma das peças selecionadas não possui corte previsto neste setor de plasma.");
+    }
+  }
+
+  const agora = new Date();
+  const arquivoPdfUrl = await salvarPdf(formData.get("arquivoPdf"), "nests", codigo);
+  const nest = await prisma.nestCorte.create({
+    data: {
+      codigo,
+      nomeArquivo: texto(formData.get("nomeArquivo"), 160) || null,
+      arquivoPdfUrl,
+      setorId,
+      maquinaId: maquina.id,
+      programadorId: usuario.id,
+      material: texto(formData.get("material"), 80) || "Aço",
+      espessuraMm: decimalOpcional(formData.get("espessuraMm"), "Espessura"),
+      larguraChapaMm: decimalOpcional(formData.get("larguraChapaMm"), "Largura da chapa"),
+      alturaChapaMm: decimalOpcional(formData.get("alturaChapaMm"), "Altura da chapa"),
+      pesoChapaKg: decimalOpcional(formData.get("pesoChapaKg"), "Peso da chapa"),
+      pesoPecasKg: decimalOpcional(formData.get("pesoPecasKg"), "Peso das peças"),
+      pesoSobraKg: decimalOpcional(formData.get("pesoSobraKg"), "Peso da sobra"),
+      aproveitamentoPct: decimalOpcional(formData.get("aproveitamentoPct"), "Aproveitamento"),
+      quantidadeChapas: inteiro(formData.get("quantidadeChapas"), "Quantidade de chapas", 1),
+      numeroPiercings: inteiroOpcional(formData.get("numeroPiercings"), "Número de furos") ?? undefined,
+      comprimentoCorteMm: decimalOpcional(formData.get("comprimentoCorteMm"), "Comprimento de corte"),
+      comprimentoRapidoMm: decimalOpcional(formData.get("comprimentoRapidoMm"), "Movimento rápido"),
+      tempoCorteSegundos: segundosOpcional(formData.get("tempoCorteSegundos"), "Tempo de corte"),
+      tempoDeslocamentoSegundos: segundosOpcional(formData.get("tempoDeslocamentoSegundos"), "Tempo de deslocamento"),
+      observacao: texto(formData.get("observacao"), 800) || null,
+      itens: { create: itens },
+    },
+  });
+  await prisma.nestEvento.create({
+    data: {
+      nestId: nest.id,
+      funcionarioId: usuario.id,
+      tipo: "PROGRAMADO",
+      descricao: "Nest programado e aguardando início do corte.",
+      dataHora: agora,
+    },
+  });
+  await registrarAlteracao({ entidade: "NEST", entidadeId: nest.id, acao: "CRIADO", descricao: `Nest ${codigo} programado.`, usuario: usuario.nome, dadosDepois: { setorId, maquinaId: maquina.id, itens: itens.length } });
+
+  revalidarNests();
+}
+
+export async function registrarEventoNest(formData: FormData) {
+  const usuario = await exigirUsuarioLogado();
+  const nestId = inteiro(formData.get("nestId"), "Nest", 1);
+  const tipo = texto(formData.get("tipo"), 24).toUpperCase();
+  if (!EVENTOS_NEST.includes(tipo as (typeof EVENTOS_NEST)[number])) {
+    throw new Error("Evento de operação inválido.");
+  }
+
+  const nest = await prisma.nestCorte.findUnique({
+    where: { id: nestId },
+    select: { id: true, status: true, iniciadoEm: true, setor: { select: { id: true, nome: true } } },
+  });
+  if (!nest) throw new Error("Nest não encontrado.");
+  validarAcessoAoSetor(usuario, nest.setor);
+
+  const transicoes: Record<(typeof EVENTOS_NEST)[number], (typeof STATUS_NEST)[number]> = {
+    INICIO: "EM_CORTE",
+    PAUSA: "PAUSADO",
+    RETORNO: "EM_CORTE",
+    FIM: "CONCLUIDO",
+    CANCELAMENTO: "CANCELADO",
+  };
+  const statusPermitidos: Record<(typeof EVENTOS_NEST)[number], string[]> = {
+    INICIO: ["PROGRAMADO"],
+    PAUSA: ["EM_CORTE"],
+    RETORNO: ["PAUSADO"],
+    FIM: ["EM_CORTE", "PAUSADO"],
+    CANCELAMENTO: ["PROGRAMADO", "EM_CORTE", "PAUSADO"],
+  };
+  if (!statusPermitidos[tipo as (typeof EVENTOS_NEST)[number]].includes(nest.status)) {
+    throw new Error("Este evento não é compatível com a situação atual do nest.");
+  }
+  const novoStatus = transicoes[tipo as (typeof EVENTOS_NEST)[number]];
+  const agora = new Date();
+
+  await prisma.$transaction([
+    prisma.nestEvento.create({
+      data: { nestId, funcionarioId: usuario.id, tipo, descricao: texto(formData.get("descricao"), 500) || null, dataHora: agora },
+    }),
+    prisma.nestCorte.update({
+      where: { id: nestId },
+      data: {
+        status: novoStatus,
+        ...(tipo === "INICIO" && !nest.iniciadoEm ? { iniciadoEm: agora } : {}),
+        ...(tipo === "FIM" || tipo === "CANCELAMENTO" ? { finalizadoEm: agora } : {}),
+      },
+    }),
+  ]);
+  await registrarAlteracao({ entidade: "NEST", entidadeId: nestId, acao: "ATUALIZADO", descricao: `Evento ${tipo} registrado no nest ${nestId}.`, usuario: usuario.nome, dadosDepois: { tipo, novoStatus } });
+
+  revalidarNests();
+  revalidatePath(`/plasma/${nestId}`);
+}
+
+export async function registrarLancamentoNest(formData: FormData) {
+  const usuario = await exigirUsuarioLogado();
+  const nestItemId = inteiro(formData.get("nestItemId"), "Item do nest", 1);
+  const quantidadeBoa = inteiro(formData.get("quantidadeBoa"), "Quantidade boa");
+  const quantidadeRefugo = inteiro(formData.get("quantidadeRefugo"), "Quantidade de perda");
+  const tipo = texto(formData.get("tipo"), 24).toUpperCase();
+  if (!(["PRODUCAO", "RETRABALHO"] as const).includes(tipo as "PRODUCAO" | "RETRABALHO")) {
+    throw new Error("Tipo de lançamento inválido.");
+  }
+  if (!quantidadeBoa && !quantidadeRefugo) {
+    throw new Error("Informe ao menos uma peça boa ou uma perda.");
+  }
+
+  const item = await prisma.nestItem.findUnique({
+    where: { id: nestItemId },
+    select: {
+      id: true,
+      opId: true,
+      pecaId: true,
+      nest: { select: { id: true, status: true, maquinaId: true, setorId: true, setor: { select: { id: true, nome: true } } } },
+      peca: { select: { roteiro: { select: { id: true, setorId: true, processo: true } } } },
+    },
+  });
+  if (!item) throw new Error("Item do nest não encontrado.");
+  validarAcessoAoSetor(usuario, item.nest.setor);
+  if (item.nest.status !== "EM_CORTE") {
+    throw new Error("Inicie ou retome o nest antes de registrar as peças cortadas.");
+  }
+
+  const etapa = item.peca.roteiro.find(
+    (registro) => registro.setorId === item.nest.setorId && registro.processo.toUpperCase().includes("CORTE"),
+  );
+  const agora = new Date();
+  const apontamento = await prisma.apontamento.create({
+    data: {
+      opId: item.opId,
+      setorId: item.nest.setorId,
+      funcionarioId: usuario.id,
+      usuario: usuario.nome,
+      quantidadeBoa,
+      quantidadeRefugo,
+      dataHora: agora,
+      pecaId: item.pecaId,
+      processo: "CORTE",
+      roteiroEtapaId: etapa?.id,
+      origem: tipo === "RETRABALHO" ? "NEST_RETRABALHO" : "NEST",
+      maquinaId: item.nest.maquinaId,
+    },
+  });
+  await prisma.nestLancamento.create({
+    data: {
+      nestItemId,
+      funcionarioId: usuario.id,
+      apontamentoId: apontamento.id,
+      tipo,
+      quantidadeBoa,
+      quantidadeRefugo,
+      motivoRefugo: texto(formData.get("motivoRefugo"), 300) || null,
+      observacao: texto(formData.get("observacao"), 500) || null,
+      dataHora: agora,
+    },
+  });
+  await registrarAlteracao({ entidade: "NEST", entidadeId: item.nest.id, acao: "ATUALIZADO", descricao: `Lançamento de corte registrado no nest ${item.nest.id}.`, usuario: usuario.nome, dadosDepois: { nestItemId, quantidadeBoa, quantidadeRefugo, tipo } });
+
+  revalidarNests();
+  revalidatePath(`/plasma/${item.nest.id}`);
+}

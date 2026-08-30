@@ -30,7 +30,6 @@ export default async function LoginPage({
                 alt="Brucke"
                 width={112}
                 height={112}
-                priority
                 className="h-24 w-24 object-cover"
               />
             </div>

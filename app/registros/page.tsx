@@ -48,7 +48,7 @@ export default function NovoSKUPage() {
                      />
                   </div>
                   
-                  <div className="grid gap-6 sm:grid-cols-4">
+                  <div className="grid gap-6 sm:grid-cols-5">
                     <div className="flex flex-col gap-1.5">
                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Curva ABC</label>
                        <select name="curva" required defaultValue="" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
@@ -64,6 +64,17 @@ export default function NovoSKUPage() {
                        <select name="tipo" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
                          <option value="FIXO">Fixo</option>
                          <option value="REMOVIVEL">Removível</option>
+                         <option value="PONTEIRA_MACHO">Ponteira macho</option>
+                       </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Ponteira macho</label>
+                       <select name="tamanhoPonteira" defaultValue="" className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 focus:border-[#3B82F6] focus:outline-none transition-colors">
+                         <option value="">Não se aplica</option>
+                         <option value="PEQUENA">Pequena</option>
+                         <option value="MEDIA">Média</option>
+                         <option value="GRANDE">Grande</option>
                        </select>
                     </div>
 
@@ -77,13 +88,12 @@ export default function NovoSKUPage() {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                       <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Regulador</label>
+                       <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Estoque regulador atual</label>
                        <input
-                         name="regulador"
+                         name="estoqueMinimo"
                          type="number"
                          min="0"
                          step="1"
-                         required
                          placeholder="Ex: 5"
                          className="w-full rounded bg-[#1A222C] border border-slate-700 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-[#3B82F6] focus:outline-none transition-colors"
                        />

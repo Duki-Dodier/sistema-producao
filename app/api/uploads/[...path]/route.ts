@@ -11,11 +11,14 @@ export async function GET(
   const object = await env.UPLOADS.get(key);
 
   if (!object) {
-    const asset = await env.ASSETS.fetch(new Request(new URL(`/uploads/${key}`, _request.url)));
-    if (asset.ok) {
-      const headers = new Headers(asset.headers);
-      headers.set("cache-control", "private, max-age=3600");
-      return new Response(asset.body, { status: asset.status, headers });
+    const assets = (env as unknown as { ASSETS?: { fetch(request: Request): Promise<Response> } }).ASSETS;
+    if (assets?.fetch) {
+      const asset = await assets.fetch(new Request(new URL(`/uploads/${key}`, _request.url), _request));
+      if (asset.ok) {
+        const headers = new Headers(asset.headers);
+        headers.set("cache-control", "private, max-age=3600");
+        return new Response(asset.body, { status: asset.status, headers });
+      }
     }
     return new Response("Imagem não encontrada", { status: 404 });
   }

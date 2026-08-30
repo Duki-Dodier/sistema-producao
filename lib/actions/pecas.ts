@@ -8,6 +8,7 @@ import { PROCESSOS, processosDoForm } from "@/lib/processos";
 import { etapasDoFormulario, roteiroPadraoDaPeca } from "@/lib/roteiro-peca";
 import { ehSetor } from "@/lib/setores";
 import { exigirAdministrador } from "@/lib/auth-operador";
+import { registrarAlteracao } from "@/lib/auditoria";
 function numeroOuNulo(formData: FormData, campo: string): number | null {
   const raw = String(formData.get(campo) ?? "").trim();
   if (!raw) return null;
@@ -16,7 +17,7 @@ function numeroOuNulo(formData: FormData, campo: string): number | null {
 }
 
 export async function createPeca(formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();
@@ -68,11 +69,13 @@ export async function createPeca(formData: FormData) {
     });
   }
 
+  await registrarAlteracao({ entidade: "BOM", entidadeId: peca.id, acao: "CRIADO", descricao: `Peça ${codigo} cadastrada.`, usuario: usuario.nome, dadosDepois: { codigo, nome, setorId, tipoMaterial, processos } });
+
   revalidatePath("/registros");
 }
 
 export async function updatePeca(id: number, formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const nome = String(formData.get("nome") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();
   const setorId = Number(formData.get("setorId"));
@@ -115,8 +118,7 @@ export async function updatePeca(id: number, formData: FormData) {
     .map((etapa) => etapa.processo)
     .join(",");
 
-  await prisma.$transaction(async (tx) => {
-    await tx.peca.update({
+  await prisma.peca.update({
       where: { id },
       data: {
         codigo: pecaAtual.codigo,
@@ -133,8 +135,8 @@ export async function updatePeca(id: number, formData: FormData) {
         ...(novaImagem ? { imagemUrl: novaImagem } : {}),
       },
     });
-    await tx.pecaRoteiro.deleteMany({ where: { pecaId: id } });
-    await tx.pecaRoteiro.createMany({
+  await prisma.pecaRoteiro.deleteMany({ where: { pecaId: id } });
+  await prisma.pecaRoteiro.createMany({
       data: etapas.map((etapa) => ({ ...etapa, pecaId: id })),
     });
 
@@ -152,12 +154,12 @@ export async function updatePeca(id: number, formData: FormData) {
       }))
       .filter((c) => c.medidaCm !== null || c.anguloGraus !== null || c.maquina !== null)
       .map((c, i) => ({ ...c, ordem: i + 1, pecaId: id }));
-    await tx.pecaCurva.deleteMany({ where: { pecaId: id } });
+  await prisma.pecaCurva.deleteMany({ where: { pecaId: id } });
     if (curvas.length > 0) {
-      await tx.pecaCurva.createMany({ data: curvas });
+      await prisma.pecaCurva.createMany({ data: curvas });
     }
-  });
 
+  await registrarAlteracao({ entidade: "BOM", entidadeId: id, acao: "ATUALIZADO", descricao: `Peça ${pecaAtual.codigo} atualizada.`, usuario: usuario.nome, dadosDepois: { nome, setorId, tipoMaterial, etapas: etapas.length, curvas: curvas.length } });
   revalidatePath("/registros");
   revalidatePath(`/registros/pecas/${id}`);
   revalidatePath("/apontamentos");
@@ -170,7 +172,7 @@ export async function updatePecaMedidas(
   modeloId: number,
   formData: FormData,
 ) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
 
   const medida = String(formData.get("medida") ?? "").trim();
   const medidaA = numeroOuNulo(formData, "medidaA");
@@ -193,6 +195,8 @@ export async function updatePecaMedidas(
     },
   });
 
+  await registrarAlteracao({ entidade: "BOM", entidadeId: pecaId, acao: "ATUALIZADO", descricao: `Medidas da peça ${pecaId} atualizadas.`, usuario: usuario.nome, dadosDepois: { medida, medidaA, medidaB, espessuraMm, comprimentoMm } });
+
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath(`/registros/pecas/${pecaId}`);
   revalidatePath("/monitoramento");
@@ -205,7 +209,7 @@ export async function updatePecaProcessos(
   modeloId: number,
   formData: FormData,
 ) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
 
   const processos = processosDoForm(formData);
   if (!processos) {
@@ -217,6 +221,8 @@ export async function updatePecaProcessos(
     data: { processos },
   });
 
+  await registrarAlteracao({ entidade: "BOM", entidadeId: pecaId, acao: "ATUALIZADO", descricao: `Processos da peça ${pecaId} atualizados.`, usuario: usuario.nome, dadosDepois: { processos } });
+
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath(`/registros/pecas/${pecaId}`);
   revalidatePath("/monitoramento");
@@ -224,7 +230,8 @@ export async function updatePecaProcessos(
 }
 
 export async function deletePeca(id: number) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
+  const anterior = await prisma.peca.findUnique({ where: { id }, select: { codigo: true } });
   try {
     await prisma.peca.delete({ where: { id } });
   } catch {
@@ -232,6 +239,7 @@ export async function deletePeca(id: number) {
       "Não é possível excluir: esta peça está usada em algum modelo ou apontamento.",
     );
   }
+  await registrarAlteracao({ entidade: "BOM", entidadeId: id, acao: "EXCLUIDO", descricao: `Peça ${anterior?.codigo ?? id} excluída.`, usuario: usuario.nome });
   revalidatePath("/registros");
 }
 
@@ -240,7 +248,7 @@ export async function deletePeca(id: number) {
  * Cada peça tem um input `qtd-<pecaId>` — vazio ou 0 = fora da BOM.
  */
 export async function updateBOM(modeloId: number, formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const pecas = await prisma.peca.findMany({ select: { id: true } });
 
   const linhas = pecas
@@ -250,16 +258,15 @@ export async function updateBOM(modeloId: number, formData: FormData) {
     }))
     .filter((l) => l.quantidadeNecessaria > 0);
 
-  await prisma.$transaction([
-    prisma.modeloPeca.deleteMany({ where: { modeloId } }),
-    prisma.modeloPeca.createMany({
-      data: linhas.map((l) => ({
-        modeloId,
-        pecaId: l.pecaId,
-        quantidadeNecessaria: l.quantidadeNecessaria,
-      })),
-    }),
-  ]);
+  const dados = linhas.map((l) => ({ modeloId, pecaId: l.pecaId, quantidadeNecessaria: l.quantidadeNecessaria }));
+  const operacoes = [prisma.modeloPeca.deleteMany({ where: { modeloId } })];
+  // D1 limita o número de variáveis por instrução; mantém a BOM em lotes seguros.
+  for (let indice = 0; indice < dados.length; indice += 150) {
+    operacoes.push(prisma.modeloPeca.createMany({ data: dados.slice(indice, indice + 150) }));
+  }
+  await prisma.$transaction(operacoes);
+
+  await registrarAlteracao({ entidade: "BOM", entidadeId: modeloId, acao: "ATUALIZADO", descricao: `BOM do modelo ${modeloId} atualizada com ${linhas.length} itens.`, usuario: usuario.nome, dadosDepois: linhas });
 
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath("/registros");
@@ -269,7 +276,7 @@ export async function updateBOM(modeloId: number, formData: FormData) {
 }
 
 export async function addPecaToEngate(modeloId: number, formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const setorId = Number(formData.get("setorId"));
   const tipoMaterial = String(formData.get("tipoMaterial") ?? "").trim();
   const medida = String(formData.get("medida") ?? "").trim();
@@ -292,8 +299,7 @@ export async function addPecaToEngate(modeloId: number, formData: FormData) {
     codigosExistentes.map((item) => item.codigo),
   );
 
-  await prisma.$transaction(async (tx) => {
-    const peca = await tx.peca.create({
+  const peca = await prisma.peca.create({
       data: {
         codigo: codigoGerado,
         nome: `${tipoMaterial} ${medida}`.trim(),
@@ -308,10 +314,10 @@ export async function addPecaToEngate(modeloId: number, formData: FormData) {
       },
     });
 
-    const setores = await tx.setor.findMany({ select: { id: true, nome: true } });
+    const setores = await prisma.setor.findMany({ select: { id: true, nome: true } });
     const etapas = roteiroPadraoDaPeca(peca, setores);
     if (etapas.length > 0) {
-      await tx.pecaRoteiro.createMany({
+      await prisma.pecaRoteiro.createMany({
         data: etapas.map(({ setorId: etapaSetorId, processo, ordem }) => ({
           pecaId: peca.id,
           setorId: etapaSetorId,
@@ -321,14 +327,15 @@ export async function addPecaToEngate(modeloId: number, formData: FormData) {
       });
     }
 
-    await tx.modeloPeca.create({
+    await prisma.modeloPeca.create({
       data: {
         modeloId,
         pecaId: peca.id,
         quantidadeNecessaria: quantidade,
       },
     });
-  });
+
+    await registrarAlteracao({ entidade: "BOM", entidadeId: modeloId, acao: "ATUALIZADO", descricao: `Peça ${codigoGerado} adicionada à BOM do modelo ${modelo.codigo}.`, usuario: usuario.nome, dadosDepois: { pecaId: peca.id, quantidade } });
 
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath("/registros");

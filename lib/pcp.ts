@@ -1,8 +1,8 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@/app/generated/prisma/client";
 import { ehSetor } from "@/lib/setores";
 import { processosDaPeca } from "@/lib/processos";
 
-export const opComProgressoArgs = Prisma.validator<Prisma.OPDefaultArgs>()({
+export const opComProgressoArgs = {
   include: {
     modelo: {
       include: {
@@ -20,7 +20,7 @@ export const opComProgressoArgs = Prisma.validator<Prisma.OPDefaultArgs>()({
     },
     apontamentos: true,
   },
-});
+} satisfies Prisma.OPDefaultArgs;
 export type OPComDados = Prisma.OPGetPayload<typeof opComProgressoArgs>;
 
 export type PecaProgresso = {

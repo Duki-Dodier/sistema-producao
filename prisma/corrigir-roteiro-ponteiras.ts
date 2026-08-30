@@ -38,8 +38,7 @@ async function executar() {
 
   const modelosAfetados = new Set<number>();
 
-  await prisma.$transaction(async (tx) => {
-    const sincronizar = async (
+  const sincronizar = async (
       peca: (typeof candidatas)[number],
       etapas: EtapaDesejada[],
       setorPrincipalId: number,
@@ -48,7 +47,7 @@ async function executar() {
         throw new Error(`A peça ${peca.codigo} possui mais etapas do que o roteiro corrigido.`);
       }
 
-      await tx.pecaRoteiro.updateMany({
+      await prisma.pecaRoteiro.updateMany({
         where: { pecaId: peca.id },
         data: { ordem: { increment: 100 } },
       });
@@ -56,18 +55,18 @@ async function executar() {
       for (const [indice, etapa] of etapas.entries()) {
         const existente = peca.roteiro[indice];
         if (existente) {
-          await tx.pecaRoteiro.update({
+          await prisma.pecaRoteiro.update({
             where: { id: existente.id },
             data: { ...etapa, ordem: indice + 1 },
           });
         } else {
-          await tx.pecaRoteiro.create({
+          await prisma.pecaRoteiro.create({
             data: { pecaId: peca.id, ...etapa, ordem: indice + 1 },
           });
         }
       }
 
-      await tx.peca.update({
+      await prisma.peca.update({
         where: { id: peca.id },
         data: {
           setorId: setorPrincipalId,
@@ -80,7 +79,7 @@ async function executar() {
 
       const primeiraEtapa = peca.roteiro[0];
       if (primeiraEtapa) {
-        await tx.apontamento.updateMany({
+        await prisma.apontamento.updateMany({
           where: {
             pecaId: peca.id,
             processo: "CORTE",
@@ -97,7 +96,7 @@ async function executar() {
     };
 
     for (const peca of removiveis) {
-      await sincronizar(
+    await sincronizar(
         peca,
         [
           { setorId: plasmaTubo.id, processo: "CORTE" },
@@ -110,7 +109,7 @@ async function executar() {
     }
 
     for (const peca of fixas) {
-      await sincronizar(
+    await sincronizar(
         peca,
         [
           { setorId: ponteira.id, processo: "CORTE" },
@@ -124,12 +123,12 @@ async function executar() {
     }
 
     for (const modeloId of modelosAfetados) {
-      const roteiro = await tx.modeloRoteiro.findMany({
+      const roteiro = await prisma.modeloRoteiro.findMany({
         where: { modeloId },
         include: { setor: true },
       });
       if (!roteiro.some((etapa) => etapa.setorId === plasmaTubo.id)) {
-        await tx.modeloRoteiro.updateMany({
+        await prisma.modeloRoteiro.updateMany({
           where: { modeloId },
           data: { ordem: { increment: 100 } },
         });
@@ -138,19 +137,18 @@ async function executar() {
         for (const [indice, setor] of setoresDoModelo.entries()) {
           const existente = roteiro.find((etapa) => etapa.setorId === setor.id);
           if (existente) {
-            await tx.modeloRoteiro.update({
+            await prisma.modeloRoteiro.update({
               where: { id: existente.id },
               data: { ordem: indice + 1 },
             });
           } else {
-            await tx.modeloRoteiro.create({
+            await prisma.modeloRoteiro.create({
               data: { modeloId, setorId: setor.id, ordem: indice + 1 },
             });
           }
         }
       }
     }
-  });
 
   console.log(
     `Roteiros corrigidos: ${removiveis.length} ponteira(s) removível(is), ${fixas.length} ponteira(s) fixa(s), ${modelosAfetados.size} modelo(s).`,

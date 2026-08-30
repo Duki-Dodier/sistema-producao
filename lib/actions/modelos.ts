@@ -10,9 +10,11 @@ import { roteiroPadraoDaPeca } from "@/lib/roteiro-peca";
 import type { Processo } from "@/lib/processos";
 import { exigirAdministrador } from "@/lib/auth-operador";
 import { proximoCodigoPeca } from "@/lib/codigos-peca";
+import { normalizarTamanhoPonteira } from "@/lib/ponteiras";
+import { registrarAlteracao } from "@/lib/auditoria";
 
 const CURVAS_VALIDAS = new Set(["A", "B", "C"]);
-const TIPOS_VALIDOS = new Set(["FIXO", "REMOVIVEL"]);
+const TIPOS_VALIDOS = new Set(["FIXO", "REMOVIVEL", "PONTEIRA_MACHO"]);
 const LINHAS_VALIDAS = new Set(["BRUCKE", "REFORCEL"]);
 
 function validarClassificacao(curva: string, tipo: string) {
@@ -27,37 +29,36 @@ function validarLinhaProduto(linhaProduto: string) {
   }
 }
 
-function parseRegulador(value: unknown, obrigatorio = false) {
+function parseEstoqueRegulador(value: unknown, obrigatorio = false) {
   const raw = String(value ?? "").trim();
   if (!raw) {
-    if (obrigatorio) throw new Error("O regulador do produto é obrigatório.");
+    if (obrigatorio) throw new Error("O estoque regulador do produto é obrigatório.");
     return null;
   }
 
-  const regulador = Number(raw);
-  if (!Number.isInteger(regulador) || regulador < 0) {
-    throw new Error("O regulador deve ser um número inteiro não negativo.");
+  const estoque = Number(raw);
+  if (!Number.isInteger(estoque) || estoque < 0) {
+    throw new Error("O estoque regulador deve ser um número inteiro não negativo.");
   }
-  return regulador;
+  return estoque;
 }
 
 export async function createModelo(formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const curva = String(formData.get("curva") ?? "").trim().toUpperCase();
   const tipo = String(formData.get("tipo") ?? "").trim().toUpperCase();
   const linhaProduto = String(formData.get("linhaProduto") ?? "").trim().toUpperCase();
-  const regulador = parseRegulador(formData.get("regulador"), true);
-  const estoqueMinimoRaw = String(formData.get("estoqueMinimo") ?? "").trim();
+  const tamanhoPonteira = normalizarTamanhoPonteira(String(formData.get("tamanhoPonteira") ?? ""));
+  const estoqueMinimo = parseEstoqueRegulador(formData.get("estoqueMinimo"));
 
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
-  validarLinhaProduto(linhaProduto);
-  if (estoqueMinimoRaw && (!Number.isInteger(Number(estoqueMinimoRaw)) || Number(estoqueMinimoRaw) < 0)) {
-    throw new Error("Estoque mínimo deve ser um número inteiro não negativo.");
+  if (tipo === "PONTEIRA_MACHO" && !tamanhoPonteira) {
+    throw new Error("Informe o tamanho da ponteira macho: Pequena, Média ou Grande.");
   }
-
+  validarLinhaProduto(linhaProduto);
   const imagemUrl = await salvarImagem(formData.get("imagem"), "modelos");
 
   const modelo = await prisma.modelo.create({
@@ -66,12 +67,13 @@ export async function createModelo(formData: FormData) {
       nome: nome || null,
       curva,
       tipo,
+      tamanhoPonteira: tipo === "REMOVIVEL" || tipo === "PONTEIRA_MACHO" ? tamanhoPonteira : null,
       linhaProduto,
-      regulador,
-      estoqueMinimo: estoqueMinimoRaw ? Number(estoqueMinimoRaw) : null,
+      estoqueMinimo,
       imagemUrl,
     },
   });
+  await registrarAlteracao({ entidade: "MODELO", entidadeId: modelo.id, acao: "CRIADO", descricao: `Modelo ${codigo} cadastrado.`, usuario: usuario.nome, dadosDepois: { codigo, curva, tipo, linhaProduto, estoqueMinimo } });
   revalidatePath("/registros");
   revalidatePath("/modelos");
   revalidatePath("/ops");
@@ -80,21 +82,24 @@ export async function createModelo(formData: FormData) {
 
 /** Atualiza os dados de cadastro do engate (ficha técnica), incluindo a foto. */
 export async function updateModeloFicha(modeloId: number, formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
+  const anterior = await prisma.modelo.findUnique({ where: { id: modeloId }, select: { codigo: true, curva: true, tipo: true, linhaProduto: true, estoqueMinimo: true } });
   const codigo = String(formData.get("codigo") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const curva = String(formData.get("curva") ?? "").trim().toUpperCase();
   const tipo = String(formData.get("tipo") ?? "").trim().toUpperCase();
-  const tamanhoPonteira = String(formData.get("tamanhoPonteira") ?? "").trim();
-  const regulador = parseRegulador(formData.get("regulador"));
-  const estoqueMinimoRaw = String(formData.get("estoqueMinimo") ?? "").trim();
+  const tamanhoInformado = String(formData.get("tamanhoPonteira") ?? "");
+  const tamanhoPonteira = normalizarTamanhoPonteira(tamanhoInformado);
+  const estoqueMinimo = parseEstoqueRegulador(formData.get("estoqueMinimo"));
 
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
-  if (estoqueMinimoRaw && (!Number.isInteger(Number(estoqueMinimoRaw)) || Number(estoqueMinimoRaw) < 0)) {
-    throw new Error("Estoque mínimo deve ser um número inteiro não negativo.");
+  if (tipo === "PONTEIRA_MACHO" && !tamanhoPonteira) {
+    throw new Error("Informe o tamanho da ponteira macho: Pequena, Média ou Grande.");
   }
-
+  if (tamanhoInformado.trim() && !tamanhoPonteira) {
+    throw new Error("O tamanho da ponteira deve ser Pequena, Média ou Grande.");
+  }
   const novaImagem = await salvarImagem(formData.get("imagem"), "modelos");
 
   await prisma.modelo.update({
@@ -104,13 +109,13 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
       nome: nome || null,
       curva,
       tipo,
-      tamanhoPonteira: tamanhoPonteira || null,
-      regulador,
-      estoqueMinimo: estoqueMinimoRaw ? Number(estoqueMinimoRaw) : null,
+      tamanhoPonteira: tipo === "REMOVIVEL" || tipo === "PONTEIRA_MACHO" ? tamanhoPonteira : null,
+      estoqueMinimo,
       ...(novaImagem ? { imagemUrl: novaImagem } : {}),
     },
   });
 
+  await registrarAlteracao({ entidade: "MODELO", entidadeId: modeloId, acao: "ATUALIZADO", descricao: `Ficha do modelo ${codigo} atualizada.`, usuario: usuario.nome, dadosAntes: anterior, dadosDepois: { codigo, curva, tipo, estoqueMinimo } });
   revalidatePath(`/registros/${modeloId}`);
   revalidatePath("/registros");
   revalidatePath("/modelos");
@@ -118,7 +123,8 @@ export async function updateModeloFicha(modeloId: number, formData: FormData) {
 }
 
 export async function deleteModelo(id: number) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
+  const anterior = await prisma.modelo.findUnique({ where: { id }, select: { codigo: true } });
   try {
     await prisma.modelo.delete({ where: { id } });
   } catch {
@@ -126,6 +132,7 @@ export async function deleteModelo(id: number) {
       "Não é possível excluir: este modelo tem OPs vinculadas.",
     );
   }
+  await registrarAlteracao({ entidade: "MODELO", entidadeId: id, acao: "EXCLUIDO", descricao: `Modelo ${anterior?.codigo ?? id} excluído.`, usuario: usuario.nome });
   revalidatePath("/modelos");
   revalidatePath("/registros");
   redirect("/registros");
@@ -136,7 +143,7 @@ export async function deleteModelo(id: number) {
  * Cada setor tem um input `ordem-<setorId>` — vazio ou 0 = fora do roteiro.
  */
 export async function updateRoteiro(modeloId: number, formData: FormData) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const setores = await prisma.setor.findMany({ select: { id: true } });
 
   const linhas = setores
@@ -154,6 +161,7 @@ export async function updateRoteiro(modeloId: number, formData: FormData) {
       data: linhas.map((l) => ({ modeloId, setorId: l.setorId, ordem: l.ordem })),
     }),
   ]);
+  await registrarAlteracao({ entidade: "ROTEIRO", entidadeId: modeloId, acao: "ATUALIZADO", descricao: `Roteiro do modelo ${modeloId} atualizado com ${linhas.length} etapas.`, usuario: usuario.nome, dadosDepois: linhas });
 
   revalidatePath(`/modelos/${modeloId}`);
   revalidatePath("/modelos");
@@ -171,16 +179,20 @@ export type PecaInput = {
 };
 
 export async function createModeloComPecas(engate: FormData, pecas: PecaInput[]) {
-  await exigirAdministrador();
+  const usuario = await exigirAdministrador();
   const codigo = String(engate.get("codigo") ?? "").trim();
   const nome = String(engate.get("nome") ?? "").trim();
   const curva = String(engate.get("curva") ?? "").trim().toUpperCase();
   const tipo = String(engate.get("tipo") ?? "").trim().toUpperCase();
   const linhaProduto = String(engate.get("linhaProduto") ?? "").trim().toUpperCase();
-  const regulador = parseRegulador(engate.get("regulador"), true);
+  const tamanhoPonteira = normalizarTamanhoPonteira(String(engate.get("tamanhoPonteira") ?? ""));
+  const estoqueMinimo = parseEstoqueRegulador(engate.get("estoqueMinimo"));
   
   if (!codigo) throw new Error("Código do engate é obrigatório.");
   validarClassificacao(curva, tipo);
+  if (tipo === "PONTEIRA_MACHO" && !tamanhoPonteira) {
+    throw new Error("Informe o tamanho da ponteira macho: Pequena, Média ou Grande.");
+  }
   validarLinhaProduto(linhaProduto);
   if (pecas.some((peca) => !Number.isInteger(peca.setorId) || !Number.isInteger(peca.quantidade) || peca.quantidade <= 0)) {
     throw new Error("Cada peça precisa ter setor e quantidade inteira positiva.");
@@ -189,20 +201,21 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
   const imagemUrl = await salvarImagem(engate.get("imagem"), "modelos");
   const codigosExistentes = await prisma.peca.findMany({ select: { codigo: true } });
 
-  await prisma.$transaction(async (tx) => {
-    const modelo = await tx.modelo.create({
+  const modelo = await prisma.modelo.create({
       data: {
         codigo,
         nome: nome || null,
-        curva,
-        tipo,
-        linhaProduto,
-        regulador,
+      curva,
+      tipo,
+      tamanhoPonteira: tipo === "REMOVIVEL" || tipo === "PONTEIRA_MACHO" ? tamanhoPonteira : null,
+      linhaProduto,
+        estoqueMinimo,
         imagemUrl,
       }
-    });
+  });
+  await registrarAlteracao({ entidade: "MODELO", entidadeId: modelo.id, acao: "CRIADO", descricao: `Modelo ${codigo} cadastrado.`, usuario: usuario.nome, dadosDepois: { codigo, curva, tipo, linhaProduto, estoqueMinimo } });
 
-    const setoresDisponiveis = await tx.setor.findMany({ select: { id: true, nome: true } });
+    const setoresDisponiveis = await prisma.setor.findMany({ select: { id: true, nome: true } });
     const mapaOperacoes: Record<string, Processo> = {
       Bate: "BATIDA",
       Fura: "FURACAO",
@@ -232,7 +245,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
         "CORTE" as Processo,
         ...p.operacoes.map((operacao) => mapaOperacoes[operacao]).filter(Boolean),
       ].filter((processo, indice, lista) => lista.indexOf(processo) === indice);
-      const peca = await tx.peca.create({
+      const peca = await prisma.peca.create({
         data: {
           codigo: pecaCodigo,
           nome: pecaNome,
@@ -247,7 +260,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
 
       const etapasPeca = roteiroPadraoDaPeca(peca, setoresDisponiveis);
       if (etapasPeca.length > 0) {
-        await tx.pecaRoteiro.createMany({
+        await prisma.pecaRoteiro.createMany({
           data: etapasPeca.map(({ setorId, processo, ordem }) => ({
             pecaId: peca.id,
             setorId,
@@ -257,7 +270,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
         });
       }
 
-      await tx.modeloPeca.create({
+      await prisma.modeloPeca.create({
         data: {
           modeloId: modelo.id,
           pecaId: peca.id,
@@ -271,7 +284,7 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
     const setoresPecasIds = [...new Set(pecas.map(p => p.setorId))];
     
     // 2. Buscar setores finais (Agrupamento, Solda, Pintura, Montagem)
-    const setoresFinais = (await tx.setor.findMany()).filter((setor) =>
+    const setoresFinais = (await prisma.setor.findMany()).filter((setor) =>
       ehSetorFinal(setor.nome),
     );
     const setoresFinaisIds = setoresFinais.map(s => s.id);
@@ -280,14 +293,14 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
     const todosSetoresIds = [...new Set([...setoresPecasIds, ...setoresFinaisIds])];
 
     // 4. Buscar a ordem padrão de todos eles no banco para ordenar corretamente
-    const setoresOrdenados = await tx.setor.findMany({
+    const setoresOrdenados = await prisma.setor.findMany({
       where: { id: { in: todosSetoresIds } },
       orderBy: { ordemPadrao: "asc" }
     });
 
     // 5. Criar o roteiro no banco de dados
     if (setoresOrdenados.length > 0) {
-      await tx.modeloRoteiro.createMany({
+      await prisma.modeloRoteiro.createMany({
         data: setoresOrdenados.map((s, idx) => ({
           modeloId: modelo.id,
           setorId: s.id,
@@ -295,7 +308,6 @@ export async function createModeloComPecas(engate: FormData, pecas: PecaInput[])
         }))
       });
     }
-  });
 
   revalidatePath("/registros");
   revalidatePath("/modelos");

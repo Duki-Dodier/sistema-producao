@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { exigirUsuarioLogado, type OperadorLogado } from "@/lib/auth-operador";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
+import { registrarAlteracao } from "@/lib/auditoria";
 
 export type LinhaFinalState = {
   error?: string;
@@ -301,6 +302,7 @@ export async function enviarParaEstoque(
           ]
         : []),
     ]);
+    await registrarAlteracao({ entidade: "ESTOQUE", entidadeId: opId, acao: "MOVIMENTADO", descricao: `${quantidade} peça(s) da OP ${opId} enviada(s) ao estoque.`, usuario: usuario.nome, dadosDepois: { quantidade, novoTotal } });
     revalidarLinhaFinal();
     return {
       success:

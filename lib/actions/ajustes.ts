@@ -41,41 +41,41 @@ export async function ajustarApontamento(formData: FormData) {
     throw new Error("Motivo muito longo (máx. 200 caracteres).");
   }
 
-  await prisma.$transaction(async (tx) => {
-    const [apontamento, autorizador] = await Promise.all([
-      tx.apontamento.findUnique({
-        where: { id: apontamentoId },
-        select: { id: true, setorId: true, quantidadeBoa: true },
-      }),
-      tx.funcionario.findUnique({
-        where: { id: autorizadorId },
-        select: { id: true, nome: true, papel: true, pin: true, ativo: true, setorId: true },
-      }),
-    ]);
+  const [apontamento, autorizador] = await Promise.all([
+    prisma.apontamento.findUnique({
+      where: { id: apontamentoId },
+      select: { id: true, setorId: true, quantidadeBoa: true },
+    }),
+    prisma.funcionario.findUnique({
+      where: { id: autorizadorId },
+      select: { id: true, nome: true, papel: true, pin: true, ativo: true, setorId: true },
+    }),
+  ]);
 
-    if (!apontamento) throw new Error("Apontamento não encontrado.");
-    if (!autorizador || !autorizador.ativo) {
-      throw new Error("Autorizador não encontrado ou inativo.");
-    }
-    if (autorizador.papel !== "LIDER" && autorizador.papel !== "PCP") {
-      throw new Error("Apenas Líder do setor ou PCP podem autorizar ajustes.");
-    }
-    if (!autorizador.pin) {
-      throw new Error(
-        `${autorizador.nome} ainda não tem PIN cadastrado — defina em Configurações antes de autorizar.`,
-      );
-    }
-    if (autorizador.pin !== pin) {
-      throw new Error("PIN incorreto.");
-    }
-    if (autorizador.papel === "LIDER" && autorizador.setorId !== apontamento.setorId) {
-      throw new Error("Líder só pode ajustar apontamentos do próprio setor.");
-    }
-    if (quantidadeCorreta === apontamento.quantidadeBoa) {
-      throw new Error("A quantidade informada é igual à atual — nada a ajustar.");
-    }
+  if (!apontamento) throw new Error("Apontamento não encontrado.");
+  if (!autorizador || !autorizador.ativo) {
+    throw new Error("Autorizador não encontrado ou inativo.");
+  }
+  if (autorizador.papel !== "LIDER" && autorizador.papel !== "PCP") {
+    throw new Error("Apenas Líder do setor ou PCP podem autorizar ajustes.");
+  }
+  if (!autorizador.pin) {
+    throw new Error(
+      `${autorizador.nome} ainda não tem PIN cadastrado — defina em Configurações antes de autorizar.`,
+    );
+  }
+  if (autorizador.pin !== pin) {
+    throw new Error("PIN incorreto.");
+  }
+  if (autorizador.papel === "LIDER" && autorizador.setorId !== apontamento.setorId) {
+    throw new Error("Líder só pode ajustar apontamentos do próprio setor.");
+  }
+  if (quantidadeCorreta === apontamento.quantidadeBoa) {
+    throw new Error("A quantidade informada é igual à atual — nada a ajustar.");
+  }
 
-    await tx.ajusteApontamento.create({
+  await prisma.$transaction([
+    prisma.ajusteApontamento.create({
       data: {
         apontamentoId: apontamento.id,
         valorAnterior: apontamento.quantidadeBoa,
@@ -83,12 +83,12 @@ export async function ajustarApontamento(formData: FormData) {
         motivo,
         autorizadoPorId: autorizador.id,
       },
-    });
-    await tx.apontamento.update({
+    }),
+    prisma.apontamento.update({
       where: { id: apontamento.id },
       data: { quantidadeBoa: quantidadeCorreta },
-    });
-  });
+    }),
+  ]);
 
   revalidarTudo();
 }

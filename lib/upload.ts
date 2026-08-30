@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 
 const TIPOS_ACEITOS = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const TAMANHO_MAXIMO_BYTES = 1024 * 1024;
+const TAMANHO_MAXIMO_PDF_BYTES = 10 * 1024 * 1024;
 
 function segmentoSeguro(valor: string, fallback: string) {
   const normalizado = valor
@@ -109,5 +110,28 @@ export async function salvarImagem(
     httpMetadata: { contentType: file.type },
   });
 
+  return `/api/uploads/${chave}`;
+}
+
+/** Armazena o relatório original do Libellula para manter a origem do nest auditável. */
+export async function salvarPdf(
+  file: FormDataEntryValue | null,
+  pasta: string,
+  nomeBase = "relatorio",
+): Promise<string | null> {
+  if (!(file instanceof File) || file.size === 0) return null;
+  const nomeValido = file.name.toLowerCase().endsWith(".pdf");
+  if (file.type !== "application/pdf" && !nomeValido) {
+    throw new Error("Envie o relatório do Libellula em formato PDF.");
+  }
+  if (file.size > TAMANHO_MAXIMO_PDF_BYTES) {
+    throw new Error("O PDF deve ter no máximo 10 MB.");
+  }
+
+  const nomeArquivo = `${segmentoSeguro(nomeBase, "NEST")}-${crypto.randomUUID()}.pdf`;
+  const chave = `${pasta}/${nomeArquivo}`;
+  await env.UPLOADS.put(chave, await file.arrayBuffer(), {
+    httpMetadata: { contentType: "application/pdf" },
+  });
   return `/api/uploads/${chave}`;
 }
