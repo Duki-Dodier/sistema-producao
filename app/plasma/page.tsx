@@ -96,13 +96,16 @@ export default async function PlasmaPage({
       select: {
         id: true,
         lote: true,
+        quantidade: true,
         numeroSequencia: true,
-        modelo: {
-          select: {
-            codigo: true,
-            pecas: {
-              select: {
-                peca: {
+          modelo: {
+            select: {
+              codigo: true,
+              nome: true,
+              pecas: {
+                select: {
+                  quantidadeNecessaria: true,
+                  peca: {
                   select: {
                     id: true,
                     codigo: true,
@@ -153,8 +156,9 @@ export default async function PlasmaPage({
     return `/plasma?${params.toString()}`;
   };
 
-  const opcoesItem = ops.flatMap((op) =>
-    op.modelo.pecas.flatMap((componente) => {
+  const opcoesOP = ops.map((op) => {
+    const referencias = new Set<string>();
+    const itens = op.modelo.pecas.flatMap((componente) => {
       const setoresDaPeca = new Set<number>();
       if (setorIds.includes(componente.peca.setorId)) setoresDaPeca.add(componente.peca.setorId);
       componente.peca.roteiro.forEach((etapa) => {
@@ -163,11 +167,22 @@ export default async function PlasmaPage({
       return [...setoresDaPeca].map((setorId) => ({
         referencia: `${op.id}:${componente.peca.id}`,
         setorId,
+        opId: op.id,
         codigoPeca: componente.peca.codigo,
-        descricao: `OP ${op.lote ?? `#${op.id}`} · ${op.modelo.codigo} · ${componente.peca.codigo} - ${componente.peca.nome}${componente.peca.medida ? ` (${componente.peca.medida})` : ""}`,
+        quantidadePlanejada: op.quantidade * componente.quantidadeNecessaria,
+        descricao: `${componente.peca.codigo} - ${componente.peca.nome}${componente.peca.medida ? ` (${componente.peca.medida})` : ""}`,
       }));
-    }),
-  );
+    }).filter((item) => {
+      if (referencias.has(`${item.setorId}:${item.referencia}`)) return false;
+      referencias.add(`${item.setorId}:${item.referencia}`);
+      return true;
+    });
+    return {
+      id: op.id,
+      label: `OP ${op.lote ?? `#${op.id}`} · ${op.modelo.codigo}${op.modelo.nome ? ` · ${op.modelo.nome}` : ""}`,
+      itens,
+    };
+  }).filter((op) => op.itens.length > 0);
 
   const programados = nests.filter((nest) => nest.status === "PROGRAMADO").length;
   const emCorte = nests.filter((nest) => nest.status === "EM_CORTE").length;
@@ -227,7 +242,7 @@ export default async function PlasmaPage({
             <span className="hidden rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300 group-open:inline">Recolher</span>
           </summary>
           <div className="border-t border-slate-700/80 p-4">
-            <NestForm setores={setores} maquinas={maquinas} opcoesItem={opcoesItem} />
+            <NestForm setores={setores} maquinas={maquinas} opcoesOP={opcoesOP} />
           </div>
         </details>
       )}
@@ -307,3 +322,4 @@ function MiniDado({ titulo, valor, cor = "text-slate-200" }: { titulo: string; v
 
 const filterLabelClass = "mb-1 block font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500";
 const filterInputClass = "w-full rounded border border-slate-700 bg-[#111925] px-2.5 py-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30";
+

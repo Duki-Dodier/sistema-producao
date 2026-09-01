@@ -461,6 +461,7 @@ model NestCorte {
   status                String   @default("PROGRAMADO") // PROGRAMADO | EM_CORTE | PAUSADO | CONCLUIDO | CANCELADO
   iniciadoEm            DateTime?
   finalizadoEm          DateTime?
+  refeitoDeId           Int? // NEST original que originou esta nova programação
   observacao            String?
 
   setor       Setor       @relation(fields: [setorId], references: [id], onDelete: Restrict)
@@ -601,3 +602,4 @@ model ConferenciaPCPItem {
   @@unique([conferenciaId, categoria])
   @@index([conferenciaId])
 }
+
