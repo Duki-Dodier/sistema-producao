@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { OPProgresso, SetorProgresso } from "@/lib/pcp";
 import { PecasModal } from "./pecas-modal";
 import { EnvioSoldaModal } from "./envio-solda-modal";
@@ -200,17 +200,22 @@ export function AgrupamentoRow({
   index,
   sugestoes,
   recebimentos,
+  abrirAutomaticamente = false,
+  abrirSetorId = null,
 }: {
   p: OPProgresso;
   colunas: ColunaAgrupamento[];
   index: number;
   sugestoes: SugestoesEnvio;
   recebimentos: RecebimentoDaCelula[];
+  abrirAutomaticamente?: boolean;
+  abrirSetorId?: number | null;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [envioOpen, setEnvioOpen] = useState(false);
   const [setorSelecionado, setSetorSelecionado] = useState<SetorProgresso | null>(null);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
+  const aberturaAutomaticaConcluida = useRef(false);
 
   const bgClass = index % 2 === 0 ? "bg-[#202A36]" : "bg-[#242D3C]"; // Efeito Zebra
   const dateStr = formatDate(p.op.dataLiberacao);
@@ -232,11 +237,36 @@ export function AgrupamentoRow({
   const openModal = (coluna: ColunaAgrupamento) => {
      const setorObj = progressoDaColuna(p, coluna);
      if (setorObj) {
-        setSetorSelecionado(setorObj);
-        setCategoriaSelecionada(coluna.chave);
-        setModalOpen(true);
-     }
+         setSetorSelecionado(setorObj);
+         setCategoriaSelecionada(coluna.chave);
+         setModalOpen(true);
+      }
   };
+
+  useEffect(() => {
+    if (!abrirAutomaticamente || aberturaAutomaticaConcluida.current) return;
+
+    const candidatos = colunas.flatMap((coluna) => {
+      const setor = progressoDaColuna(p, coluna);
+      return setor ? [{ coluna, setor }] : [];
+    });
+    const candidatoPorSetor = abrirSetorId === null
+      ? null
+      : candidatos.find(({ coluna, setor }) => coluna.setorId === abrirSetorId || setor.setorId === abrirSetorId);
+    const candidatoPendente = candidatos.find(({ coluna }) => {
+      const recebimento = recebimentos.find((item) => item.categoria === coluna.chave);
+      const temMaterial = (progressoDaColuna(p, coluna)?.quantidadeBoa ?? 0) > 0;
+      return temMaterial && !recebimento;
+    });
+    const candidato = candidatoPorSetor ?? candidatoPendente ?? candidatos[0];
+
+    if (candidato) {
+      aberturaAutomaticaConcluida.current = true;
+      setSetorSelecionado(candidato.setor);
+      setCategoriaSelecionada(candidato.coluna.chave);
+      setModalOpen(true);
+    }
+  }, [abrirAutomaticamente, abrirSetorId, colunas, p, recebimentos]);
 
   return (
     <>

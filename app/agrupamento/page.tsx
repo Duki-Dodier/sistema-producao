@@ -13,6 +13,8 @@ export default async function AgrupamentoPage({
   const busca = (sp.busca ?? "").trim().toLowerCase();
   const filtroFalta = (sp.falta ?? "").trim();
   const filtroSetorId = /^\d+$/.test(filtroFalta) ? Number(filtroFalta) : null;
+  const abrirOpId = /^\d+$/.test(sp.op ?? "") ? Number(sp.op) : null;
+  const abrirSetorId = /^\d+$/.test(sp.setor ?? "") ? Number(sp.setor) : null;
 
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
   const setorSolda = setores.find((setor) => ehSetor(setor.nome, "Solda"));
@@ -253,6 +255,8 @@ export default async function AgrupamentoPage({
                 index={index}
                 sugestoes={sugestoes}
                 recebimentos={recebimentos.filter((item) => item.opId === p.op.id)}
+                abrirAutomaticamente={abrirOpId === p.op.id}
+                abrirSetorId={abrirSetorId}
               />
             ))}
             {progresso.length === 0 && (

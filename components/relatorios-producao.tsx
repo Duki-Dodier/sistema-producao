@@ -89,6 +89,12 @@ export function RelatoriosProducao({
   const [operadorRelatorio, setOperadorRelatorio] = useState("");
   const [statusOP, setStatusOP] = useState("");
   const [modeloEngateId, setModeloEngateId] = useState("");
+  const [filtrosAplicados, setFiltrosAplicados] = useState({
+    busca: "",
+    operador: "",
+    maquina: "",
+    setor: "",
+  });
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioDoMes = `${hoje.slice(0, 8)}01`;
   const [dataInicio, setDataInicio] = useState(inicioDoMes);
@@ -108,6 +114,14 @@ export function RelatoriosProducao({
     maquinas: [...new Set(registros.map((item) => item.maquinaCodigo).filter((item): item is string => Boolean(item)))].sort((a, b) => a.localeCompare(b, "pt-BR")),
     setores: [...new Set(registros.map((item) => item.setorNome))].sort((a, b) => a.localeCompare(b, "pt-BR")),
   }), [produtos, registros]);
+
+  const opcoesDependentes = useMemo(() => {
+    const registrosDoSetor = setor ? registros.filter((registro) => registro.setorNome === setor) : registros;
+    return {
+      operadores: [...new Set(registrosDoSetor.map((item) => item.usuario))].sort((a, b) => a.localeCompare(b, "pt-BR")),
+      maquinas: [...new Set(registrosDoSetor.map((item) => item.maquinaCodigo).filter((item): item is string => Boolean(item)))].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    };
+  }, [registros, setor]);
 
   const hrefPdf = useMemo(() => {
     const parametros = new URLSearchParams();
@@ -133,7 +147,7 @@ export function RelatoriosProducao({
     : "#";
 
   const registrosFiltrados = useMemo(() => {
-    const termo = busca.trim().toLocaleLowerCase("pt-BR");
+    const termo = filtrosAplicados.busca.trim().toLocaleLowerCase("pt-BR");
     return registros.filter((registro) => {
       const texto = [
         registro.opNumero,
@@ -147,11 +161,11 @@ export function RelatoriosProducao({
         registro.setorNome,
       ].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR");
       return (!termo || texto.includes(termo)) &&
-        (!operador || registro.usuario === operador) &&
-        (!maquina || registro.maquinaCodigo === maquina) &&
-        (!setor || registro.setorNome === setor);
+        (!filtrosAplicados.operador || registro.usuario === filtrosAplicados.operador) &&
+        (!filtrosAplicados.maquina || registro.maquinaCodigo === filtrosAplicados.maquina) &&
+        (!filtrosAplicados.setor || registro.setorNome === filtrosAplicados.setor);
     });
-  }, [busca, maquina, operador, registros, setor]);
+  }, [filtrosAplicados, registros]);
 
   const produtosFiltrados = useMemo(() => {
     const opIds = new Set(registrosFiltrados.map((registro) => registro.opId));
@@ -492,7 +506,13 @@ export function RelatoriosProducao({
           {(busca || operador || maquina || setor) && (
             <button
               type="button"
-              onClick={() => { setBusca(""); setOperador(""); setMaquina(""); setSetor(""); }}
+              onClick={() => {
+                setBusca("");
+                setOperador("");
+                setMaquina("");
+                setSetor("");
+                setFiltrosAplicados({ busca: "", operador: "", maquina: "", setor: "" });
+              }}
               className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300 hover:text-white"
             >
               Limpar filtros
@@ -503,21 +523,29 @@ export function RelatoriosProducao({
           <input
             value={busca}
             onChange={(event) => setBusca(event.target.value)}
-            placeholder="OP, modelo, peça..."
+            placeholder="Digite o código da OP, modelo ou peça..."
+            aria-label="Buscar por código da OP, modelo ou peça"
             className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300"
           />
-          <select value={operador} onChange={(event) => setOperador(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
-            <option value="">Todos os operadores</option>
-            {opcoes.operadores.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-          <select value={maquina} onChange={(event) => setMaquina(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
-            <option value="">Todas as máquinas</option>
-            {opcoes.maquinas.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-          <select value={setor} onChange={(event) => setSetor(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
+          <select value={setor} onChange={(event) => { setSetor(event.target.value); setOperador(""); setMaquina(""); }} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
             <option value="">Todos os setores</option>
             {opcoes.setores.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
+          <select value={operador} onChange={(event) => setOperador(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
+            <option value="">Todos os operadores</option>
+            {opcoesDependentes.operadores.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select value={maquina} onChange={(event) => setMaquina(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
+            <option value="">Todas as máquinas</option>
+            {opcoesDependentes.maquinas.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => setFiltrosAplicados({ busca, operador, maquina, setor })}
+            className="inline-flex items-center justify-center rounded-lg bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-200 md:col-span-4 md:justify-self-end"
+          >
+            Buscar
+          </button>
         </div>
       </div>
 

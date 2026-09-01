@@ -160,9 +160,17 @@ export default async function DocumentoOPPage({
                   inicioReal={modoBranco ? null : inicioReal}
                   fimReal={modoBranco ? null : fimReal}
                 />
-                <h2 className="mb-2 mt-6 border-b-2 border-slate-800 pb-1 text-sm font-bold uppercase tracking-wide">
-                  Roteiro de produção
-                </h2>
+                <div className="mb-2 mt-6 flex items-end justify-between gap-4 border-b-2 border-slate-800 pb-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wide">Roteiro de produção</h2>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <div className="h-16 w-16 rounded bg-white p-1 print:border print:border-slate-400">
+                      <QrCode value={`${appOrigin}/agrupamento?op=${op.id}`} />
+                    </div>
+                    <span className="max-w-24 text-right text-[8px] font-bold uppercase leading-tight text-slate-600">
+                      Escaneie para abrir o Agrupamento
+                    </span>
+                  </div>
+                </div>
               </td>
             </tr>
           </thead>

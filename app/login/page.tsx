@@ -10,12 +10,11 @@ export default async function LoginPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const conectado = await buscarOperadorLogado();
-  if (conectado) redirect(destinoInicial(conectado));
-
   const destino = sp.redirect?.startsWith("/") && !sp.redirect.startsWith("//")
     ? sp.redirect
     : "";
+  const conectado = await buscarOperadorLogado();
+  if (conectado) redirect(destino || destinoInicial(conectado));
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#07101f] px-4 py-10 text-slate-100">

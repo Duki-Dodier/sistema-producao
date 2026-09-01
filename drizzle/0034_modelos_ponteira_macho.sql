@@ -15,9 +15,9 @@ WHERE "codigo" IN ('PON-TB-PM', 'PON-TB-G', 'PON-CH-12', 'PON-CH-16');
 
 INSERT INTO "Modelo" ("codigo", "nome", "curva", "tipo", "tamanhoPonteira", "linhaProduto", "createdAt", "updatedAt")
 VALUES
-  ('PON-M-P', 'Ponteira macho pequena', 'A', 'PONTEIRA_MACHO', 'PEQUENA', 'BRUCKE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  ('PON-M-M', 'Ponteira macho média',   'A', 'PONTEIRA_MACHO', 'MEDIA',   'BRUCKE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  ('PON-M-G', 'Ponteira macho grande',  'A', 'PONTEIRA_MACHO', 'GRANDE',  'BRUCKE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  ('PONT-P', 'Ponteira macho pequena', 'A', 'PONTEIRA_MACHO', 'PEQUENA', 'BRUCKE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  ('PONT-M', 'Ponteira macho média',   'A', 'PONTEIRA_MACHO', 'MEDIA',   'BRUCKE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  ('PONT-G', 'Ponteira macho grande',  'A', 'PONTEIRA_MACHO', 'GRANDE',  'BRUCKE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT("codigo") DO UPDATE SET
   "nome" = excluded."nome",
   "curva" = excluded."curva",
@@ -49,8 +49,8 @@ JOIN "Peca" p ON p."codigo" = CASE
 END
 WHERE m."tipo" = 'PONTEIRA_MACHO';
 
--- O apontamento da ponteira macho passa por corte do material e soldagem da
--- montagem. O lixamento permanece como acabamento rastreável antes do estoque.
+-- A chapa da ponteira macho passa por corte, dobra no setor de componentes e soldagem.
+-- O tubo passa por corte e, junto com a chapa, é unido por soldagem no setor Ponteira.
 INSERT INTO "PecaRoteiro" ("pecaId", "setorId", "processo", "ordem")
 SELECT p."id", s."id", 'CORTE', 1
 FROM "Peca" p
@@ -66,14 +66,14 @@ WHERE p."codigo" IN ('PON-CH-12', 'PON-CH-16')
   AND NOT EXISTS (SELECT 1 FROM "PecaRoteiro" r WHERE r."pecaId" = p."id" AND r."ordem" = 1);
 
 INSERT INTO "PecaRoteiro" ("pecaId", "setorId", "processo", "ordem")
-SELECT p."id", s."id", 'SOLDAGEM', 2
+SELECT p."id", s."id", 'DOBRA', 2
 FROM "Peca" p
-JOIN "Setor" s ON UPPER(TRIM(s."nome")) = 'PONTEIRA'
-WHERE p."codigo" IN ('PON-TB-PM', 'PON-TB-G', 'PON-CH-12', 'PON-CH-16')
+JOIN "Setor" s ON UPPER(TRIM(s."nome")) = 'COMPONENTE BARRA CHATA E CANTONEIRA'
+WHERE p."codigo" IN ('PON-CH-12', 'PON-CH-16')
   AND NOT EXISTS (SELECT 1 FROM "PecaRoteiro" r WHERE r."pecaId" = p."id" AND r."ordem" = 2);
 
 INSERT INTO "PecaRoteiro" ("pecaId", "setorId", "processo", "ordem")
-SELECT p."id", s."id", 'LIXAR', 3
+SELECT p."id", s."id", 'SOLDAGEM', 3
 FROM "Peca" p
 JOIN "Setor" s ON UPPER(TRIM(s."nome")) = 'PONTEIRA'
 WHERE p."codigo" IN ('PON-TB-PM', 'PON-TB-G', 'PON-CH-12', 'PON-CH-16')
