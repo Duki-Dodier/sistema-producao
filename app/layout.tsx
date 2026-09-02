@@ -47,15 +47,15 @@ export default async function RootLayout({
         <div className="flex h-full print:h-auto print:block">
           
           {/* Barra lateral: expande ao passar o mouse para revelar os nomes. */}
-          <aside className={`${paginaApontamento ? "hidden sm:flex" : "flex"} group/sidebar relative w-16 shrink-0 flex-col overflow-hidden border-r border-white/5 bg-[#1A222C] shadow-xl transition-[width] duration-200 ease-out hover:w-60 z-20 print:hidden`}>
+          <aside className={`${paginaApontamento ? "hidden sm:flex" : "flex"} group/sidebar relative w-16 shrink-0 flex-col overflow-hidden border-r border-white/5 bg-[#1A222C] shadow-xl transition-[width] duration-500 ease-out hover:w-60 z-20 print:hidden`}>
             {/* Top Logo / App Icon */}
-            <div className="flex h-14 items-center justify-center bg-[#1A222C] px-1 shadow-md shadow-black/20 transition-all duration-200 group-hover/sidebar:justify-start group-hover/sidebar:px-3">
+            <div className="flex h-14 items-center justify-center bg-[#1A222C] px-1 shadow-md shadow-black/20 transition-all duration-500 group-hover/sidebar:justify-start group-hover/sidebar:px-3">
               <img
                 src="/uploads/logo/logoBrucke-transparente.png"
                 alt="Engates Brucke"
                 className="h-10 w-14 object-contain"
               />
-              <div className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,margin,opacity] duration-200 group-hover/sidebar:ml-2 group-hover/sidebar:max-w-28 group-hover/sidebar:opacity-100">
+              <div className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,margin,opacity] duration-500 group-hover/sidebar:ml-2 group-hover/sidebar:max-w-28 group-hover/sidebar:opacity-100">
                 <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300">Engates</p>
                 <p className="text-xs font-bold tracking-wide text-slate-100">BRUCKE</p>
               </div>
@@ -63,10 +63,10 @@ export default async function RootLayout({
             
             <SidebarNav administrador={usuario.administrador} papel={usuario.papel} setorNome={usuario.setorNome} />
             
-            <div className="mt-auto flex h-14 items-center justify-center border-t border-white/5 transition-all duration-200 group-hover/sidebar:justify-start group-hover/sidebar:px-5">
+            <div className="mt-auto flex h-14 items-center justify-center border-t border-white/5 transition-all duration-500 group-hover/sidebar:justify-start group-hover/sidebar:px-5">
               <div className="group/status relative flex cursor-pointer items-center justify-center">
                  <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
-                 <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-emerald-400 opacity-0 transition-[max-width,margin,opacity] duration-200 group-hover/sidebar:ml-3 group-hover/sidebar:max-w-32 group-hover/sidebar:opacity-100">
+                 <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-emerald-400 opacity-0 transition-[max-width,margin,opacity] duration-500 group-hover/sidebar:ml-3 group-hover/sidebar:max-w-32 group-hover/sidebar:opacity-100">
                    Sistema online
                  </span>
                  
@@ -130,3 +130,4 @@ export default async function RootLayout({
     </html>
   );
 }
+
