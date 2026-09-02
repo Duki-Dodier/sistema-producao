@@ -55,7 +55,7 @@ export function SidebarNav({
             href={item.href}
             title={item.label}
             aria-label={item.label}
-            className={`group/item relative flex h-10 w-10 items-center justify-center rounded-lg transition-all duration-200 group-hover/sidebar:w-full group-hover/sidebar:justify-start group-hover/sidebar:px-3 ${
+            className={`group/item relative flex h-10 w-10 items-center justify-center rounded-lg transition-all duration-500 group-hover/sidebar:w-full group-hover/sidebar:justify-start group-hover/sidebar:px-3 ${
               active
                 ? "bg-[#3B82F6] text-white shadow-md shadow-blue-500/20"
                 : "text-slate-400 hover:bg-slate-700/50 hover:text-white"
@@ -63,7 +63,7 @@ export function SidebarNav({
           >
             <Icon className="h-5 w-5 shrink-0" />
 
-            <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap text-left text-xs font-semibold opacity-0 transition-[max-width,margin,opacity] duration-200 group-hover/sidebar:ml-3 group-hover/sidebar:max-w-48 group-hover/sidebar:opacity-100">
+            <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap text-left text-xs font-semibold opacity-0 transition-[max-width,margin,opacity] duration-500 group-hover/sidebar:ml-3 group-hover/sidebar:max-w-48 group-hover/sidebar:opacity-100">
               {item.label}
             </span>
 
@@ -210,3 +210,4 @@ function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
