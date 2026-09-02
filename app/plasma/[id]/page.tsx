@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { registrarEventoNest, registrarLancamentoNest } from "@/lib/actions/nests";
+import { refazerNest, registrarEventoNest, registrarLancamentoNest } from "@/lib/actions/nests";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
@@ -54,6 +54,7 @@ export default async function NestDetalhePage({ params }: { params: Promise<{ id
   const emAberto = !["CONCLUIDO", "CANCELADO"].includes(nest.status);
   const totalPlanejado = nest.itens.reduce((total, item) => total + item.quantidadePlanejada, 0);
   const totalBom = nest.itens.reduce((total, item) => total + item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa, 0), 0);
+  const quantidadeParaRefazer = Math.max(0, totalPlanejado - totalBom);
   const totalRefugo = nest.itens.reduce((total, item) => total + item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeRefugo, 0), 0);
   const todosLancamentos = nest.itens.flatMap((item) => item.lancamentos).sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime());
   const ultimoLancamento = todosLancamentos[0] ?? null;
@@ -130,6 +131,30 @@ export default async function NestDetalhePage({ params }: { params: Promise<{ id
               })}
             </div>
           </section>
+
+          {!emAberto && (
+            <section className="rounded-xl border border-amber-400/25 bg-[#202a36] shadow-lg shadow-black/10">
+              <div className="border-b border-amber-400/20 px-4 py-3">
+                <h3 className="text-sm font-semibold text-amber-100">Refazer este NEST</h3>
+                <p className="mt-0.5 text-xs text-slate-400">Crie uma nova programação mantendo o NEST original e todo o histórico.</p>
+              </div>
+              <form action={refazerNest} className="space-y-3 p-4">
+                <input type="hidden" name="nestId" value={nest.id} />
+                <label className="block">
+                  <span className={labelClass}>Motivo da refação</span>
+                  <input name="motivo" placeholder="Ex.: perda de peças, erro de corte..." className={inputClass} />
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-300">
+                  <input name="quantidade" type="checkbox" value="TOTAL" className="mt-0.5 accent-amber-300" />
+                  <span>Refazer todas as quantidades originais</span>
+                </label>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  Sem marcar, serão programadas apenas as {quantidadeParaRefazer} peças ainda pendentes. {quantidadeParaRefazer === 0 && "Como não há pendências, marque a opção acima para repetir o corte completo."}
+                </p>
+                <button type="submit" className="w-full rounded bg-amber-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-200">Gerar NEST de refação</button>
+              </form>
+            </section>
+          )}
 
           <section className="rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
             <div className="border-b border-slate-700/80 px-4 py-3"><h3 className="text-sm font-semibold text-slate-100">Dados técnicos da programação</h3></div>

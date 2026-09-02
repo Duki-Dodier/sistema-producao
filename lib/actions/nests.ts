@@ -207,6 +207,137 @@ export async function criarNestCorte(formData: FormData) {
   revalidarNests();
 }
 
+export async function refazerNest(formData: FormData) {
+  const usuario = await exigirUsuarioLogado();
+  const nestId = inteiro(formData.get("nestId"), "Nest", 1);
+  const motivo = texto(formData.get("motivo"), 500);
+  const refazerTudo = texto(formData.get("quantidade"), 16).toUpperCase() === "TOTAL";
+
+  const origem = await prisma.nestCorte.findUnique({
+    where: { id: nestId },
+    select: {
+      id: true,
+      codigo: true,
+      nomeArquivo: true,
+      arquivoPdfUrl: true,
+      setorId: true,
+      maquinaId: true,
+      programadorId: true,
+      material: true,
+      espessuraMm: true,
+      larguraChapaMm: true,
+      alturaChapaMm: true,
+      pesoChapaKg: true,
+      pesoPecasKg: true,
+      pesoSobraKg: true,
+      aproveitamentoPct: true,
+      quantidadeChapas: true,
+      numeroPiercings: true,
+      comprimentoCorteMm: true,
+      comprimentoRapidoMm: true,
+      tempoCorteSegundos: true,
+      tempoDeslocamentoSegundos: true,
+      observacao: true,
+      status: true,
+      setor: { select: { id: true, nome: true } },
+      itens: {
+        select: {
+          opId: true,
+          pecaId: true,
+          quantidadePlanejada: true,
+          lancamentos: { select: { quantidadeBoa: true } },
+        },
+      },
+    },
+  });
+
+  if (!origem) throw new Error("Nest não encontrado.");
+  if (!["CONCLUIDO", "CANCELADO"].includes(origem.status)) {
+    throw new Error("O nest só pode ser refeito depois de concluído ou cancelado.");
+  }
+  validarAcessoAoSetor(usuario, origem.setor);
+
+  const itens = origem.itens
+    .map((item) => ({
+      opId: item.opId,
+      pecaId: item.pecaId,
+      quantidadePlanejada: refazerTudo
+        ? item.quantidadePlanejada
+        : Math.max(0, item.quantidadePlanejada - item.lancamentos.reduce((total, lancamento) => total + lancamento.quantidadeBoa, 0)),
+    }))
+    .filter((item) => item.quantidadePlanejada > 0);
+
+  if (!itens.length) {
+    throw new Error("Não há peças pendentes para refazer. Se quiser repetir tudo, escolha a refação total.");
+  }
+
+  const prefixo = `${origem.codigo.slice(0, 70).replace(/-+$/, "")}-R`;
+  const codigosExistentes = await prisma.nestCorte.findMany({
+    where: { codigo: { startsWith: prefixo } },
+    select: { codigo: true },
+  });
+  const usados = new Set(codigosExistentes.map((item) => item.codigo));
+  let sequencia = 1;
+  let codigo = `${prefixo}${sequencia}`;
+  while (usados.has(codigo)) {
+    sequencia += 1;
+    codigo = `${prefixo}${sequencia}`;
+  }
+
+  const agora = new Date();
+  const novoNest = await prisma.nestCorte.create({
+    data: {
+      codigo,
+      nomeArquivo: origem.nomeArquivo,
+      arquivoPdfUrl: origem.arquivoPdfUrl,
+      setorId: origem.setorId,
+      maquinaId: origem.maquinaId,
+      programadorId: usuario.id,
+      material: origem.material,
+      espessuraMm: origem.espessuraMm,
+      larguraChapaMm: origem.larguraChapaMm,
+      alturaChapaMm: origem.alturaChapaMm,
+      pesoChapaKg: origem.pesoChapaKg,
+      pesoPecasKg: origem.pesoPecasKg,
+      pesoSobraKg: origem.pesoSobraKg,
+      aproveitamentoPct: origem.aproveitamentoPct,
+      quantidadeChapas: origem.quantidadeChapas,
+      numeroPiercings: origem.numeroPiercings,
+      comprimentoCorteMm: origem.comprimentoCorteMm,
+      comprimentoRapidoMm: origem.comprimentoRapidoMm,
+      tempoCorteSegundos: origem.tempoCorteSegundos,
+      tempoDeslocamentoSegundos: origem.tempoDeslocamentoSegundos,
+      refeitoDeId: origem.id,
+      observacao: [
+        `Refazendo o NEST ${origem.codigo}.`,
+        refazerTudo ? "Refação total." : "Refação das peças pendentes.",
+        motivo ? `Motivo: ${motivo}` : "Motivo não informado.",
+      ].join(" "),
+      itens: { create: itens },
+    },
+  });
+  await prisma.nestEvento.create({
+    data: {
+      nestId: novoNest.id,
+      funcionarioId: usuario.id,
+      tipo: "PROGRAMADO",
+      descricao: `NEST criado para refazer ${origem.codigo}.`,
+      dataHora: agora,
+    },
+  });
+  await registrarAlteracao({
+    entidade: "NEST",
+    entidadeId: novoNest.id,
+    acao: "CRIADO",
+    descricao: `NEST ${codigo} criado para refazer ${origem.codigo}.`,
+    usuario: usuario.nome,
+    dadosDepois: { refeitoDeId: origem.id, quantidade: refazerTudo ? "TOTAL" : "PENDENCIAS", itens: itens.length },
+  });
+
+  revalidarNests();
+  revalidatePath(`/plasma/${novoNest.id}`);
+}
+
 export async function registrarEventoNest(formData: FormData) {
   const usuario = await exigirUsuarioLogado();
   const nestId = inteiro(formData.get("nestId"), "Nest", 1);
