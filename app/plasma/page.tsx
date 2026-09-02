@@ -59,6 +59,7 @@ export default async function PlasmaPage({
   const todosSetores = await prisma.setor.findMany({ select: { id: true, nome: true }, orderBy: { ordemPadrao: "asc" } });
   const setores = todosSetores.filter((setor) => ehPlasma(setor.nome));
   const setorIds = setores.map((setor) => setor.id);
+  const setorPlasmaChapa = setores.find((setor) => ehSetor(setor.nome, "Plasma Chapa"));
 
   const whereNest = {
     ...(statusFiltro ? { status: statusFiltro } : {}),
@@ -87,7 +88,7 @@ export default async function PlasmaPage({
       orderBy: [{ setorId: "asc" }, { codigo: "asc" }],
     }),
     prisma.funcionario.findMany({
-      where: { ativo: true },
+      where: { ativo: true, setorId: setorPlasmaChapa?.id ?? -1 },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
@@ -204,10 +205,6 @@ export default async function PlasmaPage({
             <h2 className="mt-1 text-2xl font-bold text-white">Plasma</h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-300">Controle cada chapa programada, as peças de cada OP, tempos e aproveitamento. As baixas feitas no nest já alimentam a produção da fábrica.</p>
           </div>
-          <div className="rounded-lg border border-cyan-300/20 bg-[#0c1722]/60 px-3 py-2 text-right">
-            <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500">Referência Libellula</p>
-            <p className="mt-0.5 text-xs font-semibold text-cyan-100">Chapa, peso, corte e perfurações</p>
-          </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -235,7 +232,7 @@ export default async function PlasmaPage({
         <details className="group rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10" open={nests.length === 0}>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-slate-100">Programar novo nest</p>
+              <p className="text-sm font-semibold uppercase text-slate-100">PROGRAMAR NOVO NEST</p>
               <p className="mt-0.5 text-xs text-slate-400">Registre a programação antes de iniciar o corte na máquina.</p>
             </div>
             <span className="rounded bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-200 transition group-open:hidden">Abrir</span>
