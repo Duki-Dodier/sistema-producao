@@ -602,3 +602,4 @@ model ConferenciaPCPItem {
   @@unique([conferenciaId, categoria])
   @@index([conferenciaId])
 }
+
