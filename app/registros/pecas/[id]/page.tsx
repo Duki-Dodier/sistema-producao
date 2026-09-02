@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { updatePeca } from "@/lib/actions/pecas";
 import { PageHeader } from "@/components/page-header";
@@ -44,9 +45,18 @@ export default async function EditarPecaPage({
       <PageHeader
         title={`Editar peça ${peca.codigo}`}
         subtitle="Ajuste foto, nome, medida e setor desta peça."
+        actions={
+          <Link
+            href="/pecas"
+            className="inline-flex items-center gap-2 rounded-md border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-400/15 hover:text-white"
+          >
+            <span aria-hidden="true" className="text-base leading-none">←</span>
+            Voltar para Peças e BOM
+          </Link>
+        }
       />
 
-      <Card className="mx-auto w-full max-w-3xl">
+      <Card className="mx-auto w-full max-w-4xl">
         <CardHeader title="Dados da peça" />
         <form
           action={boundUpdatePeca}
@@ -214,56 +224,98 @@ export default async function EditarPecaPage({
             </div>
           </div>
 
-          <div className="w-full border-t border-white/5 pt-4">
-            <p className="text-xs font-medium text-slate-300">Curvas de dobra</p>
-            <p className="mb-3 mt-1 text-[11px] text-slate-500">
-              Tabela &quot;Dobra&quot; da folha do Tubo na OP impressa. Linhas vazias são ignoradas.
-            </p>
-            <div className="space-y-2">
-              <div className="grid grid-cols-[38px_1fr_1fr_1fr_1fr] gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="w-full border-t border-white/5 pt-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-cyan-400/10 text-cyan-300" aria-hidden="true">
+                    ↗
+                  </span>
+                  <p className="text-sm font-semibold text-slate-100">Curvas e dobras</p>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Informe cada dobra na ordem de execução. Esses dados também aparecem na OP impressa.
+                </p>
+              </div>
+              <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-cyan-200">
+                {peca.curvas.length} {peca.curvas.length === 1 ? "dobra cadastrada" : "dobras cadastradas"}
+              </span>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-700/80 bg-[#111925]/50">
+              <div className="hidden grid-cols-[2rem_minmax(8rem,1.1fr)_minmax(8rem,1fr)_6rem_minmax(8rem,1fr)] gap-2 border-b border-slate-700/70 bg-slate-950/20 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:grid">
                 <span className="text-center">#</span>
-                <span>Medida (cm)</span>
-                <span>Ângulo (grau)</span>
-                <span>Quant.</span>
+                <span>Medida da dobra (cm)</span>
+                <span>Ângulo (°)</span>
+                <span>Quantidade</span>
                 <span>Máquina</span>
               </div>
-              {Array.from({ length: Math.max(4, peca.curvas.length + 1) }, (_, indice) => {
-                const curva = peca.curvas[indice] ?? null;
-                return (
-                  <div key={indice} className="grid grid-cols-[38px_1fr_1fr_1fr_1fr] items-center gap-2">
-                    <span className="text-center font-mono text-xs font-bold text-slate-500">{indice + 1}</span>
-                    <input
-                      name="curvaMedida"
-                      type="number"
-                      step="0.1"
-                      defaultValue={curva?.medidaCm ?? ""}
-                      className="rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    <input
-                      name="curvaAngulo"
-                      type="number"
-                      step="0.1"
-                      defaultValue={curva?.anguloGraus ?? ""}
-                      className="rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    <input
-                      name="curvaQuantidade"
-                      type="number"
-                      min={1}
-                      defaultValue={curva?.quantidade ?? ""}
-                      placeholder="1"
-                      className="rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    <input
-                      name="curvaMaquina"
-                      defaultValue={curva?.maquina ?? ""}
-                      placeholder="Ex.: CV1"
-                      className="rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                );
-              })}
+              <div className="divide-y divide-slate-700/50">
+                {Array.from({ length: Math.max(4, peca.curvas.length + 1) }, (_, indice) => {
+                  const curva = peca.curvas[indice] ?? null;
+                  return (
+                    <div
+                      key={indice}
+                      className="grid gap-2 px-3 py-3 sm:grid-cols-[2rem_minmax(8rem,1.1fr)_minmax(8rem,1fr)_6rem_minmax(8rem,1fr)] sm:items-center"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 font-mono text-xs font-bold text-slate-300 sm:mx-auto">
+                        {indice + 1}
+                      </span>
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:hidden">Medida da dobra (cm)</span>
+                        <input
+                          name="curvaMedida"
+                          type="number"
+                          min={0}
+                          step="0.1"
+                          defaultValue={curva?.medidaCm ?? ""}
+                          placeholder="Ex.: 12,5"
+                          aria-label={`Medida da dobra ${indice + 1} em centímetros`}
+                          className="w-full rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:hidden">Ângulo (°)</span>
+                        <input
+                          name="curvaAngulo"
+                          type="number"
+                          step="0.1"
+                          defaultValue={curva?.anguloGraus ?? ""}
+                          placeholder="Ex.: 90"
+                          aria-label={`Ângulo da dobra ${indice + 1} em graus`}
+                          className="w-full rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:hidden">Quantidade</span>
+                        <input
+                          name="curvaQuantidade"
+                          type="number"
+                          min={1}
+                          defaultValue={curva?.quantidade ?? ""}
+                          placeholder="1"
+                          aria-label={`Quantidade da dobra ${indice + 1}`}
+                          className="w-full rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:hidden">Máquina</span>
+                        <input
+                          name="curvaMaquina"
+                          defaultValue={curva?.maquina ?? ""}
+                          placeholder="Ex.: CV1"
+                          aria-label={`Máquina da dobra ${indice + 1}`}
+                          className="w-full rounded-md border border-white/5 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+            <p className="mt-2 text-[10px] text-slate-500">
+              Exemplo: medida 12,5 cm · ângulo 90° · quantidade 1 · máquina CV1. Linhas vazias são ignoradas.
+            </p>
           </div>
 
           <SubmitButton>Salvar peça</SubmitButton>

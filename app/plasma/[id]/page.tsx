@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { Thumb } from "@/components/thumb";
 import { refazerNest, registrarEventoNest, registrarLancamentoNest } from "@/lib/actions/nests";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
+import { rotuloMaquina } from "@/lib/maquinas";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
 
@@ -21,8 +23,15 @@ function tempo(segundos: number | null) {
   return [Math.floor(segundos / 3600), Math.floor((segundos % 3600) / 60), segundos % 60].map((item) => String(item).padStart(2, "0")).join(":");
 }
 
-export default async function NestDetalhePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function NestDetalhePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const { id: idRaw } = await params;
+  const sp = await searchParams;
   const id = Number(idRaw);
   if (!Number.isInteger(id)) notFound();
 
@@ -37,7 +46,7 @@ export default async function NestDetalhePage({ params }: { params: Promise<{ id
         itens: {
           include: {
             op: { select: { id: true, lote: true, modelo: { select: { codigo: true, nome: true } } } },
-            peca: { select: { codigo: true, nome: true, medida: true } },
+            peca: { select: { codigo: true, nome: true, medida: true, imagemUrl: true } },
             lancamentos: { include: { funcionario: { select: { nome: true } } }, orderBy: { dataHora: "desc" } },
           },
           orderBy: { id: "asc" },
@@ -47,6 +56,10 @@ export default async function NestDetalhePage({ params }: { params: Promise<{ id
     }),
   ]);
   if (!nest) notFound();
+  if (sp.origem === "qrcode" && !usuario) {
+    const destino = `/plasma/${nest.id}?origem=qrcode`;
+    redirect(`/login?redirect=${encodeURIComponent(destino)}`);
+  }
 
   const usuarioNoPlasma = Boolean(usuario && (usuario.administrador || usuario.papel !== "OPERADOR" || usuario.setorId === nest.setor.id));
   const setorEhPlasma = ehSetor(nest.setor.nome, "Plasma Chapa") || ehSetor(nest.setor.nome, "Plasma Tubo");
@@ -64,7 +77,10 @@ export default async function NestDetalhePage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/plasma" className="text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">← Voltar para Plasma</Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/plasma" className="text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">← Voltar para Plasma</Link>
+          <a href={`/plasma/${nest.id}/pdf`} target="_blank" rel="noreferrer" className="rounded border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan-100 transition hover:bg-cyan-400/20">PDF de corte ↗</a>
+        </div>
         <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Criado em {dataHora(nest.createdAt)}</span>
       </div>
 
@@ -73,7 +89,7 @@ export default async function NestDetalhePage({ params }: { params: Promise<{ id
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">Rastreabilidade de corte</p>
             <h2 className="mt-1 font-mono text-2xl font-bold tracking-wide text-white">{nest.codigo}</h2>
-            <p className="mt-1 text-sm text-slate-300">{nest.setor.nome} · {nest.maquina.codigo} - {nest.maquina.nome} · Programador: {nest.programador.nome}</p>
+            <p className="mt-1 text-sm text-slate-300">{nest.setor.nome} · {rotuloMaquina(nest.maquina.codigo, nest.maquina.nome)} · Programador: {nest.programador.nome}</p>
             {nest.arquivoPdfUrl && <a href={nest.arquivoPdfUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">Abrir PDF original do Libellula ↗</a>}
           </div>
           <span className="rounded border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-cyan-100">{statusLabel[nest.status] ?? nest.status}</span>
@@ -105,9 +121,16 @@ export default async function NestDetalhePage({ params }: { params: Promise<{ id
                 return (
                   <article key={item.id} className="p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-mono text-sm font-bold text-white">{item.peca.codigo}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">OP {item.op.lote ?? `#${item.op.id}`} · {item.op.modelo.codigo} · {item.peca.nome}{item.peca.medida ? ` (${item.peca.medida})` : ""}</p>
+                      <div className="flex min-w-0 items-start gap-3">
+                        {item.peca.imagemUrl && (
+                          <a href={item.peca.imagemUrl} target="_blank" rel="noreferrer" title={`Abrir imagem da peça ${item.peca.codigo}`}>
+                            <Thumb src={item.peca.imagemUrl} alt={`Imagem da peça ${item.peca.codigo}`} size={76} className="rounded-lg border-slate-600 bg-white p-1 object-contain" />
+                          </a>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-mono text-sm font-bold text-white">{item.peca.codigo}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">OP {item.op.lote ?? `#${item.op.id}`} · {item.op.modelo.codigo} · {item.peca.nome}{item.peca.medida ? ` (${item.peca.medida})` : ""}</p>
+                        </div>
                       </div>
                       <div className="flex gap-2 text-center text-xs"><Resumo titulo="Plano" valor={item.quantidadePlanejada} /><Resumo titulo="Boa" valor={boas} cor="text-emerald-200" /><Resumo titulo="Falta" valor={Math.max(0, item.quantidadePlanejada - boas)} cor="text-amber-200" /><Resumo titulo="Perda" valor={refugo} cor="text-rose-200" /><Resumo titulo="Retrab." valor={retrabalho} cor="text-amber-200" /></div>
                     </div>

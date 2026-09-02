@@ -4,6 +4,7 @@ import { useActionState, useMemo, useRef, useState } from "react";
 import { ImportadorPdfLibellula } from "@/components/importador-pdf-libellula";
 import { criarNestCorte } from "@/lib/actions/nests";
 import type { DadosImportadosLibellula } from "@/lib/libellula-pdf";
+import { rotuloMaquina } from "@/lib/maquinas";
 
 type Setor = { id: number; nome: string };
 type Maquina = { id: number; codigo: string; nome: string; setorId: number };
@@ -24,7 +25,7 @@ export function NestForm({
   const [setorId, setSetorId] = useState(setores[0]?.id ?? 0);
   const [maquinaId, setMaquinaId] = useState("");
   const [linhas, setLinhas] = useState<Linha[]>([{ id: 1, referencia: "", quantidade: "" }]);
-  const [opSelecionadaId, setOpSelecionadaId] = useState("");
+  const [buscaOp, setBuscaOp] = useState("");
   const [opsSelecionadas, setOpsSelecionadas] = useState<number[]>([]);
   const [maquinaImportada, setMaquinaImportada] = useState("");
   const [aviso, setAviso] = useState("");
@@ -48,6 +49,13 @@ export function NestForm({
   function normalizar(valor: string) {
     return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
   }
+
+  const opsDisponiveis = useMemo(() => opsDoSetor.filter((op) => !opsSelecionadas.includes(op.id)), [opsDoSetor, opsSelecionadas]);
+  const opsFiltradas = useMemo(() => {
+    const termo = normalizar(buscaOp);
+    if (!termo) return [];
+    return opsDisponiveis.filter((op) => normalizar([op.label, ...op.itens.flatMap((item) => [item.codigoPeca, item.descricao])].join(" ")).includes(termo)).slice(0, 8);
+  }, [buscaOp, opsDisponiveis]);
 
   function preencherCampo(nome: string, valor: string | number | undefined) {
     if (valor === undefined) return;
@@ -108,13 +116,13 @@ export function NestForm({
     const haviaPecas = linhas.some((linha) => linha.referencia);
     setSetorId(novoSetorId);
     setMaquinaId("");
-    setOpSelecionadaId("");
+    setBuscaOp("");
     setOpsSelecionadas([]);
     setLinhas([{ id: 1, referencia: "", quantidade: "" }]);
     if (haviaPecas) setAviso("As peças escolhidas foram limpas porque o setor foi alterado.");
   }
 
-  function adicionarOp(opIdTexto = opSelecionadaId) {
+  function adicionarOp(opIdTexto: string) {
     const opId = Number(opIdTexto);
     const op = opPorId.get(opId);
     if (!op) {
@@ -134,7 +142,7 @@ export function NestForm({
       ...atual.filter((linha) => linha.referencia),
       ...novosItens.map((item, indice) => ({ id: proximoId + indice + 1, referencia: item.referencia, quantidade: String(item.quantidadePlanejada) })),
     ]);
-    setOpSelecionadaId("");
+    setBuscaOp("");
     setAviso("");
   }
 
@@ -267,7 +275,7 @@ export function NestForm({
             <select name="maquinaId" className={inputClass} value={maquinaId} onChange={(event) => setMaquinaId(event.target.value)}>
               <option value="">Usar máquina do PDF / selecione</option>
               {maquinasDoSetor.map((maquina) => (
-                <option key={maquina.id} value={maquina.id}>{maquina.codigo} - {maquina.nome}</option>
+                <option key={maquina.id} value={maquina.id}>{rotuloMaquina(maquina.codigo, maquina.nome)}</option>
               ))}
             </select>
             {!maquinaId && maquinaImportada && <span className="mt-1 block text-[11px] text-cyan-200">Será criada a máquina informada no PDF: {maquinaImportada}</span>}
@@ -322,10 +330,46 @@ export function NestForm({
 
         <div className="mt-3">
           <Campo label="Adicionar OP ao NEST">
-            <select value={opSelecionadaId} onChange={(event) => { setOpSelecionadaId(event.target.value); if (event.target.value) adicionarOp(event.target.value); }} className={inputClass}>
-              <option value="">Selecione uma OP aberta</option>
-              {opsDoSetor.filter((op) => !opsSelecionadas.includes(op.id)).map((op) => <option key={op.id} value={op.id}>{op.label}</option>)}
-            </select>
+            <div className="relative">
+              <input
+                value={buscaOp}
+                onChange={(event) => setBuscaOp(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && opsFiltradas[0]) {
+                    event.preventDefault();
+                    adicionarOp(String(opsFiltradas[0].id));
+                  }
+                }}
+                placeholder="Digite o código, lote ou modelo da OP..."
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={Boolean(buscaOp && opsFiltradas.length)}
+                aria-controls="op-sugestoes"
+                className={inputClass}
+              />
+              {buscaOp && opsFiltradas.length > 0 && (
+                <div id="op-sugestoes" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-cyan-400/30 bg-[#111925] shadow-xl shadow-black/30" role="listbox">
+                  {opsFiltradas.map((op) => (
+                    <button
+                      key={op.id}
+                      type="button"
+                      role="option"
+                      onClick={() => adicionarOp(String(op.id))}
+                      className="flex w-full items-center justify-between gap-3 border-b border-slate-700/60 px-3 py-2 text-left last:border-b-0 hover:bg-cyan-400/10"
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium text-slate-100">{op.label}</span>
+                      <span className="shrink-0 text-[10px] text-slate-500">{op.itens.length} peça(s)</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {buscaOp && !opsFiltradas.length && opsDisponiveis.length > 0 && (
+                <p className="mt-1 text-[11px] text-amber-200">Nenhuma OP encontrada para esta busca.</p>
+              )}
+            </div>
+            <span className="mt-1 block text-[11px] text-slate-500">
+              Digite para filtrar as OPs abertas; pressione Enter para adicionar o primeiro resultado.
+            </span>
           </Campo>
         </div>
 
