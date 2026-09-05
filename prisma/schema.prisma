@@ -55,7 +55,7 @@ model Funcionario {
   setorId       Int
   ativo         Boolean @default(true)
   pin           String? // PIN de 4 dígitos p/ apontar no kiosk e autorizar ajustes
-  papel         String  @default("OPERADOR") // OPERADOR | LIDER | PCP
+  papel         String  @default("OPERADOR") // OPERADOR | LIDER | PCP | CONFERENTE
   usuario       String? @unique
   senhaHash     String?
   administrador Boolean @default(false)
@@ -69,7 +69,8 @@ model Funcionario {
   producoesEmAndamento ProducaoEmAndamento[]
   nestsProgramados     NestCorte[]       @relation("NestProgramador")
   eventosNest          NestEvento[]
-  lancamentosNest      NestLancamento[]
+  lancamentosNest      NestLancamento[] @relation("NestLancamentoOperador")
+  conferenciasNest     NestLancamento[] @relation("NestLancamentoConferente")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -515,8 +516,8 @@ model NestEvento {
   @@index([funcionarioId, dataHora])
 }
 
-/// Baixa por peça cortada no nest. A baixa também gera um Apontamento normal,
-/// mantendo os painéis e a rastreabilidade por OP sincronizados.
+/// Produção declarada pelo operador. Somente a conferência gera o Apontamento
+/// oficial. Registros antigos com apontamentoId permanecem válidos.
 model NestLancamento {
   id               Int      @id @default(autoincrement())
   nestItemId       Int
@@ -529,8 +530,15 @@ model NestLancamento {
   observacao       String?
   dataHora         DateTime @default(now())
 
+  conferenteId              Int?
+  conferidoEm               DateTime?
+  quantidadeConferidaBoa    Int?
+  quantidadeConferidaRefugo Int?
+  motivoConferencia         String?
+
   item        NestItem    @relation(fields: [nestItemId], references: [id], onDelete: Cascade)
-  funcionario Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Restrict)
+  funcionario Funcionario @relation("NestLancamentoOperador", fields: [funcionarioId], references: [id], onDelete: Restrict)
+  conferente  Funcionario? @relation("NestLancamentoConferente", fields: [conferenteId], references: [id], onDelete: Restrict)
   apontamento Apontamento? @relation(fields: [apontamentoId], references: [id], onDelete: SetNull)
 
   @@index([nestItemId, dataHora])

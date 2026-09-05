@@ -261,10 +261,11 @@ export default async function ConfiguracoesPage() {
                           </label>
                           <label className="flex min-w-0 flex-col gap-1.5">
                             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Função</span>
-                            <select key={`papel-${f.id}-${f.papel}`} name="papel" defaultValue={f.papel} className={INPUT_CLS} title="Líder autoriza ajustes do próprio setor; PCP autoriza qualquer setor">
+                            <select key={`papel-${f.id}-${f.papel}`} name="papel" defaultValue={f.papel} className={INPUT_CLS} title="O conferente é exclusivo do Plasma e valida o corte">
                               <option value="OPERADOR">Operador</option>
                               <option value="LIDER">Líder</option>
                               <option value="PCP">PCP</option>
+                              <option value="CONFERENTE">Conferente do Plasma</option>
                             </select>
                           </label>
                           <label className="flex min-w-0 flex-col gap-1.5">

@@ -4,6 +4,8 @@ import { rotuloMaquina } from "@/lib/maquinas";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
 import { DateFilter } from "@/components/date-filter";
+import { boasConferidas, perdasEfetivas, podeConferirPlasma, segundosEfetivos } from "@/lib/plasma-regras";
+import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
 
 const statusLabel: Record<string, string> = {
   PROGRAMADO: "Programado",
@@ -114,14 +116,14 @@ export default async function PlasmaPage({
     } : {}),
   };
 
-  const [maquinas, operadores, totalNests, nests, statusResumo, itemResumo, lancamentoResumo] = await Promise.all([
+  const [maquinas, operadores, totalNests, nests, statusResumo, lancamentosResumo, demanda, operacaoMaquinas, pendenciasConferencia, conferentePlasma] = await Promise.all([
     prisma.maquina.findMany({
       where: { setorId: { in: setorIds }, ativo: true },
       select: { id: true, codigo: true, nome: true, setorId: true },
       orderBy: [{ setorId: "asc" }, { codigo: "asc" }],
     }),
     prisma.funcionario.findMany({
-      where: { ativo: true, setorId: setorPlasmaChapa?.id ?? -1 },
+      where: { ativo: true, setorId: setorPlasmaChapa?.id ?? -1, papel: { not: "CONFERENTE" } },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     }),
@@ -136,7 +138,7 @@ export default async function PlasmaPage({
           include: {
             peca: { select: { codigo: true, nome: true } },
             op: { select: { lote: true, modelo: { select: { codigo: true } } } },
-            lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true, dataHora: true, funcionario: { select: { nome: true } } } },
+            lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true, quantidadeConferidaBoa: true, quantidadeConferidaRefugo: true, apontamentoId: true, dataHora: true, funcionario: { select: { nome: true } } } },
           },
         },
         eventos: { select: { tipo: true, dataHora: true, funcionario: { select: { nome: true } } } },
@@ -146,8 +148,19 @@ export default async function PlasmaPage({
       take: porPagina,
     }),
     prisma.nestCorte.groupBy({ where: whereNest, by: ["status"], _count: { _all: true } }),
-    prisma.nestItem.aggregate({ where: { nest: whereNest }, _count: { _all: true }, _sum: { quantidadePlanejada: true } }),
-    prisma.nestLancamento.aggregate({ where: { item: { nest: whereNest } }, _sum: { quantidadeBoa: true, quantidadeRefugo: true } }),
+    prisma.nestLancamento.findMany({ where: { item: { nest: whereNest } }, select: { quantidadeBoa: true, quantidadeRefugo: true, quantidadeConferidaBoa: true, quantidadeConferidaRefugo: true, apontamentoId: true } }),
+    buscarDemandaPlasma(),
+    prisma.nestCorte.findMany({
+      where: { setorId: setorPlasmaChapa?.id ?? -1, status: { in: ["PROGRAMADO", "EM_CORTE", "PAUSADO"] } },
+      include: { maquina: { select: { id: true, codigo: true, nome: true } }, itens: { include: { lancamentos: true } }, eventos: { select: { tipo: true, dataHora: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.nestLancamento.findMany({
+      where: { apontamentoId: null, item: { nest: { setorId: { in: setorIds }, status: { in: ["CONCLUIDO", "CANCELADO"] } } } },
+      include: { funcionario: { select: { nome: true } }, item: { include: { peca: { select: { codigo: true } }, op: { select: { lote: true } }, nest: { select: { id: true, codigo: true, setorId: true, setor: { select: { nome: true } } } } } } },
+      orderBy: { dataHora: "asc" },
+    }),
+    prisma.funcionario.findFirst({ where: { ativo: true, papel: "CONFERENTE", setor: { nome: "Plasma Chapa" } }, select: { nome: true } }),
   ]);
 
   const statusTotal = (status: string) => statusResumo.find((item) => item.status === status)?._count._all ?? 0;
@@ -155,10 +168,14 @@ export default async function PlasmaPage({
   const nestsEmCorte = statusTotal("EM_CORTE");
   const nestsPausados = statusTotal("PAUSADO");
   const nestsAtivos = nestsProgramados + nestsEmCorte + nestsPausados;
-  const totalPlanejado = itemResumo._sum.quantidadePlanejada ?? 0;
-  const totalBoas = lancamentoResumo._sum.quantidadeBoa ?? 0;
-  const totalPerdas = lancamentoResumo._sum.quantidadeRefugo ?? 0;
-  const totalPendente = Math.max(0, totalPlanejado - totalBoas);
+  const totalDeclarado = lancamentosResumo.reduce((s, l) => s + l.quantidadeBoa, 0);
+  const totalBoas = lancamentosResumo.reduce((s, l) => s + boasConferidas(l), 0);
+  const totalPerdas = lancamentosResumo.reduce((s, l) => s + perdasEfetivas(l), 0);
+  const aguardandoConferencia = lancamentosResumo.filter(l => l.apontamentoId === null).reduce((s, l) => s + l.quantidadeBoa + l.quantidadeRefugo, 0);
+  const maquinasChapa = maquinas.filter(maquina => maquina.setorId === setorPlasmaChapa?.id);
+  const reposicoes = demanda.filter(item => item.setorId === setorPlasmaChapa?.id && item.reposicao > 0);
+  const totalReposicao = reposicoes.reduce((s, item) => s + item.reposicao, 0);
+  const podeConferir = podeConferirPlasma(usuario);
   const totalPaginas = Math.max(1, Math.ceil(totalNests / porPagina));
   const buscaDetalhada = Boolean(
     busca || dataInicioFiltro || dataFimFiltro || statusFiltro || (Number.isInteger(maquinaFiltro) && maquinaFiltro > 0) || (Number.isInteger(operadorFiltro) && operadorFiltro > 0) || (Number.isInteger(setorFiltro) && setorFiltro > 0),
@@ -183,8 +200,9 @@ export default async function PlasmaPage({
     return hrefComFiltros({ dataInicio: valor, dataFim: valor });
   };
   const periodoInvalido = dataInicio !== "" && dataFim !== "" && dataInicioFiltro && dataFimFiltro && dataInicioFiltro > dataFimFiltro;
+  const cadastroConcluido = sp.cadastrado === "1";
   const podeProgramar = Boolean(
-    usuario && (usuario.administrador || ["LIDER", "PCP"].includes(usuario.papel) || (usuario.papel === "OPERADOR" && setorIds.includes(usuario.setorId))),
+    usuario && (usuario.administrador || usuario.papel === "PCP" || (["LIDER", "OPERADOR"].includes(usuario.papel) && setorIds.includes(usuario.setorId))),
   );
 
   return (
@@ -194,7 +212,13 @@ export default async function PlasmaPage({
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">Painel de programação e corte</p>
             <h2 className="mt-1 text-2xl font-bold text-white">PLASMA</h2>
-            <p className="mt-1 max-w-3xl text-sm text-slate-300">Acompanhe os NESTs de Plasma Chapa e Plasma Tubo. Abra a rastreabilidade somente quando precisar dos detalhes.</p>
+            <p className="mt-1 max-w-3xl text-sm text-slate-300">Da programação à conferência: cada corte registra máquina, pessoas, tempo, boas e perdas.</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <span className="rounded bg-sky-400/10 px-2.5 py-1.5 text-sky-200">1 Programação</span><span aria-hidden="true" className="text-slate-600">→</span>
+              <span className="rounded bg-emerald-400/10 px-2.5 py-1.5 text-emerald-200">2 Operação</span><span aria-hidden="true" className="text-slate-600">→</span>
+              <span className="rounded bg-amber-400/10 px-2.5 py-1.5 text-amber-200">3 Conferência</span><span aria-hidden="true" className="text-slate-600">→</span>
+              <span className="rounded bg-cyan-400/10 px-2.5 py-1.5 text-cyan-200">4 OP liberada</span>
+            </div>
           </div>
           {podeProgramar && (
             <Link href="/plasma/novo" className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300">
@@ -204,15 +228,72 @@ export default async function PlasmaPage({
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+      {!conferentePlasma && (
+        <section role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-400/35 bg-amber-400/10 px-4 py-3">
+          <div><p className="text-sm font-semibold text-amber-100">Defina o conferente único do Plasma.</p><p className="mt-0.5 text-xs text-amber-100/75">Até essa pessoa ser designada, os cortes declarados ficarão aguardando liberação.</p></div>
+          {usuario?.administrador && <Link href="/configuracoes" className="rounded border border-amber-300/40 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/10">Abrir configurações</Link>}
+        </section>
+      )}
+
+      {cadastroConcluido && (
+        <section role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-emerald-100">NEST cadastrado com sucesso.</p>
+            <p className="mt-0.5 text-xs text-emerald-200/80">O novo NEST está no início da lista abaixo, aguardando o corte.</p>
+          </div>
+          <Link href="/plasma" className="rounded border border-emerald-300/30 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-300/10">Fechar aviso</Link>
+        </section>
+      )}
+
+      <section className="rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/80 px-4 py-3">
+          <div><h3 className="text-base font-bold uppercase tracking-wide text-slate-100">Máquinas · Plasma Chapa</h3><p className="mt-1 text-sm text-slate-400">Situação das seis máquinas e sua fila programada.</p></div>
+          <span className="rounded border border-slate-600 px-2.5 py-1 text-xs font-bold text-slate-300">{maquinasChapa.length} máquinas ativas</span>
+        </div>
+        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+          {maquinasChapa.map(maquina => {
+            const fila = operacaoMaquinas.filter(nest => nest.maquinaId === maquina.id);
+            const atual = fila.find(nest => ["EM_CORTE", "PAUSADO"].includes(nest.status)) ?? fila[0];
+            const planejado = atual?.itens.reduce((s, item) => s + item.quantidadePlanejada, 0) ?? 0;
+            const declarado = atual?.itens.flatMap(item => item.lancamentos).reduce((s, item) => s + item.quantidadeBoa + item.quantidadeRefugo, 0) ?? 0;
+            const cor = atual?.status === "EM_CORTE" ? "border-emerald-400/40" : atual?.status === "PAUSADO" ? "border-amber-400/40" : atual ? "border-sky-400/30" : "border-slate-700";
+            return <article key={maquina.id} className={`rounded-lg border ${cor} bg-[#111925]/65 p-4`}>
+              <div className="flex items-start justify-between gap-2"><div><p className="text-base font-bold text-white">{rotuloMaquina(maquina.codigo, maquina.nome)}</p><p className="mt-1 text-xs text-slate-500">{fila.length > 1 ? `${fila.length - 1} NEST(s) na fila` : "Sem fila adicional"}</p></div><span className={`h-2.5 w-2.5 rounded-full ${atual?.status === "EM_CORTE" ? "bg-emerald-400" : atual?.status === "PAUSADO" ? "bg-amber-400" : atual ? "bg-sky-400" : "bg-slate-600"}`} /></div>
+              {atual ? <Link href={`/plasma/${atual.id}`} className="mt-4 block rounded border border-white/5 bg-black/15 p-3 transition hover:border-cyan-400/30">
+                <div className="flex items-center justify-between gap-2"><strong className="font-mono text-sm text-cyan-100">{atual.codigo}</strong><span className="text-xs font-bold uppercase text-slate-400">{statusLabel[atual.status]}</span></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded bg-slate-800"><div className="h-full bg-cyan-400" style={{ width: `${planejado ? Math.min(100, Math.round(declarado / planejado * 100)) : 0}%` }} /></div>
+                <p className="mt-2 text-xs text-slate-400">Declarado {declarado}/{planejado} · tempo {tempo(segundosEfetivos(atual.eventos))}</p>
+              </Link> : <div className="mt-4 rounded border border-dashed border-slate-700 px-3 py-5 text-center text-sm text-slate-500">Disponível</div>}
+            </article>;
+          })}
+        </div>
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-xl border border-amber-400/20 bg-[#202a36] shadow-lg shadow-black/10">
+          <div className="flex items-center justify-between gap-3 border-b border-amber-400/15 px-4 py-3"><div><h3 className="text-base font-bold text-amber-100">Aguardando conferência</h3><p className="mt-1 text-sm text-slate-400">Só o conferente do Plasma transforma estes valores em produção oficial.</p></div><strong className="text-2xl text-amber-200">{pendenciasConferencia.length}</strong></div>
+          <div className="divide-y divide-slate-700/70">
+            {pendenciasConferencia.slice(0, 5).map(item => <Link key={item.id} href={`/plasma/${item.item.nest.id}#conferencia`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition hover:bg-amber-400/5"><span><strong className="text-slate-100">{item.item.nest.codigo}</strong><span className="ml-2 text-slate-400">{item.item.peca.codigo} · OP {item.item.op.lote ?? `#${item.item.opId}`}</span><span className="mt-1 block text-xs text-slate-500">{item.item.nest.setor.nome} · declarado por {item.funcionario.nome}</span></span><span className="shrink-0 font-bold text-amber-200">{item.quantidadeBoa} boas / {item.quantidadeRefugo} perdas</span></Link>)}
+            {!pendenciasConferencia.length && <p className="px-4 py-7 text-center text-sm text-slate-500">Nenhum corte aguardando conferência.</p>}
+          </div>
+          {pendenciasConferencia.length > 0 && <p className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500">{podeConferir ? "Seu usuário é o responsável por esta conferência." : conferentePlasma ? `Somente ${conferentePlasma.nome}, conferente designado, pode validar.` : "Aguardando a designação do conferente."}</p>}
+        </section>
+
+        <section className="rounded-xl border border-rose-400/20 bg-[#202a36] shadow-lg shadow-black/10">
+          <div className="flex items-center justify-between gap-3 border-b border-rose-400/15 px-4 py-3"><div><h3 className="text-base font-bold text-rose-100">Peças perdidas para repor</h3><p className="mt-1 text-sm text-slate-400">Fila consolidada para programar várias reposições juntas.</p></div><strong className="text-2xl text-rose-200">{numero(totalReposicao)}</strong></div>
+          <div className="divide-y divide-slate-700/70">
+            {reposicoes.slice(0, 5).map(item => <div key={`${item.setorId}:${item.referencia}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span><strong className="text-slate-100">{item.codigo}</strong><span className="ml-2 text-slate-400">{item.opLabel}</span></span><strong className="shrink-0 text-rose-200">{item.reposicao} a repor</strong></div>)}
+            {!reposicoes.length && <p className="px-4 py-7 text-center text-sm text-slate-500">Nenhuma perda pendente de reposição.</p>}
+          </div>
+          {podeProgramar && reposicoes.length > 0 && <div className="border-t border-slate-700 p-3"><Link href="/plasma/novo?reposicao=1" className="block rounded bg-rose-300 px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:bg-rose-200">Programar reposições juntas</Link></div>}
+        </section>
+      </div>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Indicador rotulo="NESTS ativos" valor={numero(nestsAtivos)} cor="text-cyan-200" />
-        <Indicador rotulo="Aguardando corte" valor={numero(nestsProgramados)} cor="text-sky-200" />
-        <Indicador rotulo="Em corte" valor={numero(nestsEmCorte)} cor="text-emerald-200" />
-        <Indicador rotulo="Pausados" valor={numero(nestsPausados)} cor="text-amber-200" />
-        <Indicador rotulo="Concluídos" valor={numero(statusTotal("CONCLUIDO"))} cor="text-slate-200" />
-        <Indicador rotulo="Peças planejadas" valor={numero(totalPlanejado)} cor="text-cyan-200" />
-        <Indicador rotulo="Peças boas" valor={numero(totalBoas)} cor="text-emerald-200" />
-        <Indicador rotulo="Pendentes / perdas" valor={`${numero(totalPendente)} / ${numero(totalPerdas)}`} cor="text-amber-200" />
+        <Indicador rotulo="Boas declaradas" valor={numero(totalDeclarado)} cor="text-sky-200" />
+        <Indicador rotulo="Peças a conferir" valor={numero(aguardandoConferencia)} cor="text-amber-200" />
+        <Indicador rotulo="Liberadas / perdas sinalizadas" valor={`${numero(totalBoas)} / ${numero(totalPerdas)}`} cor="text-emerald-200" />
       </section>
 
       <section className="rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
@@ -257,8 +338,10 @@ export default async function PlasmaPage({
             {nests.map((nest) => {
               const lancamentos = nest.itens.flatMap((item) => item.lancamentos).sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime());
               const eventos = [...nest.eventos].sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime());
-              const boas = lancamentos.reduce((total, item) => total + item.quantidadeBoa, 0);
-              const perdas = lancamentos.reduce((total, item) => total + item.quantidadeRefugo, 0);
+              const declaradas = lancamentos.reduce((total, item) => total + item.quantidadeBoa, 0);
+              const boas = lancamentos.reduce((total, item) => total + boasConferidas(item), 0);
+              const perdas = lancamentos.reduce((total, item) => total + perdasEfetivas(item), 0);
+              const pendentesConferenciaNest = lancamentos.filter(item => item.apontamentoId === null).length;
               const planejado = nest.itens.reduce((total, item) => total + item.quantidadePlanejada, 0);
               const ops = [...new Set(nest.itens.map((item) => item.op.lote ?? item.op.modelo.codigo))];
               const apontadores = [...new Set(lancamentos.map((item) => item.funcionario.nome))];
@@ -271,7 +354,7 @@ export default async function PlasmaPage({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-bold tracking-wide text-white">{nest.codigo}</span>
-                        <span className={`rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${statusClass[nest.status] ?? statusClass.PROGRAMADO}`}>{statusLabel[nest.status] ?? nest.status}</span>
+                        <span className={`rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${pendentesConferenciaNest && nest.status === "CONCLUIDO" ? statusClass.PAUSADO : statusClass[nest.status] ?? statusClass.PROGRAMADO}`}>{pendentesConferenciaNest && nest.status === "CONCLUIDO" ? "Aguardando conferência" : statusLabel[nest.status] ?? nest.status}</span>
                       </div>
                       <p className="mt-0.5 truncate text-[11px] text-slate-500">{nest.setor.nome}</p>
                     </div>
@@ -289,8 +372,9 @@ export default async function PlasmaPage({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      <span><span className="font-mono text-[9px] uppercase tracking-wider text-slate-500">Cortadas </span><strong className="text-emerald-200">{numero(boas)}</strong><span className="text-slate-500">/{numero(planejado)}</span></span>
-                      <span><span className="font-mono text-[9px] uppercase tracking-wider text-slate-500">Pendentes </span><strong className="text-amber-200">{numero(Math.max(0, planejado - boas))}</strong></span>
+                      <span><span className="font-mono text-[9px] uppercase tracking-wider text-slate-500">Declaradas </span><strong className="text-sky-200">{numero(declaradas)}</strong><span className="text-slate-500">/{numero(planejado)}</span></span>
+                      <span><span className="font-mono text-[9px] uppercase tracking-wider text-slate-500">Liberadas </span><strong className="text-emerald-200">{numero(boas)}</strong></span>
+                      {pendentesConferenciaNest > 0 && <span><strong className="text-amber-200">{pendentesConferenciaNest} conferência(ões)</strong></span>}
                       {perdas > 0 && <span><span className="font-mono text-[9px] uppercase tracking-wider text-slate-500">Perdas </span><strong className="text-rose-200">{numero(perdas)}</strong></span>}
                     </div>
 

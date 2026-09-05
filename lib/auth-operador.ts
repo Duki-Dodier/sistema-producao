@@ -180,6 +180,8 @@ export async function exigirAdministrador() {
 
 export function destinoInicial(usuario: OperadorLogado) {
   if (usuario.administrador || usuario.papel === "PCP") return "/";
+  if (usuario.papel === "CONFERENTE") return "/plasma";
+  if (usuario.papel === "OPERADOR" && (ehSetor(usuario.setorNome, "Plasma Chapa") || ehSetor(usuario.setorNome, "Plasma Tubo"))) return "/plasma";
   return `/apontamentos?setor=${usuario.setorId}`;
 }
 
@@ -187,15 +189,16 @@ export function podeAcessarRota(usuario: OperadorLogado, pathname: string) {
   if (usuario.administrador) return true;
   if (pathname === "/login") return true;
   if (usuario.papel === "OPERADOR") {
-    if (pathname.startsWith("/plasma")) {
-      return ehSetor(usuario.setorNome, "Plasma Chapa") || ehSetor(usuario.setorNome, "Plasma Tubo");
-    }
-    return pathname.startsWith("/apontamentos");
+    const operadorDoPlasma = ehSetor(usuario.setorNome, "Plasma Chapa") || ehSetor(usuario.setorNome, "Plasma Tubo");
+    return operadorDoPlasma ? pathname.startsWith("/plasma") : pathname.startsWith("/apontamentos");
   }
   if (usuario.papel === "LIDER") {
     return ["/", "/monitoramento", "/plasma", "/ponteiras", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].some(
       (rota) => rota === "/" ? pathname === "/" : pathname.startsWith(rota),
     );
+  }
+  if (usuario.papel === "CONFERENTE") {
+    return pathname.startsWith("/plasma");
   }
   if (usuario.papel === "PCP") return !pathname.startsWith("/configuracoes");
   return false;

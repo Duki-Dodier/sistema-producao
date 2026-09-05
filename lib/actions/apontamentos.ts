@@ -5,6 +5,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { ehSetor } from "@/lib/setores";
 import { processosDaPeca, PROCESSOS, type Processo } from "@/lib/processos";
 import { exigirUsuarioLogado } from "@/lib/auth-operador";
+import { exigirCorteCompleto } from "@/lib/plasma-saldo";
 
 const revalidarApontamentos = () => {
   revalidatePath("/apontamentos");
@@ -140,10 +141,14 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
     throw new Error("O início do processo informado é inválido.");
   }
 
-  const maquinasAtivas = await prisma.maquina.findMany({
-    where: { setorId, ativo: true },
-    select: { id: true },
-  });
+  const [setorApontamento, maquinasAtivas] = await Promise.all([
+    prisma.setor.findUnique({ where: { id: setorId }, select: { nome: true } }),
+    prisma.maquina.findMany({ where: { setorId, ativo: true }, select: { id: true } }),
+  ]);
+  if (!setorApontamento) throw new Error("Setor não encontrado.");
+  if (ehSetor(setorApontamento.nome, "Plasma Chapa") || ehSetor(setorApontamento.nome, "Plasma Tubo")) {
+    throw new Error("No Plasma, registre a produção pelo NEST para que o conferente possa liberar o corte.");
+  }
   if (maquinasAtivas.length > 0 && maquinaId === null) {
     throw new Error("Selecione a máquina usada neste apontamento.");
   }
@@ -223,7 +228,7 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
             select: {
               roteiro: {
                 orderBy: { ordem: "asc" },
-                select: { id: true, setorId: true, processo: true, ordem: true },
+                select: { id: true, setorId: true, processo: true, ordem: true, setor: { select: { nome: true } } },
               },
             },
           },
@@ -276,6 +281,8 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
           _sum: { quantidadeBoa: true },
         });
         const liberado = totalAnterior._sum.quantidadeBoa ?? 0;
+        const anteriorEhPlasma = ehSetor(anterior.setor.nome, "Plasma Chapa") || ehSetor(anterior.setor.nome, "Plasma Tubo");
+        if (anteriorEhPlasma && anterior.processo.toUpperCase().includes("CORTE")) await exigirCorteCompleto(opId);
         if (atual + quantidadeBoa > liberado) {
           throw new Error(
             `A etapa anterior (${anterior.processo}) liberou somente ${liberado} peça(s).`,
@@ -491,9 +498,12 @@ export async function iniciarProducao(formData: FormData): Promise<ResultadoInic
 
     const maquina = await prisma.maquina.findFirst({
       where: { id: maquinaId, setorId, ativo: true },
-      select: { id: true },
+      select: { id: true, setor: { select: { nome: true } } },
     });
     if (!maquina) throw new Error("A máquina selecionada não pertence a este setor ou está inativa.");
+    if (ehSetor(maquina.setor.nome, "Plasma Chapa") || ehSetor(maquina.setor.nome, "Plasma Tubo")) {
+      throw new Error("No Plasma, inicie a operação pelo NEST para manter a rastreabilidade e a conferência.");
+    }
 
     const op = await prisma.oP.findUnique({
       where: { id: opId },
@@ -506,10 +516,11 @@ export async function iniciarProducao(formData: FormData): Promise<ResultadoInic
             pecas: {
               select: {
                 pecaId: true,
+                quantidadeNecessaria: true,
                 peca: {
                   select: {
                     setorId: true,
-                    roteiro: { select: { id: true, setorId: true, processo: true } },
+                    roteiro: { orderBy: { ordem: "asc" }, select: { id: true, setorId: true, processo: true, setor: { select: { nome: true } } } },
                   },
                 },
               },
@@ -530,6 +541,11 @@ export async function iniciarProducao(formData: FormData): Promise<ResultadoInic
       const etapa = pecaDaOp?.peca.roteiro.find((item) => item.id === roteiroEtapaId);
       if (!etapa || etapa.setorId !== setorId || etapa.processo !== processo) {
         throw new Error("Esta etapa não pertence à peça, ao setor ou ao processo selecionado.");
+      }
+      const indice = pecaDaOp?.peca.roteiro.findIndex(item => item.id === roteiroEtapaId) ?? -1;
+      const anterior = indice > 0 ? pecaDaOp?.peca.roteiro[indice - 1] : null;
+      if (pecaDaOp && anterior && (ehSetor(anterior.setor.nome, "Plasma Chapa") || ehSetor(anterior.setor.nome, "Plasma Tubo")) && anterior.processo.toUpperCase().includes("CORTE")) {
+        await exigirCorteCompleto(opId);
       }
     }
     if (pecaDaOp && processo === null) throw new Error("Selecione o processo da peça.");

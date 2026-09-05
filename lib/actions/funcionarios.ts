@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { PROCESSOS } from "@/lib/processos";
 import { criarSenhaHash, exigirUsuarioLogado, normalizarUsuario } from "@/lib/auth-operador";
 import { registrarAlteracao } from "@/lib/auditoria";
+import { ehSetor } from "@/lib/setores";
 
 export async function createFuncionario(formData: FormData) {
   const acesso = await exigirUsuarioLogado();
@@ -50,9 +51,9 @@ export async function createFuncionario(formData: FormData) {
   revalidatePath("/monitoramento");
 }
 
-const PAPEIS = ["OPERADOR", "LIDER", "PCP"] as const;
+const PAPEIS = ["OPERADOR", "LIDER", "PCP", "CONFERENTE"] as const;
 
-/** Define o papel (Operador/Líder/PCP) e o PIN de 4 dígitos do funcionário. */
+/** Define o papel e o PIN de 4 dígitos do funcionário. */
 export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   const acesso = await exigirUsuarioLogado();
   if (!acesso.administrador) throw new Error("Apenas o administrador pode alterar acessos.");
@@ -60,9 +61,10 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   const setorId = Number(formData.get("setorId"));
   const pinRaw = String(formData.get("pin") ?? "").trim();
   const bancadaRaw = String(formData.get("bancada") ?? "").trim();
-  const processos = PROCESSOS.filter((processo) =>
+  const processosInformados = PROCESSOS.filter((processo) =>
     formData.getAll("processos").map(String).includes(processo),
   );
+  const processos = papel === "CONFERENTE" ? [] : processosInformados;
 
   if (!PAPEIS.includes(papel as (typeof PAPEIS)[number]) || !Number.isInteger(setorId) || setorId <= 0) {
     throw new Error("Papel ou setor inválido.");
@@ -72,6 +74,16 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   }
   if (papel === "OPERADOR" && processos.length === 0) {
     throw new Error("Selecione ao menos um processo permitido para o operador.");
+  }
+  if (papel === "CONFERENTE") {
+    const setor = await prisma.setor.findUnique({ where: { id: setorId }, select: { nome: true } });
+    if (!setor || !ehSetor(setor.nome, "Plasma Chapa")) {
+      throw new Error("O conferente exclusivo deve pertencer ao setor Plasma Chapa.");
+    }
+    const outro = await prisma.funcionario.findFirst({
+      where: { id: { not: id }, ativo: true, papel: "CONFERENTE" }, select: { nome: true },
+    });
+    if (outro) throw new Error(`O conferente do Plasma já é ${outro.nome}. Altere essa pessoa primeiro.`);
   }
 
   await prisma.funcionario.update({
@@ -98,6 +110,10 @@ export async function toggleFuncionario(id: number) {
   if (!acesso.administrador) throw new Error("Apenas o administrador pode alterar funcionarios.");
   const f = await prisma.funcionario.findUnique({ where: { id } });
   if (!f) throw new Error("Funcionário não encontrado.");
+  if (!f.ativo && f.papel === "CONFERENTE") {
+    const outro = await prisma.funcionario.findFirst({ where: { id: { not: id }, ativo: true, papel: "CONFERENTE" }, select: { nome: true } });
+    if (outro) throw new Error(`O conferente do Plasma já é ${outro.nome}.`);
+  }
 
   await prisma.funcionario.update({
     where: { id },

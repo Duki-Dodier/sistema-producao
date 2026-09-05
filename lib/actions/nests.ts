@@ -6,8 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
 import { salvarPdf } from "@/lib/upload";
 import { registrarAlteracao } from "@/lib/auditoria";
+import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
+import { podeConferirPlasma } from "@/lib/plasma-regras";
 
-const STATUS_NEST = ["PROGRAMADO", "EM_CORTE", "PAUSADO", "CONCLUIDO", "CANCELADO"] as const;
+type StatusNest = "PROGRAMADO" | "EM_CORTE" | "PAUSADO" | "CONCLUIDO" | "CANCELADO";
 const EVENTOS_NEST = ["INICIO", "PAUSA", "RETORNO", "FIM", "CANCELAMENTO"] as const;
 
 function texto(valor: FormDataEntryValue | null, limite: number) {
@@ -56,8 +58,11 @@ function validarAcessoAoSetor(usuario: OperadorLogado, setor: { id: number; nome
   if (!setorEhPlasma(setor.nome)) {
     throw new Error("O nest deve pertencer ao Plasma Chapa ou ao Plasma Tubo.");
   }
-  if (!usuario.administrador && usuario.papel === "OPERADOR" && usuario.setorId !== setor.id) {
-    throw new Error("O operador só pode registrar atividades do seu próprio setor.");
+  if (!usuario.administrador && usuario.papel !== "PCP" && usuario.setorId !== setor.id) {
+    throw new Error("Este usuário só pode registrar atividades do próprio setor.");
+  }
+  if (usuario.papel === "CONFERENTE") {
+    throw new Error("O conferente registra apenas a conferência final do Plasma.");
   }
 }
 
@@ -66,6 +71,9 @@ function revalidarNests() {
   revalidatePath("/apontamentos");
   revalidatePath("/monitoramento");
   revalidatePath("/ponteiras");
+  revalidatePath("/agrupamento");
+  revalidatePath("/ops");
+  revalidatePath("/");
 }
 
 type ItemInformado = { opId: number; pecaId: number; quantidadePlanejada: number };
@@ -112,20 +120,17 @@ export async function criarNestCorte(formData: FormData) {
   if (!setor) throw new Error("Setor não encontrado.");
   validarAcessoAoSetor(usuario, setor);
 
-  let maquina = maquinaId && Number.isInteger(maquinaId)
+  const maquina = maquinaId && Number.isInteger(maquinaId)
     ? await prisma.maquina.findFirst({ where: { id: maquinaId, setorId, ativo: true }, select: { id: true } })
     : null;
-  if (!maquina) {
-    const codigoImportado = texto(formData.get("maquinaImportada"), 80);
-    if (!codigoImportado) throw new Error("Selecione uma máquina ou importe um PDF com a máquina informada.");
-    const existente = await prisma.maquina.findFirst({
-      where: { setorId, OR: [{ codigo: codigoImportado }, { nome: codigoImportado }] },
-      select: { id: true },
-    });
-    maquina = existente ?? await prisma.maquina.create({
-      data: { codigo: codigoImportado, nome: codigoImportado, setorId, ativo: true },
-      select: { id: true },
-    });
+  if (!maquina) throw new Error("Selecione uma máquina ativa cadastrada. A importação não cria máquinas.");
+
+  const demanda = await buscarDemandaPlasma();
+  for (const item of itens) {
+    const saldo = demanda.find(d => d.opId === item.opId && d.pecaId === item.pecaId && d.setorId === setorId);
+    if (!saldo || item.quantidadePlanejada > saldo.disponivel) {
+      throw new Error(`Saldo disponível para ${saldo?.codigo ?? "esta peça"}: ${saldo?.disponivel ?? 0}. Considere os NESTs já programados e os cortes aguardando conferência.`);
+    }
   }
 
   const ops = await prisma.oP.findMany({
@@ -353,7 +358,7 @@ export async function registrarEventoNest(formData: FormData) {
   if (!nest) throw new Error("Nest não encontrado.");
   validarAcessoAoSetor(usuario, nest.setor);
 
-  const transicoes: Record<(typeof EVENTOS_NEST)[number], (typeof STATUS_NEST)[number]> = {
+  const transicoes: Record<(typeof EVENTOS_NEST)[number], StatusNest> = {
     INICIO: "EM_CORTE",
     PAUSA: "PAUSADO",
     RETORNO: "EM_CORTE",
@@ -373,19 +378,10 @@ export async function registrarEventoNest(formData: FormData) {
   const novoStatus = transicoes[tipo as (typeof EVENTOS_NEST)[number]];
   const agora = new Date();
 
-  await prisma.$transaction([
-    prisma.nestEvento.create({
-      data: { nestId, funcionarioId: usuario.id, tipo, descricao: texto(formData.get("descricao"), 500) || null, dataHora: agora },
-    }),
-    prisma.nestCorte.update({
-      where: { id: nestId },
-      data: {
-        status: novoStatus,
-        ...(tipo === "INICIO" && !nest.iniciadoEm ? { iniciadoEm: agora } : {}),
-        ...(tipo === "FIM" || tipo === "CANCELAMENTO" ? { finalizadoEm: agora } : {}),
-      },
-    }),
-  ]);
+  // A migração 0046 valida e aplica a transição junto ao evento, atomicamente.
+  await prisma.nestEvento.create({
+    data: { nestId, funcionarioId: usuario.id, tipo, descricao: texto(formData.get("descricao"), 500) || null, dataHora: agora },
+  });
   await registrarAlteracao({ entidade: "NEST", entidadeId: nestId, acao: "ATUALIZADO", descricao: `Evento ${tipo} registrado no nest ${nestId}.`, usuario: usuario.nome, dadosDepois: { tipo, novoStatus } });
 
   revalidarNests();
@@ -411,6 +407,8 @@ export async function registrarLancamentoNest(formData: FormData) {
       id: true,
       opId: true,
       pecaId: true,
+      quantidadePlanejada: true,
+      lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true } },
       nest: { select: { id: true, status: true, maquinaId: true, setorId: true, setor: { select: { id: true, nome: true } } } },
       peca: { select: { roteiro: { select: { id: true, setorId: true, processo: true } } } },
     },
@@ -421,31 +419,16 @@ export async function registrarLancamentoNest(formData: FormData) {
     throw new Error("Inicie ou retome o nest antes de registrar as peças cortadas.");
   }
 
-  const etapa = item.peca.roteiro.find(
-    (registro) => registro.setorId === item.nest.setorId && registro.processo.toUpperCase().includes("CORTE"),
-  );
+  const registrado = item.lancamentos.reduce((soma, l) => soma + l.quantidadeBoa + l.quantidadeRefugo, 0);
+  if (registrado + quantidadeBoa + quantidadeRefugo > item.quantidadePlanejada) {
+    throw new Error(`Restam ${Math.max(0, item.quantidadePlanejada - registrado)} peças a declarar neste NEST.`);
+  }
+  if (quantidadeRefugo && !texto(formData.get("motivoRefugo"), 300)) throw new Error("Informe o motivo da perda.");
   const agora = new Date();
-  const apontamento = await prisma.apontamento.create({
-    data: {
-      opId: item.opId,
-      setorId: item.nest.setorId,
-      funcionarioId: usuario.id,
-      usuario: usuario.nome,
-      quantidadeBoa,
-      quantidadeRefugo,
-      dataHora: agora,
-      pecaId: item.pecaId,
-      processo: "CORTE",
-      roteiroEtapaId: etapa?.id,
-      origem: tipo === "RETRABALHO" ? "NEST_RETRABALHO" : "NEST",
-      maquinaId: item.nest.maquinaId,
-    },
-  });
   await prisma.nestLancamento.create({
     data: {
       nestItemId,
       funcionarioId: usuario.id,
-      apontamentoId: apontamento.id,
       tipo,
       quantidadeBoa,
       quantidadeRefugo,
@@ -458,5 +441,30 @@ export async function registrarLancamentoNest(formData: FormData) {
 
   revalidarNests();
   revalidatePath(`/plasma/${item.nest.id}`);
+}
+
+export async function conferirLancamentoNest(formData: FormData) {
+  const usuario = await exigirUsuarioLogado();
+  const id = inteiro(formData.get("lancamentoId"), "Lançamento", 1);
+  const registro = await prisma.nestLancamento.findUnique({
+    where: { id }, include: { item: { include: { nest: { include: { setor: { select: { nome: true } } } } } } },
+  });
+  if (!registro) throw new Error("Lançamento não encontrado.");
+  if (!setorEhPlasma(registro.item.nest.setor.nome) || !podeConferirPlasma(usuario)) throw new Error("Seu usuário não tem acesso à conferência do Plasma.");
+  if (registro.funcionarioId === usuario.id) throw new Error("Outro usuário deve conferir este lançamento.");
+  if (registro.apontamentoId !== null) throw new Error("Este lançamento já foi conferido.");
+  if (!["CONCLUIDO", "CANCELADO"].includes(registro.item.nest.status)) throw new Error("Aguarde o encerramento do corte.");
+  const boas = inteiro(formData.get("quantidadeConferidaBoa"), "Boas conferidas");
+  const totalDeclarado = registro.quantidadeBoa + registro.quantidadeRefugo;
+  if (boas > totalDeclarado) throw new Error("As boas conferidas não podem superar o total declarado.");
+  const motivo = texto(formData.get("motivoConferencia"), 500);
+  if (boas !== registro.quantidadeBoa && !motivo) throw new Error("Informe o motivo da divergência.");
+  await prisma.nestLancamento.update({ where: { id }, data: {
+    conferenteId: usuario.id, conferidoEm: new Date(), quantidadeConferidaBoa: boas,
+    quantidadeConferidaRefugo: totalDeclarado - boas,
+    motivoConferencia: motivo || null,
+  } });
+  revalidarNests();
+  revalidatePath(`/plasma/${registro.item.nestId}`);
 }
 

@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ImportadorPdfLibellula } from "@/components/importador-pdf-libellula";
 import { criarNestCorte } from "@/lib/actions/nests";
 import type { DadosImportadosLibellula } from "@/lib/libellula-pdf";
@@ -8,7 +10,7 @@ import { rotuloMaquina } from "@/lib/maquinas";
 
 type Setor = { id: number; nome: string };
 type Maquina = { id: number; codigo: string; nome: string; setorId: number };
-type OpcaoItem = { referencia: string; setorId: number; opId: number; descricao: string; codigoPeca: string; quantidadePlanejada: number };
+type OpcaoItem = { referencia: string; setorId: number; opId: number; descricao: string; codigoPeca: string; imagemUrl: string | null; quantidadePlanejada: number; quantidadeNecessaria: number; perdas: number; reposicao: boolean };
 type OpcaoOP = { id: number; label: string; itens: OpcaoItem[] };
 type Linha = { id: number; referencia: string; quantidade: string; identificacaoPdf?: string };
 
@@ -16,10 +18,12 @@ export function NestForm({
   setores,
   maquinas,
   opcoesOP,
+  modoReposicao = false,
 }: {
   setores: Setor[];
   maquinas: Maquina[];
   opcoesOP: OpcaoOP[];
+  modoReposicao?: boolean;
 }) {
   type Resultado = { ok: true; mensagem: string } | { ok: false; mensagem: string };
   const [setorId, setSetorId] = useState(setores[0]?.id ?? 0);
@@ -29,9 +33,8 @@ export function NestForm({
   const [opsSelecionadas, setOpsSelecionadas] = useState<number[]>([]);
   const [maquinaImportada, setMaquinaImportada] = useState("");
   const [aviso, setAviso] = useState("");
-  const [etapa, setEtapa] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
-  const etapaRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const router = useRouter();
   const [resultado, acao, pendente] = useActionState<Resultado | null, FormData>(async (_anterior, formData) => {
     try {
       await criarNestCorte(formData);
@@ -40,6 +43,9 @@ export function NestForm({
       return { ok: false, mensagem: erro instanceof Error ? erro.message : "Não foi possível registrar o nest." };
     }
   }, null);
+  useEffect(() => {
+    if (resultado?.ok) router.push("/plasma?cadastrado=1");
+  }, [resultado, router]);
   const maquinasDoSetor = useMemo(() => maquinas.filter((maquina) => maquina.setorId === setorId), [maquinas, setorId]);
   const todasOpcoes = useMemo(() => opcoesOP.flatMap((op) => op.itens), [opcoesOP]);
   const opPorId = useMemo(() => new Map(opcoesOP.map((op) => [op.id, op])), [opcoesOP]);
@@ -73,12 +79,10 @@ export function NestForm({
         })
       : undefined;
     const setorImportado = maquina?.setorId ?? setores.find((setor) => dados.setor === "TUBO" ? setor.nome.toUpperCase().includes("TUBO") : setor.nome.toUpperCase().includes("CHAPA"))?.id ?? setorId;
-    if (maquina) {
-      setSetorId(maquina.setorId);
-      setMaquinaId(String(maquina.id));
-    }
+    setSetorId(setorImportado);
+    setMaquinaId(maquina ? String(maquina.id) : "");
     setMaquinaImportada(dados.maquina ?? "");
-    if (!maquina && dados.maquina) setAviso(`A máquina "${dados.maquina}" veio no PDF e será cadastrada automaticamente neste setor.`);
+    setAviso(!maquina && dados.maquina ? `A máquina "${dados.maquina}" do PDF não corresponde às máquinas cadastradas. Selecione a correta.` : "");
 
     preencherCampo("codigo", dados.codigo);
     preencherCampo("nomeArquivo", dados.nomeArquivo ?? dados.codigo);
@@ -150,6 +154,12 @@ export function NestForm({
     setLinhas((atual) => [...atual, { id: Math.max(0, ...atual.map((linha) => linha.id)) + 1, referencia: "", quantidade: "" }]);
   }
 
+  function vincularLinhaManual(linhaId: number, referencia: string) {
+    setLinhas((atual) => atual.map((item) => item.id === linhaId ? { ...item, referencia } : item));
+    const opId = itemPorReferencia.get(referencia)?.opId;
+    if (opId) setOpsSelecionadas((atual) => atual.includes(opId) ? atual : [...atual, opId]);
+  }
+
   function removerLinha(linha: Linha) {
     const novasLinhas = linhas.filter((item) => item.id !== linha.id);
     setLinhas(novasLinhas);
@@ -168,9 +178,20 @@ export function NestForm({
         {opcao ? (
           <>
             <input type="hidden" name="itemRef" value={linha.referencia} />
-            <div className="min-w-0">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{op?.label ?? "OP selecionada"}</p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-slate-100">{opcao.descricao}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="group/peca-preview relative h-16 w-20 shrink-0 transition-[width,height] duration-200 hover:h-32 hover:w-40 focus-within:h-32 focus-within:w-40" title={opcao.imagemUrl ? `Imagem da peça ${opcao.codigoPeca}` : "Sem imagem cadastrada para esta peça"}>
+                <a href={opcao.imagemUrl ?? undefined} target={opcao.imagemUrl ? "_blank" : undefined} tabIndex={opcao.imagemUrl ? 0 : -1} className="relative block h-full w-full overflow-hidden rounded border border-slate-700 bg-white transition group-hover/peca-preview:border-cyan-300 group-focus-within/peca-preview:border-cyan-300">
+                  {opcao.imagemUrl ? (
+                    <Image src={opcao.imagemUrl} alt={`Desenho da peça ${opcao.codigoPeca}`} fill sizes="160px" className="object-contain p-1" unoptimized />
+                  ) : (
+                    <div className="flex h-full items-center justify-center px-1 text-center text-[9px] font-semibold uppercase tracking-wide text-slate-600">Sem imagem</div>
+                  )}
+                </a>
+              </div>
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{op?.label ?? "OP selecionada"}</p>
+                <p className="mt-0.5 truncate text-sm font-semibold text-slate-100">{opcao.descricao}</p>
+              </div>
             </div>
           </>
         ) : (
@@ -179,7 +200,7 @@ export function NestForm({
             required
             className={inputClass}
             value={linha.referencia}
-            onChange={(event) => setLinhas((atual) => atual.map((item) => item.id === linha.id ? { ...item, referencia: event.target.value } : item))}
+            onChange={(event) => vincularLinhaManual(linha.id, event.target.value)}
           >
             <option value="">Vincular esta peça a uma OP</option>
             {todasOpcoes.filter((item) => item.setorId === setorId).map((item) => (
@@ -189,7 +210,7 @@ export function NestForm({
         )}
         <div>
           <input name="itemQuantidade" type="number" min="1" step="1" required placeholder="Qtd." aria-label={`Quantidade a programar da peça ${indice + 1}`} className={inputClass} value={linha.quantidade} onChange={(event) => setLinhas((atual) => atual.map((item) => item.id === linha.id ? { ...item, quantidade: event.target.value } : item))} />
-          {opcao && <span className="mt-1 block text-[10px] text-slate-500">Necessária pela OP: {opcao.quantidadePlanejada}</span>}
+          {opcao && <span className="mt-1 block text-xs text-slate-500">Saldo: {opcao.quantidadePlanejada} de {opcao.quantidadeNecessaria}{opcao.reposicao ? ` · ${opcao.perdas} perdida(s)` : ""}</span>}
         </div>
         <button
           type="button"
@@ -204,35 +225,12 @@ export function NestForm({
     );
   }
 
-  function validarEtapa(indice: number) {
-    const painel = etapaRefs.current[indice];
-    const invalido = painel?.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(":invalid");
-    if (!invalido) return true;
-    invalido.reportValidity();
-    invalido.focus();
-    return false;
-  }
-
-  function avancarEtapa() {
-    if (!validarEtapa(etapa)) return;
-    setAviso("");
-    setEtapa((atual) => Math.min(2, atual + 1));
-  }
-
-  function voltarEtapa() {
-    setAviso("");
-    setEtapa((atual) => Math.max(0, atual - 1));
-  }
-
   return (
     <form ref={formRef} action={acao} noValidate className="space-y-5" onSubmit={(event) => {
       const invalido = event.currentTarget.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(":invalid");
       if (invalido) {
         event.preventDefault();
         setAviso("Confira os campos obrigatórios. Se o PDF identificou uma peça, ainda falta vincular a OP correta.");
-        const painel = invalido.closest<HTMLElement>("[data-etapa]");
-        const etapaComErro = Number(painel?.dataset.etapa);
-        if (Number.isInteger(etapaComErro)) setEtapa(etapaComErro);
         window.setTimeout(() => { invalido.reportValidity(); invalido.focus(); }, 0);
       } else {
         setAviso("");
@@ -241,24 +239,14 @@ export function NestForm({
       <input type="hidden" name="setorId" value={setorId} />
       <input type="hidden" name="maquinaImportada" value={maquinaImportada} />
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        {["Identificação", "Dados técnicos", "OPs e peças"].map((nome, indice) => (
-          <button
-            key={nome}
-            type="button"
-            onClick={() => { if (indice <= etapa || validarEtapa(etapa)) { setAviso(""); setEtapa(indice); } }}
-            className={`rounded-lg border px-3 py-2 text-left transition ${etapa === indice ? "border-cyan-300 bg-cyan-400/15 text-cyan-100" : indice < etapa ? "border-emerald-400/30 bg-emerald-400/5 text-emerald-200" : "border-slate-700 bg-slate-950/20 text-slate-500 hover:border-slate-500"}`}
-          >
-            <span className="block font-mono text-[9px] font-bold uppercase tracking-wider">Etapa {indice + 1}</span>
-            <span className="mt-1 block text-xs font-semibold">{nome}</span>
-          </button>
-        ))}
-      </div>
-
-      <div ref={(node) => { etapaRefs.current[0] = node; }} data-etapa="0" hidden={etapa !== 0} className="space-y-4">
+      <section className="space-y-4 rounded-lg border border-cyan-400/25 bg-slate-950/20 p-4">
+        <div>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.13em] text-cyan-300">Etapa 1 · Identificação</p>
+          <p className="mt-1 text-xs text-slate-400">Informe os dados básicos do nest ou importe o relatório do Libellula.</p>
+        </div>
         <ImportadorPdfLibellula onImportar={importarPdf} />
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Campo label="Código do nest" dica="Ex.: NEST3530" obrigatorio>
             <input name="codigo" required placeholder="NEST3530" className={inputClass} />
           </Campo>
@@ -271,53 +259,61 @@ export function NestForm({
               {setores.map((setor) => <option key={setor.id} value={setor.id}>{setor.nome}</option>)}
             </select>
           </Campo>
-          <Campo label="Máquina">
-            <select name="maquinaId" className={inputClass} value={maquinaId} onChange={(event) => setMaquinaId(event.target.value)}>
-              <option value="">Usar máquina do PDF / selecione</option>
-              {maquinasDoSetor.map((maquina) => (
-                <option key={maquina.id} value={maquina.id}>{rotuloMaquina(maquina.codigo, maquina.nome)}</option>
-              ))}
-            </select>
-            {!maquinaId && maquinaImportada && <span className="mt-1 block text-[11px] text-cyan-200">Será criada a máquina informada no PDF: {maquinaImportada}</span>}
-          </Campo>
           <Campo label="Arquivo / referência">
             <input name="nomeArquivo" placeholder="NEST3530 - 6,35 - PLS 1" className={inputClass} />
           </Campo>
         </div>
-      </div>
-
-      <div ref={(node) => { etapaRefs.current[1] = node; }} data-etapa="1" hidden={etapa !== 1} className="space-y-4">
-        <section className="rounded-lg border border-slate-700/80 bg-slate-950/30 p-3">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.13em] text-cyan-300">Dados técnicos</p>
-          <p className="mt-1 text-xs text-slate-400">Se o PDF foi importado, confira os valores. O preenchimento manual é opcional, exceto a quantidade de chapas.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-            <Campo label="Material"><input name="material" defaultValue="Aço" className={inputClass} /></Campo>
-            <Campo label="Espessura (mm)"><input name="espessuraMm" type="number" min="0" step="any" placeholder="6,35" className={inputClass} /></Campo>
-            <Campo label="Largura (mm)"><input name="larguraChapaMm" type="number" min="0" step="any" placeholder="1205" className={inputClass} /></Campo>
-            <Campo label="Altura (mm)"><input name="alturaChapaMm" type="number" min="0" step="any" placeholder="2000" className={inputClass} /></Campo>
-            <Campo label="Chapas"><input name="quantidadeChapas" type="number" min="1" step="1" defaultValue="1" required className={inputClass} /></Campo>
-            <Campo label="Perfurações"><input name="numeroPiercings" type="number" min="0" step="1" placeholder="108" className={inputClass} /></Campo>
-            <Campo label="Peso chapa (kg)"><input name="pesoChapaKg" type="number" min="0" step="any" className={inputClass} /></Campo>
-            <Campo label="Peso peças (kg)"><input name="pesoPecasKg" type="number" min="0" step="any" className={inputClass} /></Campo>
-            <Campo label="Sobra (kg)"><input name="pesoSobraKg" type="number" min="0" step="any" className={inputClass} /></Campo>
-            <Campo label="Aproveitamento (%)"><input name="aproveitamentoPct" type="number" min="0" step="any" placeholder="79,21" className={inputClass} /></Campo>
-            <Campo label="Corte (mm)"><input name="comprimentoCorteMm" type="number" min="0" step="any" className={inputClass} /></Campo>
-            <Campo label="Movimento rápido (mm)"><input name="comprimentoRapidoMm" type="number" min="0" step="any" className={inputClass} /></Campo>
-            <Campo label="Tempo corte (seg.)"><input name="tempoCorteSegundos" type="number" min="0" step="1" placeholder="1326" className={inputClass} /></Campo>
-            <Campo label="Deslocamento (seg.)"><input name="tempoDeslocamentoSegundos" type="number" min="0" step="1" placeholder="275" className={inputClass} /></Campo>
+        <fieldset>
+          <legend className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Máquina de corte *</legend>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {maquinasDoSetor.map((maquina) => (
+              <label key={maquina.id} className={`cursor-pointer rounded-lg border p-3 transition ${maquinaId === String(maquina.id) ? "border-cyan-300 bg-cyan-400/10 text-white" : "border-slate-700 bg-[#111925] text-slate-300 hover:border-slate-500"}`}>
+                <input type="radio" name="maquinaId" value={maquina.id} required checked={maquinaId === String(maquina.id)} onChange={(event) => setMaquinaId(event.target.value)} className="sr-only" />
+                <span className="block text-sm font-bold">{rotuloMaquina(maquina.codigo, maquina.nome)}</span>
+                <span className="mt-1 block text-xs text-slate-500">Selecionar para esta programação</span>
+              </label>
+            ))}
           </div>
-        </section>
+          {!maquinaId && maquinaImportada && <span className="mt-2 block text-xs text-amber-200">Máquina lida no PDF: {maquinaImportada}. Confirme uma opção acima.</span>}
+        </fieldset>
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-cyan-400/25 bg-slate-950/20 p-4">
+        <div>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.13em] text-cyan-300">Etapa 2 · Dados principais</p>
+          <p className="mt-1 text-xs text-slate-400">Confira somente as informações essenciais. Os demais dados do PDF são mantidos automaticamente.</p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Campo label="Material"><input name="material" defaultValue="Aço" className={inputClass} /></Campo>
+          <Campo label="Espessura (mm)"><input name="espessuraMm" type="number" min="0" step="any" placeholder="6,35" className={inputClass} /></Campo>
+          <Campo label="Chapas"><input name="quantidadeChapas" type="number" min="1" step="1" defaultValue="1" required className={inputClass} /></Campo>
+          <Campo label="Largura (mm)"><input name="larguraChapaMm" type="number" min="0" step="any" placeholder="1205" className={inputClass} /></Campo>
+          <Campo label="Altura (mm)"><input name="alturaChapaMm" type="number" min="0" step="any" placeholder="2000" className={inputClass} /></Campo>
+          <Campo label="Aproveitamento (%)"><input name="aproveitamentoPct" type="number" min="0" step="any" placeholder="79,21" className={inputClass} /></Campo>
+        </div>
+
+        <div className="hidden" aria-hidden="true">
+          <input type="hidden" name="numeroPiercings" />
+          <input type="hidden" name="pesoChapaKg" />
+          <input type="hidden" name="pesoPecasKg" />
+          <input type="hidden" name="pesoSobraKg" />
+          <input type="hidden" name="comprimentoCorteMm" />
+          <input type="hidden" name="comprimentoRapidoMm" />
+          <input type="hidden" name="tempoCorteSegundos" />
+          <input type="hidden" name="tempoDeslocamentoSegundos" />
+        </div>
 
         <Campo label="Observações da programação">
           <textarea name="observacao" rows={2} placeholder="Material, prioridade, observações do operador ou do programa." className={`${inputClass} resize-y`} />
         </Campo>
-      </div>
+      </section>
 
-      <div ref={(node) => { etapaRefs.current[2] = node; }} data-etapa="2" hidden={etapa !== 2} className="rounded-lg border border-slate-700/80 bg-slate-950/30 p-3">
+      <section className="space-y-4 rounded-lg border border-cyan-400/25 bg-slate-950/20 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.13em] text-cyan-300">OPs e peças do Plasma</p>
-            <p className="mt-1 text-xs text-slate-400">Escolha uma OP para abrir automaticamente todas as suas peças de Plasma. Você pode adicionar mais de uma OP na mesma chapa.</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.13em] text-cyan-300">Etapa 3 · OPs e peças</p>
+            <p className="mt-1 text-sm text-slate-400">{modoReposicao ? "Adicione OPs com perdas e monte uma programação única de reposição." : "Escolha uma OP para abrir as peças que ainda possuem saldo de programação."}</p>
           </div>
           <button
             type="button"
@@ -354,6 +350,7 @@ export function NestForm({
                       key={op.id}
                       type="button"
                       role="option"
+                      aria-selected="false"
                       onClick={() => adicionarOp(String(op.id))}
                       className="flex w-full items-center justify-between gap-3 border-b border-slate-700/60 px-3 py-2 text-left last:border-b-0 hover:bg-cyan-400/10"
                     >
@@ -386,21 +383,19 @@ export function NestForm({
             );
           })}
 
-          {linhas.filter((linha) => !itemPorReferencia.has(linha.referencia)).map((linha, indice) => renderLinha(linha, indice))}
+          {linhas.filter((linha) => {
+            const opId = itemPorReferencia.get(linha.referencia)?.opId;
+            return !opId || !opsSelecionadas.includes(opId);
+          }).map((linha, indice) => renderLinha(linha, indice))}
           {!linhas.length && <p className="rounded border border-amber-400/20 bg-amber-400/5 p-2 text-xs text-amber-200">Adicione uma OP ou vincule uma peça manualmente.</p>}
           {!opsDoSetor.length && <p className="rounded border border-amber-400/20 bg-amber-400/5 p-2 text-xs text-amber-200">Não há OPs abertas com peças de corte configuradas neste setor.</p>}
         </div>
-      </div>
+      </section>
 
-      <div className="flex items-center justify-between gap-3">
-        {etapa > 0 ? <button type="button" onClick={voltarEtapa} className="rounded border border-slate-600 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-300 hover:text-cyan-100">← Voltar</button> : <span />}
-        {etapa < 2 ? (
-          <button type="button" onClick={avancarEtapa} className="rounded bg-cyan-400 px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300">Próxima etapa →</button>
-        ) : (
-          <button type="submit" disabled={pendente} className="rounded bg-cyan-400 px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60">
-            {pendente ? "Registrando…" : "Registrar nest programado"}
-          </button>
-        )}
+      <div className="flex justify-end gap-3">
+        <button type="submit" disabled={pendente} className="rounded bg-cyan-400 px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60">
+          {pendente ? "Registrando…" : "Registrar nest programado"}
+        </button>
       </div>
       {(aviso || resultado) && <p role="status" className={`text-right text-xs ${resultado?.ok ? "text-emerald-200" : resultado && !resultado.ok ? "text-rose-200" : "text-amber-200"}`}>{resultado?.mensagem ?? aviso}</p>}
     </form>

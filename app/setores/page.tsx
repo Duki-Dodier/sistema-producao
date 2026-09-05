@@ -86,7 +86,7 @@ export default async function SetoresPage() {
                     {s.ordemPadrao}
                   </td>
                   <td className="px-5 py-3 font-medium text-slate-100">
-                    <Link href={`/setores/${s.id}`} className="hover:text-blue-600 hover:underline">
+                    <Link href={`/setores/${s.id}`} className="uppercase hover:text-blue-600 hover:underline">
                       {s.nome}
                     </Link>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">

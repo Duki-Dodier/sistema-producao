@@ -32,9 +32,11 @@ export function SidebarNav({
   const operadorDoPlasma = /PLASMA/i.test(setorNome);
   const itensVisiveis = administrador
     ? NAV_ITEMS
+    : papel === "CONFERENTE"
+      ? NAV_ITEMS.filter((item) => item.href === "/plasma")
     : papel === "OPERADOR"
       ? NAV_ITEMS.filter((item) =>
-          item.href === "/apontamentos" || (operadorDoPlasma && item.href === "/plasma"),
+          operadorDoPlasma ? item.href === "/plasma" : item.href === "/apontamentos",
       )
       : papel === "LIDER"
         ? NAV_ITEMS.filter((item) =>
