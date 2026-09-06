@@ -198,7 +198,7 @@ export function podeAcessarRota(usuario: OperadorLogado, pathname: string) {
     );
   }
   if (usuario.papel === "CONFERENTE") {
-    return pathname.startsWith("/plasma");
+    return pathname.startsWith("/plasma") || pathname.startsWith("/apontamentos");
   }
   if (usuario.papel === "PCP") return !pathname.startsWith("/configuracoes");
   return false;

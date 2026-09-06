@@ -15,7 +15,7 @@ declare global {
   }
 }
 
-function destinoConferencia(op: number | string, setor?: number | string, peca?: number | string, quantidade?: number | string) {
+function destinoApontamento(op: number | string, setor?: number | string, peca?: number | string, quantidade?: number | string) {
   const params = new URLSearchParams({ origem: "qrcode" });
   if (setor) params.set("setor", String(setor));
   if (peca) params.set("peca", String(peca));
@@ -34,7 +34,7 @@ function destinoDoQr(valor: string, modo: ModoScanner) {
     }
     if (dados && dados.op) {
       if (modo === "conferencia") {
-        return destinoConferencia(dados.op, dados.setor, dados.peca, dados.quantidade);
+        return destinoApontamento(dados.op, dados.setor, dados.peca, dados.quantidade);
       }
       const params = new URLSearchParams({ origem: "qrcode", op: String(dados.op) });
       if (dados.setor) params.set("setor", String(dados.setor));
@@ -57,7 +57,7 @@ function destinoDoQr(valor: string, modo: ModoScanner) {
     }
     if (url.pathname !== "/apontamentos" || !op || !/^\d+$/.test(op)) return null;
     if (modo === "conferencia") {
-      return destinoConferencia(
+      return destinoApontamento(
         op,
         url.searchParams.get("setor") ?? undefined,
         url.searchParams.get("peca") ?? undefined,

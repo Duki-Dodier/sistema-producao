@@ -10,8 +10,10 @@ import {
   type ProducaoAtivaKiosk,
 } from "@/components/operador-apontamento-kiosk";
 import { PlasmaApontamentoFabrica, type NestApontamentoFabrica } from "@/components/plasma-apontamento-fabrica";
+import { PlasmaConferenciaApontamentoFabrica } from "@/components/plasma-conferencia-apontamento-fabrica";
 import { HistoricoApontamentos } from "@/components/historico-apontamentos";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
+import { buscarConferenciaPlasmaFabrica } from "@/lib/plasma-conferencia-fabrica";
 
 export default async function ApontamentosPage({
   searchParams,
@@ -77,6 +79,27 @@ export default async function ApontamentosPage({
 
   const setorSolda = ehSetor(setor.nome, "Solda");
   const setorPlasmaChapa = ehSetor(setor.nome, "Plasma Chapa");
+
+  if (setorPlasmaChapa && operadorLogado?.papel === "CONFERENTE") {
+    const conferencia = Number.isInteger(opIdFiltro) && opIdFiltro > 0 && Number.isInteger(pecaIdFiltro) && pecaIdFiltro > 0
+      ? await buscarConferenciaPlasmaFabrica({ opId: opIdFiltro, pecaId: pecaIdFiltro, setorId: setor.id })
+      : null;
+
+    return (
+      <div className="flex flex-col gap-4 p-3 sm:gap-6 sm:p-6">
+        <PageHeader
+          title="Apontamentos da Fábrica"
+          subtitle="Conferência final do Plasma Chapa · sem iniciar corte e sem controle de tempo."
+        />
+        <div className="flex items-center gap-2 overflow-x-auto rounded-lg border border-amber-400/25 bg-[#202a36] p-3">
+          <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Setor do QR</span>
+          <span className="whitespace-nowrap rounded border border-amber-300/35 bg-amber-300/10 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-amber-100">Plasma Chapa</span>
+        </div>
+        <PlasmaConferenciaApontamentoFabrica dados={conferencia} />
+      </div>
+    );
+  }
+
   const [funcionarios, autorizadores, opsAbertas, maquinas, recentes, producaoAtiva, nestsPlasma] = await Promise.all([
     prisma.funcionario.findMany({
       where: {

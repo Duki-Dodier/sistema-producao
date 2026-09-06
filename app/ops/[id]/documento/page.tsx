@@ -284,19 +284,18 @@ export default async function DocumentoOPPage({
                     {setoresDaPeca.map((setorDaPeca) => {
                       const destinoApontamento = `/apontamentos?origem=qrcode&op=${op.id}&setor=${setorDaPeca.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`;
                       const plasmaChapa = ehSetor(setorDaPeca.setorNome, "Plasma Chapa");
-                      const destinoPlasmaConferencia = `/plasma/conferencia/op/${op.id}?origem=qrcode&setor=${setorDaPeca.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`;
                       return (
                       <div key={setorDaPeca.setorId} className={`flex items-start ${plasmaChapa ? "gap-2" : ""}`}>
                         <div className="w-24 shrink-0 text-center">
                           <div className="mx-auto h-20 w-20 rounded bg-white p-1 print:border print:border-slate-400">
-                            <QrCode value={`${appOrigin}${plasmaChapa ? destinoPlasmaConferencia : destinoApontamento}`} />
+                            <QrCode value={`${appOrigin}${destinoApontamento}`} />
                           </div>
                           <span className="mt-1 block text-[7px] font-bold uppercase leading-tight text-slate-600">
                             {setorDaPeca.setorNome}
                           </span>
                         </div>
-                        {plasmaChapa && <Link href={destinoPlasmaConferencia} className="nao-imprimir mt-6 inline-flex w-24 rounded border border-cyan-700/50 px-1.5 py-2 text-center text-[8px] font-bold uppercase leading-tight tracking-wide text-cyan-800 transition hover:bg-cyan-50" aria-label={`Abrir conferência do Plasma Chapa para a OP ${op.numeroSequencia}, peça ${peca.codigo}`}>
-                          Testar conferência
+                        {plasmaChapa && <Link href={destinoApontamento} className="nao-imprimir mt-6 inline-flex w-24 rounded border border-cyan-700/50 px-1.5 py-2 text-center text-[8px] font-bold uppercase leading-tight tracking-wide text-cyan-800 transition hover:bg-cyan-50" aria-label={`Abrir apontamento do Plasma Chapa para a OP ${op.numeroSequencia}, peça ${peca.codigo}`}>
+                          Testar apontamento
                         </Link>}
                       </div>
                       );
