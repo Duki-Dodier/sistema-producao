@@ -525,7 +525,7 @@ export async function conferirLancamentoNest(formData: FormData) {
   });
   if (!registro) throw new Error("Lançamento não encontrado.");
   if (!setorEhPlasma(registro.item.nest.setor.nome) || !podeConferirPlasma(usuario)) throw new Error("Seu usuário não tem acesso à conferência do Plasma.");
-  if (registro.funcionarioId === usuario.id) throw new Error("Outro usuário deve conferir este lançamento.");
+  if (!usuario.administrador && registro.funcionarioId === usuario.id) throw new Error("Outro usuário deve conferir este lançamento.");
   if (registro.apontamentoId !== null) throw new Error("Este lançamento já foi conferido.");
   if (!["CONCLUIDO", "CANCELADO"].includes(registro.item.nest.status)) throw new Error("Aguarde o encerramento do corte.");
   const valorRecebido = formData.get("quantidadeRecebida") ?? formData.get("quantidadeConferidaBoa");
@@ -655,7 +655,7 @@ export async function conferirOpPlasma(formData: FormData) {
     }))).sort((a, b) => +a.dataHora - +b.dataHora || a.id - b.id);
     const pendentes = lancamentos.filter((lancamento) => lancamento.apontamentoId === null);
     if (!pendentes.length) throw new Error("Todos os lançamentos desta OP já foram conferidos.");
-    if (pendentes.some((lancamento) => lancamento.funcionarioId === usuario.id)) {
+    if (!usuario.administrador && pendentes.some((lancamento) => lancamento.funcionarioId === usuario.id)) {
       throw new Error("Outro usuário deve conferir os lançamentos feitos pelo próprio conferente.");
     }
 
