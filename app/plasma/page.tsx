@@ -237,6 +237,41 @@ export default async function PlasmaPage({
         </div>
       </section>
 
+      <nav aria-label="Navegação do Plasma" className="rounded-xl border border-slate-700 bg-[#111925] p-1.5 shadow-lg shadow-black/10">
+        <div className="grid gap-1.5 sm:grid-cols-3">
+          {podeProgramar ? (
+            <Link href="/plasma/novo" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-cyan-400/45 bg-cyan-400/10 px-3 py-2.5 transition hover:border-cyan-300 hover:bg-cyan-400/20">
+              <span>
+                <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">Programar novo NEST</span>
+                <span className="mt-1 block text-xs text-slate-400">Criar uma nova programação</span>
+              </span>
+              <span aria-hidden="true" className="text-lg text-cyan-300 transition group-hover:translate-x-0.5">→</span>
+            </Link>
+          ) : (
+            <span className="flex min-h-14 items-center rounded-lg border border-slate-700 bg-slate-900/30 px-3 py-2.5 opacity-60">
+              <span>
+                <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Programar novo NEST</span>
+                <span className="mt-1 block text-xs text-slate-500">Acesso restrito</span>
+              </span>
+            </span>
+          )}
+          <Link href="/plasma#reposicao" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-rose-400/35 bg-rose-400/5 px-3 py-2.5 transition hover:border-rose-300 hover:bg-rose-400/10">
+            <span>
+              <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-200">Reposição</span>
+              <span className="mt-1 block text-xs text-slate-400">{totalReposicao ? `${numero(totalReposicao)} peça(s) para repor` : "Nenhuma peça pendente"}</span>
+            </span>
+            <span aria-hidden="true" className="text-lg text-rose-300 transition group-hover:translate-x-0.5">→</span>
+          </Link>
+          <Link href="/plasma#conferencia" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-amber-400/35 bg-amber-400/5 px-3 py-2.5 transition hover:border-amber-300 hover:bg-amber-400/10">
+            <span>
+              <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">Conferência</span>
+              <span className="mt-1 block text-xs text-slate-400">{pendenciasConferencia.length ? `${pendenciasConferencia.length} lançamento(s) pendente(s)` : "Nenhuma pendência"}</span>
+            </span>
+            <span aria-hidden="true" className="text-lg text-amber-300 transition group-hover:translate-x-0.5">→</span>
+          </Link>
+        </div>
+      </nav>
+
       {!conferentePlasma && (
         <section role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-400/35 bg-amber-400/10 px-4 py-3">
           <div><p className="text-sm font-semibold text-amber-100">Defina o conferente único do Plasma.</p><p className="mt-0.5 text-xs text-amber-100/75">Até essa pessoa ser designada, os cortes declarados ficarão aguardando liberação.</p></div>
@@ -336,7 +371,7 @@ export default async function PlasmaPage({
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-xl border border-amber-400/20 bg-[#202a36] shadow-lg shadow-black/10">
+        <section id="conferencia" className="scroll-mt-6 rounded-xl border border-amber-400/20 bg-[#202a36] shadow-lg shadow-black/10">
           <div className="flex items-center justify-between gap-3 border-b border-amber-400/15 px-4 py-3"><div><h3 className="text-base font-bold text-amber-100">Aguardando conferência</h3><p className="mt-1 text-sm text-slate-400">Só o conferente do Plasma transforma estes valores em produção oficial.</p></div><strong className="text-2xl text-amber-200">{pendenciasConferencia.length}</strong></div>
           <div className="divide-y divide-slate-700/70">
             {pendenciasConferencia.slice(0, 5).map(item => <Link key={item.id} href={`/plasma/${item.item.nest.id}#conferencia`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition hover:bg-amber-400/5"><span><strong className="text-slate-100">{item.item.nest.codigo}</strong><span className="ml-2 text-slate-400">{item.item.peca.codigo} · OP {item.item.op.lote ?? `#${item.item.opId}`}</span><span className="mt-1 block text-xs text-slate-500">{item.item.nest.setor.nome} · declarado por {item.funcionario.nome}</span></span><span className="shrink-0 font-bold text-amber-200">{item.quantidadeBoa} boas / {item.quantidadeRefugo} perdas</span></Link>)}
@@ -345,7 +380,7 @@ export default async function PlasmaPage({
           {pendenciasConferencia.length > 0 && <p className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500">{podeConferir ? "Seu usuário é o responsável por esta conferência." : conferentePlasma ? `Somente ${conferentePlasma.nome}, conferente designado, pode validar.` : "Aguardando a designação do conferente."}</p>}
         </section>
 
-        <section className="rounded-xl border border-rose-400/20 bg-[#202a36] shadow-lg shadow-black/10">
+        <section id="reposicao" className="scroll-mt-6 rounded-xl border border-rose-400/20 bg-[#202a36] shadow-lg shadow-black/10">
           <div className="flex items-center justify-between gap-3 border-b border-rose-400/15 px-4 py-3"><div><h3 className="text-base font-bold text-rose-100">Peças perdidas para repor</h3><p className="mt-1 text-sm text-slate-400">Fila consolidada para programar várias reposições juntas.</p></div><strong className="text-2xl text-rose-200">{numero(totalReposicao)}</strong></div>
           <div className="divide-y divide-slate-700/70">
             {reposicoes.slice(0, 5).map(item => <div key={`${item.setorId}:${item.referencia}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span><strong className="text-slate-100">{item.codigo}</strong><span className="ml-2 text-slate-400">{item.opLabel}</span></span><strong className="shrink-0 text-rose-200">{item.reposicao} a repor</strong></div>)}
