@@ -147,6 +147,46 @@ export default async function PlasmaReposicaoPage() {
         </section>
       </div>
 
+      <section className="rounded-xl border border-rose-400/25 bg-[#202a36] shadow-lg shadow-black/10" aria-labelledby="pecas-reposicao">
+        <header className="border-b border-rose-400/15 px-4 py-4 sm:px-5">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-rose-300">Fila para programar</p>
+          <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="pecas-reposicao" className="text-lg font-bold text-rose-100">Peças para fazer a reposição</h2>
+              <p className="mt-1 text-sm text-slate-400">Estas são as peças que ainda precisam ser cortadas novamente.</p>
+            </div>
+            <span className="text-sm font-semibold text-rose-200">{numero(totalReposicao)} a fazer</span>
+          </div>
+        </header>
+
+        {reposicoes.length > 0 ? (
+          <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+            {reposicoes.map((item) => (
+              <article key={`${item.setorId}:${item.referencia}`} className="rounded-xl border border-slate-700 bg-slate-950/25 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm font-bold text-cyan-100">{item.codigo}</p>
+                    <p className="mt-1 text-sm font-semibold text-white">{item.nome}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.opLabel}{item.medida ? ` · ${item.medida}` : ""}</p>
+                  </div>
+                  <div className="shrink-0 rounded-lg border border-rose-300/25 bg-rose-300/10 px-3 py-2 text-right">
+                    <strong className="block text-xl text-rose-200">{numero(item.reposicao)}</strong>
+                    <span className="text-[10px] uppercase tracking-wide text-slate-500">a fazer</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold">
+                  {item.reposicaoOperador > 0 && <span className="rounded border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-amber-100">Falta do operador: {numero(item.reposicaoOperador)}</span>}
+                  {item.reposicaoConferente > 0 && <span className="rounded border border-rose-300/25 bg-rose-300/10 px-2 py-1 text-rose-100">Falta do conferente: {numero(item.reposicaoConferente)}</span>}
+                  {item.conferenteNotificou && item.reposicaoOperador > 0 && item.reposicaoConferente === 0 && <span className="rounded border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-cyan-100">Conferente também notificou · sem duplicar</span>}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="p-5 text-sm text-emerald-100">Nenhuma peça pendente de reposição no Plasma Chapa.</div>
+        )}
+      </section>
+
       <section className="rounded-xl border border-slate-700/80 bg-slate-950/15 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
