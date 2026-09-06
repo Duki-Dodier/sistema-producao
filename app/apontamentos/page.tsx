@@ -14,6 +14,7 @@ import { PlasmaConferenciaApontamentoFabrica } from "@/components/plasma-confere
 import { HistoricoApontamentos } from "@/components/historico-apontamentos";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { buscarConferenciaPlasmaFabrica } from "@/lib/plasma-conferencia-fabrica";
+import { podeConferirPlasma } from "@/lib/plasma-regras";
 
 export default async function ApontamentosPage({
   searchParams,
@@ -80,7 +81,7 @@ export default async function ApontamentosPage({
   const setorSolda = ehSetor(setor.nome, "Solda");
   const setorPlasmaChapa = ehSetor(setor.nome, "Plasma Chapa");
 
-  if (setorPlasmaChapa && operadorLogado?.papel === "CONFERENTE") {
+  if (setorPlasmaChapa && Number.isInteger(opIdFiltro) && opIdFiltro > 0) {
     const conferencia = Number.isInteger(opIdFiltro) && opIdFiltro > 0 && Number.isInteger(pecaIdFiltro) && pecaIdFiltro > 0
       ? await buscarConferenciaPlasmaFabrica({ opId: opIdFiltro, pecaId: pecaIdFiltro, setorId: setor.id })
       : null;
@@ -95,7 +96,7 @@ export default async function ApontamentosPage({
           <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Setor do QR</span>
           <span className="whitespace-nowrap rounded border border-amber-300/35 bg-amber-300/10 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-amber-100">Plasma Chapa</span>
         </div>
-        <PlasmaConferenciaApontamentoFabrica dados={conferencia} />
+        <PlasmaConferenciaApontamentoFabrica dados={conferencia} podeConferir={podeConferirPlasma(operadorLogado)} />
       </div>
     );
   }

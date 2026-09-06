@@ -19,8 +19,10 @@ function dataHora(valor: string) {
 
 export function PlasmaConferenciaApontamentoFabrica({
   dados,
+  podeConferir,
 }: {
   dados: ConferenciaPlasmaFabrica | null;
+  podeConferir: boolean;
 }) {
   if (!dados) {
     return (
@@ -110,7 +112,9 @@ export function PlasmaConferenciaApontamentoFabrica({
       </div>
 
       <div className="border-t border-slate-700/80 p-4 sm:px-5">
-        {prontoParaConferir ? (
+        {!podeConferir ? (
+          <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 p-4 text-sm text-amber-100">Consulta da conferência carregada. Somente o usuário designado como <strong>CONFERENTE do Plasma Chapa</strong> pode registrar o total recebido e liberar a OP.</p>
+        ) : prontoParaConferir ? (
           <PlasmaConferenciaOPForm
             opId={dados.opId}
             pecaId={dados.pecaId}
