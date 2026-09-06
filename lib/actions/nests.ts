@@ -415,6 +415,8 @@ export async function registrarEventoNest(formData: FormData) {
 
   revalidarNests();
   revalidatePath(`/plasma/${nestId}`);
+  revalidatePath(`/plasma/operar/${nestId}`);
+  revalidatePath(`/plasma/apontar/${nestId}`);
 }
 
 export async function registrarLancamentoNest(formData: FormData) {
@@ -470,6 +472,8 @@ export async function registrarLancamentoNest(formData: FormData) {
 
   revalidarNests();
   revalidatePath(`/plasma/${item.nest.id}`);
+  revalidatePath(`/plasma/operar/${item.nest.id}`);
+  revalidatePath(`/plasma/apontar/${item.nest.id}`);
 }
 
 export async function conferirLancamentoNest(formData: FormData) {

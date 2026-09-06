@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { registrarEventoNest } from "@/lib/actions/nests";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { rotuloMaquina } from "@/lib/maquinas";
 import { boasConferidas, perdasEfetivas, segundosEfetivos } from "@/lib/plasma-regras";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
 import { TempoOperacao } from "@/components/tempo-operacao";
+import { PlasmaEventForm } from "@/components/plasma-event-form";
 
 const statusLabel: Record<string, string> = {
   PROGRAMADO: "Programado",
@@ -16,8 +16,15 @@ const statusLabel: Record<string, string> = {
   CANCELADO: "Cancelado",
 };
 
-export default async function OperacaoPlasmaMobilePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OperacaoPlasmaMobilePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ finalizado?: string }>;
+}) {
   const { id: idRaw } = await params;
+  const filtros = await searchParams;
   const id = Number(idRaw);
   if (!Number.isInteger(id)) notFound();
 
@@ -64,6 +71,13 @@ export default async function OperacaoPlasmaMobilePage({ params }: { params: Pro
           <Link href="/plasma" className="text-xs font-semibold text-cyan-200 hover:text-cyan-100">Painel Plasma</Link>
         </div>
 
+        {filtros?.finalizado === "1" && (
+          <div role="status" className="rounded-2xl border border-emerald-300/35 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+            <p className="font-bold">Corte finalizado com sucesso.</p>
+            <p className="mt-1 text-xs text-emerald-100/75">O tempo foi encerrado e o registro ficou salvo na rastreabilidade.</p>
+          </div>
+        )}
+
         <section className="rounded-2xl border border-cyan-400/25 bg-gradient-to-br from-[#1b3142] via-[#182735] to-[#111b2b] p-4 shadow-xl shadow-black/20">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -98,12 +112,7 @@ export default async function OperacaoPlasmaMobilePage({ params }: { params: Pro
 
         {!encerrado && podeOperar && <section className="rounded-2xl border border-slate-700 bg-[#111b2b] p-4">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Comando da máquina</p>
-          <form action={registrarEventoNest} className="mt-3 space-y-2">
-            <input type="hidden" name="nestId" value={nest.id} />
-            {nest.status === "PROGRAMADO" && <BotaoEvento tipo="INICIO" texto="Iniciar corte" className="bg-emerald-400 text-slate-950 hover:bg-emerald-300" />}
-            {nest.status === "EM_CORTE" && <div className="grid grid-cols-2 gap-2"><BotaoEvento tipo="PAUSA" texto="Pausar" className="border border-amber-300/40 text-amber-200 hover:bg-amber-300/10" /><BotaoEvento tipo="FIM" texto="Finalizar corte" className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" /></div>}
-            {nest.status === "PAUSADO" && <div className="grid grid-cols-2 gap-2"><BotaoEvento tipo="RETORNO" texto="Retomar" className="border border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10" /><BotaoEvento tipo="FIM" texto="Finalizar corte" className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" /></div>}
-          </form>
+          <PlasmaEventForm nestId={nest.id} status={nest.status as "PROGRAMADO" | "EM_CORTE" | "PAUSADO"} />
         </section>}
 
         {!encerrado && <Link href={`/plasma/apontar/${nest.id}`} className="block rounded-2xl border border-amber-300/35 bg-amber-300/10 p-4 transition hover:bg-amber-300/15"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">Produção do Plasma</p><p className="mt-1 text-base font-bold text-white">Registrar peças cortadas →</p><p className="mt-1 text-xs text-amber-100/70">Informe boas e perdas em uma tela própria.</p></Link>}
@@ -119,8 +128,4 @@ export default async function OperacaoPlasmaMobilePage({ params }: { params: Pro
 
 function Resumo({ titulo, valor, cor = "text-white" }: { titulo: string; valor: number; cor?: string }) {
   return <div className="rounded-xl border border-slate-700 bg-[#111b2b] p-3"><p className="font-mono text-[9px] uppercase tracking-wide text-slate-500">{titulo}</p><p className={`mt-1 text-xl font-black ${cor}`}>{valor}</p></div>;
-}
-
-function BotaoEvento({ tipo, texto, className }: { tipo: string; texto: string; className: string }) {
-  return <button type="submit" name="tipo" value={tipo} className={`min-h-12 w-full rounded-xl border px-3 py-3 text-sm font-bold transition ${className}`}>{texto}</button>;
 }
