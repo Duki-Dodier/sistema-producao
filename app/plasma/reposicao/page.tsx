@@ -187,20 +187,6 @@ export default async function PlasmaReposicaoPage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-slate-700/80 bg-slate-950/15 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Fluxo da reposição</p>
-            <h2 className="mt-1 text-base font-bold text-white">Como os números avançam</h2>
-          </div>
-          <span className="text-xs text-slate-500">Perda → programação → produção → liberação</span>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-rose-400/20 bg-rose-400/5 px-3 py-3"><p className="text-xs font-semibold text-rose-100">1. Falta registrada</p><p className="mt-1 text-xs text-slate-400">Operador ou conferente identifica a diferença.</p></div>
-          <div className="rounded-lg border border-sky-400/20 bg-sky-400/5 px-3 py-3"><p className="text-xs font-semibold text-sky-100">2. NEST programado</p><p className="mt-1 text-xs text-slate-400">As reposições podem ser agrupadas.</p></div>
-          <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-3 py-3"><p className="text-xs font-semibold text-emerald-100">3. Peça liberada</p><p className="mt-1 text-xs text-slate-400">Só entra como reposta após a conferência.</p></div>
-        </div>
-      </section>
     </div>
   );
 }
