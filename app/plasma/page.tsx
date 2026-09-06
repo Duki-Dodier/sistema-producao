@@ -4,7 +4,7 @@ import { rotuloMaquina } from "@/lib/maquinas";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
 import { DateFilter } from "@/components/date-filter";
-import { boasConferidas, perdasEfetivas, podeConferirPlasma, segundosEfetivos } from "@/lib/plasma-regras";
+import { boasConferidas, perdasEfetivas, segundosEfetivos } from "@/lib/plasma-regras";
 import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
 
 const statusLabel: Record<string, string> = {
@@ -184,7 +184,6 @@ export default async function PlasmaPage({
   const maquinasChapa = maquinas.filter(maquina => maquina.setorId === setorPlasmaChapa?.id);
   const reposicoes = demanda.filter(item => item.setorId === setorPlasmaChapa?.id && item.reposicao > 0);
   const totalReposicao = reposicoes.reduce((s, item) => s + item.reposicao, 0);
-  const podeConferir = podeConferirPlasma(usuario);
   const totalPaginas = Math.max(1, Math.ceil(totalNests / porPagina));
   const buscaDetalhada = Boolean(
     busca || dataInicioFiltro || dataFimFiltro || statusFiltro || (Number.isInteger(maquinaFiltro) && maquinaFiltro > 0) || (Number.isInteger(operadorFiltro) && operadorFiltro > 0) || (Number.isInteger(setorFiltro) && setorFiltro > 0),
@@ -229,45 +228,27 @@ export default async function PlasmaPage({
               <span className="rounded bg-cyan-400/10 px-2.5 py-1.5 text-cyan-200">4 OP liberada</span>
             </div>
           </div>
-          {podeProgramar && (
-            <Link href="/plasma/novo" className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300">
-              PROGRAMAR NOVO NEST <span aria-hidden="true">→</span>
-            </Link>
-          )}
         </div>
       </section>
 
-      <nav aria-label="Navegação do Plasma" className="rounded-xl border border-slate-700 bg-[#111925] p-1.5 shadow-lg shadow-black/10">
-        <div className="grid gap-1.5 sm:grid-cols-3">
+      <nav aria-label="Navegação do Plasma" className="border-b border-slate-700/80 pb-1">
+        <div className="grid gap-2 sm:grid-cols-3">
           {podeProgramar ? (
-            <Link href="/plasma/novo" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-cyan-400/45 bg-cyan-400/10 px-3 py-2.5 transition hover:border-cyan-300 hover:bg-cyan-400/20">
-              <span>
-                <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">Programar novo NEST</span>
-                <span className="mt-1 block text-xs text-slate-400">Criar uma nova programação</span>
-              </span>
-              <span aria-hidden="true" className="text-lg text-cyan-300 transition group-hover:translate-x-0.5">→</span>
+            <Link href="/plasma/novo" className="flex min-h-11 items-center justify-center rounded-md border border-cyan-400/45 bg-cyan-400/10 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100 transition hover:border-cyan-300 hover:bg-cyan-400/20">
+              PROGRAMAR NOVO NEST
             </Link>
           ) : (
-            <span className="flex min-h-14 items-center rounded-lg border border-slate-700 bg-slate-900/30 px-3 py-2.5 opacity-60">
-              <span>
-                <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">Programar novo NEST</span>
-                <span className="mt-1 block text-xs text-slate-500">Acesso restrito</span>
-              </span>
+            <span className="flex min-h-11 items-center justify-center rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 opacity-70">
+              PROGRAMAR NOVO NEST · ACESSO RESTRITO
             </span>
           )}
-          <Link href="/plasma/reposicao" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-rose-400/35 bg-rose-400/5 px-3 py-2.5 transition hover:border-rose-300 hover:bg-rose-400/10">
-            <span>
-              <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-200">Reposição</span>
-              <span className="mt-1 block text-xs text-slate-400">{totalReposicao ? `${numero(totalReposicao)} peça(s) para repor` : "Nenhuma peça pendente"}</span>
-            </span>
-            <span aria-hidden="true" className="text-lg text-rose-300 transition group-hover:translate-x-0.5">→</span>
+          <Link href="/plasma/reposicao" className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-rose-400/35 bg-rose-400/5 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-100 transition hover:border-rose-300 hover:bg-rose-400/10">
+            REPOSIÇÃO
+            <span className="rounded bg-rose-300/15 px-1.5 py-0.5 text-[9px] text-rose-200">{numero(totalReposicao)}</span>
           </Link>
-          <Link href="/plasma#conferencia" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-amber-400/35 bg-amber-400/5 px-3 py-2.5 transition hover:border-amber-300 hover:bg-amber-400/10">
-            <span>
-              <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">Conferência</span>
-              <span className="mt-1 block text-xs text-slate-400">{pendenciasConferencia.length ? `${pendenciasConferencia.length} lançamento(s) pendente(s)` : "Nenhuma pendência"}</span>
-            </span>
-            <span aria-hidden="true" className="text-lg text-amber-300 transition group-hover:translate-x-0.5">→</span>
+          <Link href="/plasma/conferencia" className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-400/35 bg-amber-400/5 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-100 transition hover:border-amber-300 hover:bg-amber-400/10">
+            CONFERÊNCIA
+            <span className="rounded bg-amber-300/15 px-1.5 py-0.5 text-[9px] text-amber-200">{pendenciasConferencia.length}</span>
           </Link>
         </div>
       </nav>
@@ -369,18 +350,6 @@ export default async function PlasmaPage({
           })}
         </div>
       </section>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section id="conferencia" className="scroll-mt-6 rounded-xl border border-amber-400/20 bg-[#202a36] shadow-lg shadow-black/10">
-          <div className="flex items-center justify-between gap-3 border-b border-amber-400/15 px-4 py-3"><div><h3 className="text-base font-bold text-amber-100">Aguardando conferência</h3><p className="mt-1 text-sm text-slate-400">Só o conferente do Plasma transforma estes valores em produção oficial.</p></div><strong className="text-2xl text-amber-200">{pendenciasConferencia.length}</strong></div>
-          <div className="divide-y divide-slate-700/70">
-            {pendenciasConferencia.slice(0, 5).map(item => <Link key={item.id} href={`/plasma/${item.item.nest.id}#conferencia`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition hover:bg-amber-400/5"><span><strong className="text-slate-100">{item.item.nest.codigo}</strong><span className="ml-2 text-slate-400">{item.item.peca.codigo} · OP {item.item.op.lote ?? `#${item.item.opId}`}</span><span className="mt-1 block text-xs text-slate-500">{item.item.nest.setor.nome} · declarado por {item.funcionario.nome}</span></span><span className="shrink-0 font-bold text-amber-200">{item.quantidadeBoa} boas / {item.quantidadeRefugo} perdas</span></Link>)}
-            {!pendenciasConferencia.length && <p className="px-4 py-7 text-center text-sm text-slate-500">Nenhum corte aguardando conferência.</p>}
-          </div>
-          {pendenciasConferencia.length > 0 && <p className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500">{podeConferir ? "Seu usuário é o responsável por esta conferência." : conferentePlasma ? `Somente ${conferentePlasma.nome}, conferente designado, pode validar.` : "Aguardando a designação do conferente."}</p>}
-        </section>
-
-      </div>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Indicador rotulo="NESTS ativos" valor={numero(nestsAtivos)} cor="text-cyan-200" />
