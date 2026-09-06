@@ -19,7 +19,10 @@ function destinoDoQr(valor: string) {
   if (!texto) return null;
 
   try {
-    const dados = JSON.parse(texto) as { op?: number | string; setor?: number | string; peca?: number | string; quantidade?: number | string };
+    const dados = JSON.parse(texto) as { op?: number | string; nest?: number | string; setor?: number | string; peca?: number | string; quantidade?: number | string };
+    if (dados && dados.nest) {
+      return `/plasma/operar/${encodeURIComponent(String(dados.nest))}?origem=qrcode`;
+    }
     if (dados && dados.op) {
       const params = new URLSearchParams({ origem: "qrcode", op: String(dados.op) });
       if (dados.setor) params.set("setor", String(dados.setor));
@@ -35,6 +38,11 @@ function destinoDoQr(valor: string) {
     const valorComoUrl = /^op=/i.test(texto) ? `/apontamentos?${texto}` : texto;
     const url = new URL(valorComoUrl, window.location.origin);
     const op = url.searchParams.get("op");
+    const rotaNest = /^\/plasma\/operar\/(\d+)$/.exec(url.pathname);
+    if (rotaNest) {
+      url.searchParams.set("origem", "qrcode");
+      return `${url.pathname}?${url.searchParams.toString()}`;
+    }
     if (url.pathname !== "/apontamentos" || !op || !/^\d+$/.test(op)) return null;
     url.searchParams.set("origem", "qrcode");
     return `${url.pathname}?${url.searchParams.toString()}`;

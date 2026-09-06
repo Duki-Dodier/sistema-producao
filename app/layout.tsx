@@ -24,7 +24,7 @@ export default async function RootLayout({
 }>) {
   const requestHeaders = await headers();
   const pathname = requestHeaders.get("x-mes-pathname") ?? "/";
-  const paginaApontamento = pathname.startsWith("/apontamentos");
+  const paginaApontamento = pathname.startsWith("/apontamentos") || pathname.startsWith("/plasma/operar") || pathname.startsWith("/plasma/apontar");
 
   if (pathname === "/login") {
     return (

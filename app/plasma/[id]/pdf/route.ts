@@ -30,7 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!nest) notFound();
 
   const origem = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || new URL(request.url).origin;
-  const qrDataUrl = await QRCode.toDataURL(`${origem}/plasma/${nest.id}?origem=qrcode`, {
+  const qrDataUrl = await QRCode.toDataURL(`${origem}/plasma/operar/${nest.id}?origem=qrcode`, {
     errorCorrectionLevel: "H", margin: 4, width: 640,
     color: { dark: "#0f1d34", light: "#ffffff" },
   });

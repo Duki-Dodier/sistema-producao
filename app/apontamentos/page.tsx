@@ -447,6 +447,14 @@ export default async function ApontamentosPage({
         )}
       </div>
 
+      <section className="flex flex-col gap-3 rounded-xl border border-cyan-400/20 bg-gradient-to-r from-cyan-400/10 to-transparent p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">Operação móvel do Plasma</p>
+          <p className="mt-1 text-sm text-slate-300">O operador pode ler o QR Code do NEST pelo celular e registrar o corte em uma tela própria.</p>
+        </div>
+        <Link href="/apontamentos/scanner?destino=plasma" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-cyan-300">Abrir scanner do Plasma</Link>
+      </section>
+
       <OperadorApontamentoKiosk
         setorId={setor.id}
         setorNome={setor.nome}
