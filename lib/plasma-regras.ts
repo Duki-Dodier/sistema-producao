@@ -87,6 +87,6 @@ export function segundosEfetivos(eventos: { tipo: string; dataHora: Date | strin
   return Math.floor(total / 1000);
 }
 
-export function podeConferirPlasma(usuario: { papel: string; setorNome: string } | null) {
-  return Boolean(usuario && usuario.papel === "CONFERENTE" && ehSetor(usuario.setorNome, "Plasma Chapa"));
+export function podeConferirPlasma(usuario: { papel: string; setorNome: string; administrador?: boolean } | null) {
+  return Boolean(usuario && (usuario.administrador || (usuario.papel === "CONFERENTE" && ehSetor(usuario.setorNome, "Plasma Chapa"))));
 }
