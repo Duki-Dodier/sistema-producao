@@ -46,8 +46,8 @@ export function PlasmaConferenciaOPForm({
         setErroLocal("");
       }
     }}>
-      <input type="hidden" name="opId" value={opId} />
-      <input type="hidden" name="pecaId" value={pecaId} />
+      <input type="hidden" name="opId" defaultValue={String(opId)} />
+      <input type="hidden" name="pecaId" defaultValue={String(pecaId)} />
       <div>
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">Conferência final da OP</p>
         <h3 className="mt-1 text-lg font-bold text-white">Informe o total recebido</h3>

@@ -596,8 +596,8 @@ export async function conferirOpPlasma(formData: FormData) {
   const motivo = texto(formData.get("motivoConferencia"), 500);
   const acaoConferencia = texto(formData.get("acaoConferencia"), 32);
 
-  const [setor, op] = await Promise.all([
-    prisma.setor.findFirst({ where: { nome: "Plasma Chapa" }, select: { id: true, nome: true } }),
+  const [setores, op] = await Promise.all([
+    prisma.setor.findMany({ select: { id: true, nome: true } }),
     prisma.oP.findUnique({
       where: { id: opId },
       select: {
@@ -615,7 +615,8 @@ export async function conferirOpPlasma(formData: FormData) {
       },
     }),
   ]);
-    if (!setor || !op) throw new Error("OP ou setor Plasma Chapa não encontrado.");
+    const setor = setores.find((item) => ehSetor(item.nome, "Plasma Chapa"));
+    if (!setor || !op) throw new Error(!setor ? "Setor Plasma Chapa não encontrado." : "OP não encontrada.");
 
     const componente = op.modelo.pecas[0];
     if (!componente) throw new Error("A peça informada não pertence à OP.");
