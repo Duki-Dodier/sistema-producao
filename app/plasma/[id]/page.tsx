@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { PlasmaConferenceForm } from "@/components/plasma-conference-form";
 import { Thumb } from "@/components/thumb";
 import { TempoOperacao } from "@/components/tempo-operacao";
-import { conferirLancamentoNest, registrarEventoNest, registrarLancamentoNest } from "@/lib/actions/nests";
+import { registrarEventoNest, registrarLancamentoNest } from "@/lib/actions/nests";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { rotuloMaquina } from "@/lib/maquinas";
 import { prisma } from "@/lib/prisma";
@@ -193,12 +194,11 @@ export default async function NestDetalhePage({
                     {item.lancamentos.length > 0 && (
                       <div className="mt-3 space-y-2">{item.lancamentos.map((lancamento) => <div key={lancamento.id} className={`rounded border p-3 ${lancamento.apontamentoId === null ? "border-amber-400/25 bg-amber-400/5" : "border-emerald-400/20 bg-emerald-400/5"}`}>
                         <div className="flex flex-wrap items-start justify-between gap-3 text-sm"><div><p className="font-semibold text-slate-200">{lancamento.funcionario.nome} · {dataHora(lancamento.dataHora)}</p><p className="mt-1 text-xs text-slate-500">{lancamento.tipo === "RETRABALHO" ? "Reposição" : "Produção"}{lancamento.motivoRefugo ? ` · ${lancamento.motivoRefugo}` : ""}</p></div><div className="text-right"><p><strong className="text-sky-200">{lancamento.quantidadeBoa}</strong> boas · <strong className="text-rose-200">{lancamento.quantidadeRefugo}</strong> perdas</p><p className={`mt-1 text-xs font-bold uppercase ${lancamento.apontamentoId === null ? "text-amber-200" : "text-emerald-200"}`}>{lancamento.apontamentoId === null ? "Aguardando conferência" : lancamento.conferente ? `Conferido por ${lancamento.conferente.nome}` : "Produção liberada (histórico)"}</p></div></div>
-                        {podeConferir && !emAberto && lancamento.apontamentoId === null && <form action={conferirLancamentoNest} className="mt-3 grid gap-2 border-t border-amber-400/15 pt-3 sm:grid-cols-[9rem_minmax(0,1fr)_auto]">
-                          <input type="hidden" name="lancamentoId" value={lancamento.id} />
-                          <label><span className={labelClass}>Boas confirmadas</span><input name="quantidadeConferidaBoa" type="number" min="0" max={lancamento.quantidadeBoa + lancamento.quantidadeRefugo} defaultValue={lancamento.quantidadeBoa} required className={inputClass} /></label>
-                          <label><span className={labelClass}>Motivo se houver diferença</span><input name="motivoConferencia" placeholder="Ex.: medida fora da tolerância" className={inputClass} /></label>
-                          <button type="submit" className="self-end rounded bg-amber-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-200">Conferir e liberar</button>
-                        </form>}
+                        {podeConferir && !emAberto && lancamento.apontamentoId === null && <PlasmaConferenceForm
+                          lancamentoId={lancamento.id}
+                          quantidadeBoa={lancamento.quantidadeBoa}
+                          quantidadeRefugo={lancamento.quantidadeRefugo}
+                        />}
                       </div>)}</div>
                     )}
                   </article>

@@ -17,6 +17,9 @@ export default async function PlasmaReposicaoPage() {
   const demanda = await buscarDemandaPlasma();
   const reposicoes = demanda.filter((item) => item.setorId === setorPlasmaChapa?.id && item.reposicao > 0);
   const totalReposicao = reposicoes.reduce((soma, item) => soma + item.reposicao, 0);
+  const totalReposicaoOperador = reposicoes.reduce((soma, item) => soma + item.reposicaoOperador, 0);
+  const totalReposicaoConferente = reposicoes.reduce((soma, item) => soma + item.reposicaoConferente, 0);
+  const itensConfirmadosPeloConferente = reposicoes.filter((item) => item.conferenteNotificou).length;
   const podeProgramar = Boolean(
     usuario && (usuario.administrador || usuario.papel === "PCP" || (["LIDER", "OPERADOR"].includes(usuario.papel) && setorIds.includes(usuario.setorId))),
   );
@@ -41,7 +44,12 @@ export default async function PlasmaReposicaoPage() {
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-rose-300">Fila de reposição do Plasma Chapa</p>
             <h2 className="mt-1 text-lg font-bold text-rose-100">Peças perdidas para repor</h2>
-            <p className="mt-1 text-sm text-slate-400">Perdas conferidas agrupadas por peça, OP e lote para uma nova programação.</p>
+            <p className="mt-1 text-sm text-slate-400">Perdas agrupadas por peça, OP e lote. A origem indica quem identificou a falta.</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
+              <span className="rounded border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-amber-100">Operador: {numero(totalReposicaoOperador)}</span>
+              <span className="rounded border border-rose-300/25 bg-rose-300/10 px-2 py-1 text-rose-100">Conferente: {numero(totalReposicaoConferente)}</span>
+              {itensConfirmadosPeloConferente > 0 && <span className="rounded border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-cyan-100">Conferente também notificou: {numero(itensConfirmadosPeloConferente)} item(ns)</span>}
+            </div>
           </div>
           <div className="text-right"><strong className="block text-3xl text-rose-200">{numero(totalReposicao)}</strong><span className="text-xs text-slate-500">peças a repor</span></div>
         </div>
@@ -52,6 +60,11 @@ export default async function PlasmaReposicaoPage() {
                 <strong className="text-slate-100">{item.codigo}</strong>
                 <span className="ml-2 text-sm text-slate-400">{item.nome}</span>
                 <p className="mt-1 text-xs text-slate-500">{item.opLabel}{item.medida ? ` · ${item.medida}` : ""}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold">
+                  {item.reposicaoOperador > 0 && <span className="rounded border border-amber-300/20 bg-amber-300/5 px-2 py-1 text-amber-100">Falta do operador: {numero(item.reposicaoOperador)}</span>}
+                  {item.reposicaoConferente > 0 && <span className="rounded border border-rose-300/20 bg-rose-300/5 px-2 py-1 text-rose-100">Falta do conferente: {numero(item.reposicaoConferente)}</span>}
+                  {item.conferenteNotificou && item.reposicaoOperador > 0 && item.reposicaoConferente === 0 && <span className="rounded border border-cyan-300/20 bg-cyan-300/5 px-2 py-1 text-cyan-100">Conferente também notificou · sem duplicar</span>}
+                </div>
               </div>
               <strong className="text-rose-200">{numero(item.reposicao)} a repor</strong>
             </div>

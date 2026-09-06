@@ -528,11 +528,14 @@ export async function conferirLancamentoNest(formData: FormData) {
   if (registro.funcionarioId === usuario.id) throw new Error("Outro usuário deve conferir este lançamento.");
   if (registro.apontamentoId !== null) throw new Error("Este lançamento já foi conferido.");
   if (!["CONCLUIDO", "CANCELADO"].includes(registro.item.nest.status)) throw new Error("Aguarde o encerramento do corte.");
-  const boas = inteiro(formData.get("quantidadeConferidaBoa"), "Boas conferidas");
+  const valorRecebido = formData.get("quantidadeRecebida") ?? formData.get("quantidadeConferidaBoa");
+  const recebidas = inteiro(valorRecebido, "Total recebido");
   const totalDeclarado = registro.quantidadeBoa + registro.quantidadeRefugo;
-  if (boas > totalDeclarado) throw new Error("As boas conferidas não podem superar o total declarado.");
+  if (recebidas > totalDeclarado) throw new Error("O total recebido não pode superar o total declarado.");
+  const faltaConferente = Math.max(0, registro.quantidadeBoa - recebidas);
+  const acaoConferencia = texto(formData.get("acaoConferencia"), 32);
   const motivo = texto(formData.get("motivoConferencia"), 500);
-  if (boas !== registro.quantidadeBoa && !motivo) throw new Error("Informe o motivo da divergência.");
+  if (recebidas !== registro.quantidadeBoa && !motivo) throw new Error("Informe o motivo da divergência.");
   const roteiroEtapa = await prisma.pecaRoteiro.findFirst({
     where: { pecaId: registro.item.pecaId, setorId: registro.item.nest.setorId, processo: "CORTE" },
     orderBy: { ordem: "asc" },
@@ -543,8 +546,8 @@ export async function conferirLancamentoNest(formData: FormData) {
     setorId: registro.item.nest.setorId,
     funcionarioId: usuario.id,
     usuario: usuario.nome,
-    quantidadeBoa: boas,
-    quantidadeRefugo: totalDeclarado - boas,
+    quantidadeBoa: recebidas,
+    quantidadeRefugo: totalDeclarado - recebidas,
     dataHora: new Date(),
     pecaId: registro.item.pecaId,
     processo: "CORTE",
@@ -553,8 +556,8 @@ export async function conferirLancamentoNest(formData: FormData) {
     maquinaId: registro.item.nest.maquinaId,
   } });
   await prisma.nestLancamento.update({ where: { id }, data: {
-    conferenteId: usuario.id, conferidoEm: new Date(), quantidadeConferidaBoa: boas,
-    quantidadeConferidaRefugo: totalDeclarado - boas,
+    conferenteId: usuario.id, conferidoEm: new Date(), quantidadeConferidaBoa: recebidas,
+    quantidadeConferidaRefugo: totalDeclarado - recebidas,
     motivoConferencia: motivo || null,
     apontamentoId: apontamento.id,
   } });
@@ -563,7 +566,7 @@ export async function conferirLancamentoNest(formData: FormData) {
       nestId: registro.item.nestId,
       funcionarioId: usuario.id,
       tipo: "CONFERENCIA",
-      descricao: `Lançamento ${id}: ${boas} boas / ${totalDeclarado - boas} perdas.${motivo ? ` ${motivo}` : ""}`,
+      descricao: `Lançamento ${id}: ${recebidas} recebidas / ${totalDeclarado - recebidas} perdas.${acaoConferencia === "falta" && faltaConferente > 0 ? ` Falta adicional do conferente: ${faltaConferente} peça(s) para reposição.` : ""}${acaoConferencia === "falta" && faltaConferente === 0 && registro.quantidadeRefugo > 0 ? " Conferente também notificou a falta já informada pelo operador; nenhuma reposição adicional foi criada." : ""}${motivo ? ` ${motivo}` : ""}`,
       dataHora: new Date(),
     },
   });
