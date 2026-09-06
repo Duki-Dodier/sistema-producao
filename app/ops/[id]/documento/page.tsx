@@ -281,16 +281,25 @@ export default async function DocumentoOPPage({
                     Roteiro de produção — {peca.codigo}
                   </h2>
                   <div className="flex items-start gap-2">
-                    {setoresDaPeca.map((setorDaPeca) => (
-                      <div key={setorDaPeca.setorId} className="w-24 text-center">
-                        <div className="mx-auto h-20 w-20 rounded bg-white p-1 print:border print:border-slate-400">
-                          <QrCode value={`${appOrigin}/apontamentos?origem=qrcode&op=${op.id}&setor=${setorDaPeca.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`} />
+                    {setoresDaPeca.map((setorDaPeca) => {
+                      const destinoApontamento = `/apontamentos?origem=qrcode&op=${op.id}&setor=${setorDaPeca.setorId}&peca=${peca.id}&quantidade=${peca.necessaria}`;
+                      const plasmaChapa = ehSetor(setorDaPeca.setorNome, "Plasma Chapa");
+                      return (
+                      <div key={setorDaPeca.setorId} className={`flex items-start ${plasmaChapa ? "gap-2" : ""}`}>
+                        <div className="w-24 shrink-0 text-center">
+                          <div className="mx-auto h-20 w-20 rounded bg-white p-1 print:border print:border-slate-400">
+                            <QrCode value={`${appOrigin}${destinoApontamento}`} />
+                          </div>
+                          <span className="mt-1 block text-[7px] font-bold uppercase leading-tight text-slate-600">
+                            {setorDaPeca.setorNome}
+                          </span>
                         </div>
-                        <span className="mt-1 block text-[7px] font-bold uppercase leading-tight text-slate-600">
-                          {setorDaPeca.setorNome}
-                        </span>
+                        {plasmaChapa && <Link href={destinoApontamento} className="nao-imprimir mt-6 inline-flex w-24 rounded border border-cyan-700/50 px-1.5 py-2 text-center text-[8px] font-bold uppercase leading-tight tracking-wide text-cyan-800 transition hover:bg-cyan-50" aria-label={`Abrir apontamento do Plasma Chapa para a OP ${op.numeroSequencia}, peça ${peca.codigo}`}>
+                          Testar no computador
+                        </Link>}
                       </div>
-                    ))}
+                      );
+                    })}
                     <div className="text-right">
                       <span className="block rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white print:border-2 print:border-slate-800 print:bg-white print:text-black">
                         ITEM {idx + 1} DE {paginasPecas.length}
