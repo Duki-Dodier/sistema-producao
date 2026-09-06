@@ -353,7 +353,14 @@ export async function registrarEventoNest(formData: FormData) {
 
   const nest = await prisma.nestCorte.findUnique({
     where: { id: nestId },
-    select: { id: true, status: true, iniciadoEm: true, setor: { select: { id: true, nome: true } } },
+    select: {
+      id: true,
+      status: true,
+      iniciadoEm: true,
+      maquinaId: true,
+      setor: { select: { id: true, nome: true } },
+      itens: { select: { quantidadePlanejada: true, lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true } } } },
+    },
   });
   if (!nest) throw new Error("Nest não encontrado.");
   validarAcessoAoSetor(usuario, nest.setor);
@@ -378,9 +385,31 @@ export async function registrarEventoNest(formData: FormData) {
   const novoStatus = transicoes[tipo as (typeof EVENTOS_NEST)[number]];
   const agora = new Date();
 
-  // A migração 0046 valida e aplica a transição junto ao evento, atomicamente.
+  if (["INICIO", "RETORNO"].includes(tipo)) {
+    const ocupante = await prisma.nestCorte.findFirst({
+      where: { maquinaId: nest.maquinaId, id: { not: nest.id }, status: { in: ["EM_CORTE", "PAUSADO"] } },
+      select: { codigo: true },
+    });
+    if (ocupante) throw new Error(`A máquina já está em uso pelo ${ocupante.codigo}.`);
+  }
+  if (tipo === "FIM") {
+    const incompletos = nest.itens.filter((item) => {
+      const total = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa + lancamento.quantidadeRefugo, 0);
+      return total !== item.quantidadePlanejada;
+    });
+    if (incompletos.length) throw new Error("Informe boas e perdas de todas as peças antes de finalizar.");
+  }
+
   await prisma.nestEvento.create({
     data: { nestId, funcionarioId: usuario.id, tipo, descricao: texto(formData.get("descricao"), 500) || null, dataHora: agora },
+  });
+  await prisma.nestCorte.update({
+    where: { id: nestId },
+    data: {
+      status: novoStatus,
+      iniciadoEm: tipo === "INICIO" ? (nest.iniciadoEm ?? agora) : undefined,
+      finalizadoEm: ["FIM", "CANCELAMENTO"].includes(tipo) ? agora : undefined,
+    },
   });
   await registrarAlteracao({ entidade: "NEST", entidadeId: nestId, acao: "ATUALIZADO", descricao: `Evento ${tipo} registrado no nest ${nestId}.`, usuario: usuario.nome, dadosDepois: { tipo, novoStatus } });
 
@@ -459,11 +488,40 @@ export async function conferirLancamentoNest(formData: FormData) {
   if (boas > totalDeclarado) throw new Error("As boas conferidas não podem superar o total declarado.");
   const motivo = texto(formData.get("motivoConferencia"), 500);
   if (boas !== registro.quantidadeBoa && !motivo) throw new Error("Informe o motivo da divergência.");
+  const roteiroEtapa = await prisma.pecaRoteiro.findFirst({
+    where: { pecaId: registro.item.pecaId, setorId: registro.item.nest.setorId, processo: "CORTE" },
+    orderBy: { ordem: "asc" },
+    select: { id: true },
+  });
+  const apontamento = await prisma.apontamento.create({ data: {
+    opId: registro.item.opId,
+    setorId: registro.item.nest.setorId,
+    funcionarioId: usuario.id,
+    usuario: usuario.nome,
+    quantidadeBoa: boas,
+    quantidadeRefugo: totalDeclarado - boas,
+    dataHora: new Date(),
+    pecaId: registro.item.pecaId,
+    processo: "CORTE",
+    roteiroEtapaId: roteiroEtapa?.id ?? null,
+    origem: "NEST_CONFERIDO",
+    maquinaId: registro.item.nest.maquinaId,
+  } });
   await prisma.nestLancamento.update({ where: { id }, data: {
     conferenteId: usuario.id, conferidoEm: new Date(), quantidadeConferidaBoa: boas,
     quantidadeConferidaRefugo: totalDeclarado - boas,
     motivoConferencia: motivo || null,
+    apontamentoId: apontamento.id,
   } });
+  await prisma.nestEvento.create({
+    data: {
+      nestId: registro.item.nestId,
+      funcionarioId: usuario.id,
+      tipo: "CONFERENCIA",
+      descricao: `Lançamento ${id}: ${boas} boas / ${totalDeclarado - boas} perdas.${motivo ? ` ${motivo}` : ""}`,
+      dataHora: new Date(),
+    },
+  });
   revalidarNests();
   revalidatePath(`/plasma/${registro.item.nestId}`);
 }
