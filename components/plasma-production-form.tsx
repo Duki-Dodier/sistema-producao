@@ -1,14 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { registrarLancamentoNest } from "@/lib/actions/nests";
+import { registrarLancamentoNestSeguro, type ResultadoLancamentoNest } from "@/lib/actions/nests";
 
-type ResultadoLancamento =
-  | { ok: true }
-  | { ok: false; mensagem: string };
-
-const ESTADO_INICIAL: ResultadoLancamento | null = null;
+const ESTADO_INICIAL: ResultadoLancamentoNest | null = null;
 
 export function PlasmaProductionForm({
   nestItemId,
@@ -19,17 +15,8 @@ export function PlasmaProductionForm({
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const [resultado, acao, pendente] = useActionState<ResultadoLancamento | null, FormData>(
-    async (_anterior, formData) => {
-      try {
-        await registrarLancamentoNest(formData);
-        return { ok: true };
-      } catch (erro) {
-        return { ok: false, mensagem: erro instanceof Error ? erro.message : "Não foi possível salvar a produção." };
-      }
-    },
-    ESTADO_INICIAL,
-  );
+  const [erroLocal, setErroLocal] = useState("");
+  const [resultado, acao, pendente] = useActionState(registrarLancamentoNestSeguro, ESTADO_INICIAL);
 
   useEffect(() => {
     if (!resultado?.ok) return;
@@ -38,7 +25,17 @@ export function PlasmaProductionForm({
   }, [resultado, router]);
 
   return (
-    <form ref={formRef} action={acao} className="mt-3 space-y-2 border-t border-slate-700/70 pt-3">
+    <form ref={formRef} action={acao} className="mt-3 space-y-2 border-t border-slate-700/70 pt-3" onSubmit={(event) => {
+      const dados = new FormData(event.currentTarget);
+      const boas = Number(dados.get("quantidadeBoa") ?? 0);
+      const perdas = Number(dados.get("quantidadeRefugo") ?? 0);
+      if (!boas && !perdas) {
+        event.preventDefault();
+        setErroLocal("Informe ao menos uma peça boa ou uma perda.");
+      } else {
+        setErroLocal("");
+      }
+    }}>
       <input type="hidden" name="nestItemId" value={nestItemId} />
       <input type="hidden" name="tipo" value="PRODUCAO" />
       <div className="grid grid-cols-2 gap-2">
@@ -55,7 +52,7 @@ export function PlasmaProductionForm({
       <button type="submit" disabled={pendente} className="min-h-11 w-full rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60">
         {pendente ? "Salvando..." : "Salvar quantidades"}
       </button>
-      {resultado && !resultado.ok && <p role="alert" className="rounded-lg border border-rose-300/25 bg-rose-400/10 p-2.5 text-xs leading-relaxed text-rose-100">{resultado.mensagem}</p>}
+      {(erroLocal || (resultado && !resultado.ok)) && <p role="alert" className="rounded-lg border border-rose-300/25 bg-rose-400/10 p-2.5 text-xs leading-relaxed text-rose-100">{erroLocal || (resultado && !resultado.ok ? resultado.mensagem : "")}</p>}
       {resultado?.ok && <p role="status" className="text-xs font-semibold text-emerald-200">Quantidades salvas.</p>}
     </form>
   );

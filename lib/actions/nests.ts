@@ -12,8 +12,25 @@ import { podeConferirPlasma } from "@/lib/plasma-regras";
 type StatusNest = "PROGRAMADO" | "EM_CORTE" | "PAUSADO" | "CONCLUIDO" | "CANCELADO";
 const EVENTOS_NEST = ["INICIO", "PAUSA", "RETORNO", "FIM", "CANCELAMENTO"] as const;
 
+export type ResultadoEventoNest =
+  | { ok: true; tipo: string }
+  | { ok: false; mensagem: string };
+
+export type ResultadoLancamentoNest =
+  | { ok: true }
+  | { ok: false; mensagem: string };
+
 function texto(valor: FormDataEntryValue | null, limite: number) {
   return String(valor ?? "").trim().slice(0, limite);
+}
+
+function ehRedirecionamento(erro: unknown) {
+  if (!erro || typeof erro !== "object" || !("digest" in erro)) return false;
+  return String(erro.digest).startsWith("NEXT_REDIRECT");
+}
+
+function mensagemDoErro(erro: unknown, padrao: string) {
+  return erro instanceof Error && erro.message ? erro.message : padrao;
 }
 
 function inteiro(valor: FormDataEntryValue | null, campo: string, minimo = 0) {
@@ -419,6 +436,16 @@ export async function registrarEventoNest(formData: FormData) {
   revalidatePath(`/plasma/apontar/${nestId}`);
 }
 
+export async function registrarEventoNestSeguro(_anterior: ResultadoEventoNest | null, formData: FormData): Promise<ResultadoEventoNest> {
+  try {
+    await registrarEventoNest(formData);
+    return { ok: true, tipo: texto(formData.get("tipo"), 24).toUpperCase() };
+  } catch (erro) {
+    if (ehRedirecionamento(erro)) throw erro;
+    return { ok: false, mensagem: mensagemDoErro(erro, "Não foi possível registrar o evento do NEST.") };
+  }
+}
+
 export async function registrarLancamentoNest(formData: FormData) {
   const usuario = await exigirUsuarioLogado();
   const nestItemId = inteiro(formData.get("nestItemId"), "Item do nest", 1);
@@ -474,6 +501,16 @@ export async function registrarLancamentoNest(formData: FormData) {
   revalidatePath(`/plasma/${item.nest.id}`);
   revalidatePath(`/plasma/operar/${item.nest.id}`);
   revalidatePath(`/plasma/apontar/${item.nest.id}`);
+}
+
+export async function registrarLancamentoNestSeguro(_anterior: ResultadoLancamentoNest | null, formData: FormData): Promise<ResultadoLancamentoNest> {
+  try {
+    await registrarLancamentoNest(formData);
+    return { ok: true };
+  } catch (erro) {
+    if (ehRedirecionamento(erro)) throw erro;
+    return { ok: false, mensagem: mensagemDoErro(erro, "Não foi possível salvar a produção.") };
+  }
 }
 
 export async function conferirLancamentoNest(formData: FormData) {

@@ -3,13 +3,9 @@
 import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { registrarEventoNest } from "@/lib/actions/nests";
+import { registrarEventoNestSeguro, type ResultadoEventoNest } from "@/lib/actions/nests";
 
-type ResultadoEvento =
-  | { ok: true; tipo: string }
-  | { ok: false; mensagem: string };
-
-const ESTADO_INICIAL: ResultadoEvento | null = null;
+const ESTADO_INICIAL: ResultadoEventoNest | null = null;
 
 export function PlasmaEventForm({
   nestId,
@@ -23,19 +19,7 @@ export function PlasmaEventForm({
   quantidadePendente: number;
 }) {
   const router = useRouter();
-  const [resultado, acao, pendente] = useActionState<ResultadoEvento | null, FormData>(
-    async (_anterior, formData) => {
-      const tipo = String(formData.get("tipo") ?? "");
-      try {
-        await registrarEventoNest(formData);
-        return { ok: true, tipo };
-      } catch (erro) {
-        const mensagem = erro instanceof Error ? erro.message : "Não foi possível registrar o evento.";
-        return { ok: false, mensagem };
-      }
-    },
-    ESTADO_INICIAL,
-  );
+  const [resultado, acao, pendente] = useActionState(registrarEventoNestSeguro, ESTADO_INICIAL);
 
   useEffect(() => {
     if (!resultado?.ok) return;
