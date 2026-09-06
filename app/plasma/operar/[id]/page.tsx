@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
 import { TempoOperacao } from "@/components/tempo-operacao";
 import { PlasmaEventForm } from "@/components/plasma-event-form";
+import { PlasmaProductionForm } from "@/components/plasma-production-form";
 
 const statusLabel: Record<string, string> = {
   PROGRAMADO: "Programado",
@@ -67,8 +68,7 @@ export default async function OperacaoPlasmaMobilePage({
     <main className="min-h-full bg-[#07101f] px-3 py-4 text-slate-100 sm:px-5 sm:py-6">
       <div className="mx-auto w-full max-w-lg space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/apontamentos" className="text-xs font-semibold text-slate-400 hover:text-cyan-200">← Apontamentos</Link>
-          <Link href="/plasma" className="text-xs font-semibold text-cyan-200 hover:text-cyan-100">Painel Plasma</Link>
+          <Link href="/plasma" className="text-xs font-semibold text-slate-400 hover:text-cyan-200">← Painel Plasma</Link>
         </div>
 
         {filtros?.finalizado === "1" && (
@@ -110,12 +110,20 @@ export default async function OperacaoPlasmaMobilePage({
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${planejado ? Math.min(100, Math.round(declarado / planejado * 100)) : 0}%` }} /></div>
         </section>
 
-        {!encerrado && podeOperar && <section className="rounded-2xl border border-slate-700 bg-[#111b2b] p-4">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Comando da máquina</p>
-          <PlasmaEventForm nestId={nest.id} status={nest.status as "PROGRAMADO" | "EM_CORTE" | "PAUSADO"} />
+        {!encerrado && <section className="rounded-2xl border border-amber-300/25 bg-[#111b2b] p-4">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">Produção do corte</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">Informe nesta mesma tela quantas peças saíram boas e quantas foram perdidas.</p>
+          {nest.status === "EM_CORTE" ? <div className="mt-3 space-y-3">{nest.itens.map((item) => {
+            const itemDeclarado = item.lancamentos.reduce((soma, l) => soma + l.quantidadeBoa + l.quantidadeRefugo, 0);
+            const itemRestante = Math.max(0, item.quantidadePlanejada - itemDeclarado);
+            return <div key={item.id} className="rounded-xl border border-slate-700 bg-slate-950/20 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold text-white">{item.peca.codigo}</p><p className="mt-1 text-xs text-slate-400">OP {item.op.numeroSequencia} · lote {item.op.lote ?? "-"}</p></div><p className="shrink-0 text-right text-xs text-slate-400">Já apontado<br /><strong className="text-cyan-100">{itemDeclarado}/{item.quantidadePlanejada}</strong></p></div>{itemRestante > 0 ? <PlasmaProductionForm nestItemId={item.id} restante={itemRestante} /> : <p className="mt-3 border-t border-slate-700/70 pt-3 text-xs font-semibold text-emerald-200">Quantidade deste item completa.</p>}</div>;
+          })}</div> : <p className="mt-3 rounded-xl border border-slate-700 bg-slate-950/20 p-3 text-xs text-slate-400">Inicie ou retome o corte para registrar as quantidades.</p>}
         </section>}
 
-        {!encerrado && <Link href={`/plasma/apontar/${nest.id}`} className="block rounded-2xl border border-amber-300/35 bg-amber-300/10 p-4 transition hover:bg-amber-300/15"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">Produção do Plasma</p><p className="mt-1 text-base font-bold text-white">Registrar peças cortadas →</p><p className="mt-1 text-xs text-amber-100/70">Informe boas e perdas em uma tela própria.</p></Link>}
+        {!encerrado && podeOperar && <section className="rounded-2xl border border-slate-700 bg-[#111b2b] p-4">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Comando da máquina</p>
+          <PlasmaEventForm nestId={nest.id} status={nest.status as "PROGRAMADO" | "EM_CORTE" | "PAUSADO"} podeFinalizar={declarado === planejado} quantidadePendente={Math.max(0, planejado - declarado)} />
+        </section>}
 
         <section className="rounded-2xl border border-slate-700 bg-[#111b2b] p-4">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Peças deste NEST</p>

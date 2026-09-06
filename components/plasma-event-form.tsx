@@ -14,9 +14,13 @@ const ESTADO_INICIAL: ResultadoEvento | null = null;
 export function PlasmaEventForm({
   nestId,
   status,
+  podeFinalizar,
+  quantidadePendente,
 }: {
   nestId: number;
   status: "PROGRAMADO" | "EM_CORTE" | "PAUSADO";
+  podeFinalizar: boolean;
+  quantidadePendente: number;
 }) {
   const router = useRouter();
   const [resultado, acao, pendente] = useActionState<ResultadoEvento | null, FormData>(
@@ -51,13 +55,13 @@ export function PlasmaEventForm({
       {status === "EM_CORTE" && (
         <div className="grid grid-cols-2 gap-2">
           <BotaoEvento tipo="PAUSA" texto={pendente ? "Aguarde..." : "Pausar"} className="border border-amber-300/40 text-amber-200 hover:bg-amber-300/10" disabled={pendente} />
-          <BotaoEvento tipo="FIM" texto={pendente ? "Finalizando..." : "Finalizar corte"} className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" disabled={pendente} />
+          {podeFinalizar ? <BotaoEvento tipo="FIM" texto={pendente ? "Finalizando..." : "Finalizar corte"} className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" disabled={pendente} /> : <PendenteFinalizacao quantidade={quantidadePendente} />}
         </div>
       )}
       {status === "PAUSADO" && (
         <div className="grid grid-cols-2 gap-2">
           <BotaoEvento tipo="RETORNO" texto={pendente ? "Aguarde..." : "Retomar"} className="border border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10" disabled={pendente} />
-          <BotaoEvento tipo="FIM" texto={pendente ? "Finalizando..." : "Finalizar corte"} className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" disabled={pendente} />
+          {podeFinalizar ? <BotaoEvento tipo="FIM" texto={pendente ? "Finalizando..." : "Finalizar corte"} className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" disabled={pendente} /> : <PendenteFinalizacao quantidade={quantidadePendente} />}
         </div>
       )}
       {resultado && !resultado.ok && (
@@ -72,6 +76,10 @@ export function PlasmaEventForm({
       )}
     </form>
   );
+}
+
+function PendenteFinalizacao({ quantidade }: { quantidade: number }) {
+  return <p className="col-span-2 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-3 text-center text-xs font-semibold leading-relaxed text-amber-100">Registre mais {quantidade} peça(s) em boas ou perdas para finalizar.</p>;
 }
 
 function BotaoEvento({
