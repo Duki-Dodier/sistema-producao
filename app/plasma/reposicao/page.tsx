@@ -142,7 +142,6 @@ export default async function PlasmaReposicaoPage() {
             ) : (
               <p className="text-sm leading-relaxed text-emerald-100">Nenhuma peça pendente de reposição no Plasma Chapa.</p>
             )}
-            {podeProgramar && reposicoes.length > 0 && <Link href="/plasma/novo?reposicao=1" className="mt-5 block rounded bg-rose-300 px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:bg-rose-200">Abrir programação consolidada</Link>}
           </div>
         </section>
       </div>

@@ -232,7 +232,7 @@ export default async function PlasmaPage({
       </section>
 
       <nav aria-label="Navegação do Plasma" className="border-b border-slate-700/80 pb-1">
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {podeProgramar ? (
             <Link href="/plasma/novo" className="flex min-h-11 items-center justify-center rounded-md border border-cyan-400/45 bg-cyan-400/10 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100 transition hover:border-cyan-300 hover:bg-cyan-400/20">
               PROGRAMAR NOVO NEST
@@ -249,6 +249,9 @@ export default async function PlasmaPage({
           <Link href="/plasma/conferencia" className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-400/35 bg-amber-400/5 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-100 transition hover:border-amber-300 hover:bg-amber-400/10">
             CONFERÊNCIA
             <span className="rounded bg-amber-300/15 px-1.5 py-0.5 text-[9px] text-amber-200">{pendenciasConferencia.length}</span>
+          </Link>
+          <Link href="/plasma/relatorio" className="flex min-h-11 items-center justify-center rounded-md border border-violet-400/35 bg-violet-400/5 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-violet-100 transition hover:border-violet-300 hover:bg-violet-400/10">
+            RELATÓRIOS
           </Link>
         </div>
       </nav>
