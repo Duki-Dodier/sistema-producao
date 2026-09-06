@@ -9,6 +9,7 @@ import {
   type ItemApontamentoOperador,
   type ProducaoAtivaKiosk,
 } from "@/components/operador-apontamento-kiosk";
+import { PlasmaApontamentoFabrica, type NestApontamentoFabrica } from "@/components/plasma-apontamento-fabrica";
 import { HistoricoApontamentos } from "@/components/historico-apontamentos";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 
@@ -75,7 +76,8 @@ export default async function ApontamentosPage({
   }
 
   const setorSolda = ehSetor(setor.nome, "Solda");
-  const [funcionarios, autorizadores, opsAbertas, maquinas, recentes, producaoAtiva] = await Promise.all([
+  const setorPlasmaChapa = ehSetor(setor.nome, "Plasma Chapa");
+  const [funcionarios, autorizadores, opsAbertas, maquinas, recentes, producaoAtiva, nestsPlasma] = await Promise.all([
     prisma.funcionario.findMany({
       where: {
         setorId: setor.id,
@@ -210,7 +212,26 @@ export default async function ApontamentosPage({
         quantidadePrevista: true,
       },
     }),
+    prisma.nestCorte.findMany({
+      where: { setorId: setorPlasmaChapa ? setor.id : -1, status: { in: ["PROGRAMADO", "EM_CORTE", "PAUSADO"] } },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        codigo: true,
+        status: true,
+        maquina: { select: { codigo: true, nome: true } },
+        itens: {
+          select: {
+            quantidadePlanejada: true,
+            op: { select: { numeroSequencia: true, lote: true } },
+            lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true } },
+          },
+        },
+      },
+    }),
   ]);
+
+  const nestsPlasmaParaApontamento = nestsPlasma as NestApontamentoFabrica[];
 
   const listaAutorizadores = autorizadores.map((a) => ({
     id: a.id,
@@ -447,44 +468,50 @@ export default async function ApontamentosPage({
         )}
       </div>
 
-      <section className="flex flex-col gap-3 rounded-xl border border-cyan-400/20 bg-gradient-to-r from-cyan-400/10 to-transparent p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">Operação móvel do Plasma</p>
-          <p className="mt-1 text-sm text-slate-300">O operador pode ler o QR Code do NEST pelo celular e registrar o corte em uma tela própria.</p>
-        </div>
-        <Link href="/apontamentos/scanner?destino=plasma" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-cyan-300">Abrir scanner do Plasma</Link>
-      </section>
+      {setorPlasmaChapa ? (
+        <PlasmaApontamentoFabrica nests={nestsPlasmaParaApontamento} />
+      ) : (
+        <>
+          <section className="flex flex-col gap-3 rounded-xl border border-cyan-400/20 bg-gradient-to-r from-cyan-400/10 to-transparent p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">Operação móvel do Plasma</p>
+              <p className="mt-1 text-sm text-slate-300">O operador pode ler o QR Code do NEST pelo celular e registrar o corte em uma tela própria.</p>
+            </div>
+            <Link href="/apontamentos/scanner?destino=plasma" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-cyan-300">Abrir scanner do Plasma</Link>
+          </section>
 
-      <OperadorApontamentoKiosk
-        setorId={setor.id}
-        setorNome={setor.nome}
-        operadores={funcionarios.map((f) => ({
-          id: f.id,
-          nome: f.nome,
-          temPin: Boolean(f.pin),
-          processosPermitidos: f.papel === "OPERADOR"
-            ? f.processosPermitidos.map((item) => item.processo)
-          : [...PROCESSOS],
-        }))}
-        sessao={operadorLogado ? {
-          id: operadorLogado.id,
-          nome: operadorLogado.nome,
-          temPin: operadorLogado.temPin,
-          processosPermitidos: operadorLogado.papel === "OPERADOR"
-            ? operadorLogado.processosPermitidos
-            : [...PROCESSOS],
-        } : undefined}
-        maquinas={maquinas}
-        producaoAtiva={producaoAtiva ? {
-          ...producaoAtiva,
-          iniciadoEm: producaoAtiva.iniciadoEm.toISOString(),
-        } as ProducaoAtivaKiosk : null}
-        itens={itensVisiveis}
-        opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
-        pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}
-        quantidadeInicial={quantidadeInicialValida}
-        modoQr={modoQr}
-      />
+          <OperadorApontamentoKiosk
+            setorId={setor.id}
+            setorNome={setor.nome}
+            operadores={funcionarios.map((f) => ({
+              id: f.id,
+              nome: f.nome,
+              temPin: Boolean(f.pin),
+              processosPermitidos: f.papel === "OPERADOR"
+                ? f.processosPermitidos.map((item) => item.processo)
+                : [...PROCESSOS],
+            }))}
+            sessao={operadorLogado ? {
+              id: operadorLogado.id,
+              nome: operadorLogado.nome,
+              temPin: operadorLogado.temPin,
+              processosPermitidos: operadorLogado.papel === "OPERADOR"
+                ? operadorLogado.processosPermitidos
+                : [...PROCESSOS],
+            } : undefined}
+            maquinas={maquinas}
+            producaoAtiva={producaoAtiva ? {
+              ...producaoAtiva,
+              iniciadoEm: producaoAtiva.iniciadoEm.toISOString(),
+            } as ProducaoAtivaKiosk : null}
+            itens={itensVisiveis}
+            opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
+            pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}
+            quantidadeInicial={quantidadeInicialValida}
+            modoQr={modoQr}
+          />
+        </>
+      )}
 
       <HistoricoApontamentos
         setorNome={setor.nome}
