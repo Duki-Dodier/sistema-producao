@@ -1,14 +1,22 @@
 -- Additive migration. Historical posted quantities are not rewritten.
+--> statement-breakpoint
 ALTER TABLE "NestLancamento" ADD COLUMN "conferenteId" INTEGER REFERENCES "Funcionario"("id");
+--> statement-breakpoint
 ALTER TABLE "NestLancamento" ADD COLUMN "conferidoEm" DATETIME;
+--> statement-breakpoint
 ALTER TABLE "NestLancamento" ADD COLUMN "quantidadeConferidaBoa" INTEGER;
+--> statement-breakpoint
 ALTER TABLE "NestLancamento" ADD COLUMN "quantidadeConferidaRefugo" INTEGER;
+--> statement-breakpoint
 ALTER TABLE "NestLancamento" ADD COLUMN "motivoConferencia" TEXT;
+--> statement-breakpoint
 CREATE INDEX "NestLancamento_pendente_idx" ON "NestLancamento"("nestItemId") WHERE "apontamentoId" IS NULL;
+--> statement-breakpoint
 CREATE UNIQUE INDEX "Funcionario_conferente_plasma_unico_idx" ON "Funcionario"("papel")
 WHERE "papel" = 'CONFERENTE' AND "ativo" = 1;
 
 -- One statement owns the event and transition, also under concurrent requests.
+--> statement-breakpoint
 CREATE TRIGGER "NestEvento_validar_operacao" BEFORE INSERT ON "NestEvento"
 WHEN NEW.tipo IN ('INICIO', 'PAUSA', 'RETORNO', 'FIM', 'CANCELAMENTO')
 BEGIN
@@ -31,8 +39,10 @@ BEGIN
   ) THEN RAISE(ABORT, 'Informe boas e perdas de todas as pecas antes de finalizar.') END;
 END;
 
+--> statement-breakpoint
 PRAGMA optimize;
 
+--> statement-breakpoint
 CREATE TRIGGER "NestEvento_aplicar_operacao" AFTER INSERT ON "NestEvento"
 WHEN NEW.tipo IN ('INICIO', 'PAUSA', 'RETORNO', 'FIM', 'CANCELAMENTO')
 BEGIN
@@ -44,6 +54,7 @@ BEGIN
     updatedAt = NEW.dataHora WHERE id = NEW.nestId;
 END;
 
+--> statement-breakpoint
 CREATE TRIGGER "NestLancamento_validar_declaracao" BEFORE INSERT ON "NestLancamento"
 BEGIN
   SELECT CASE WHEN NEW.quantidadeBoa < 0 OR NEW.quantidadeRefugo < 0 OR
@@ -59,6 +70,7 @@ END;
 
 -- Atomic conference + official posting + audit trail, without Prisma interactive
 -- transactions (unsupported by D1). A second confirmation cannot post twice.
+--> statement-breakpoint
 CREATE TRIGGER "NestLancamento_validar_conferencia" BEFORE UPDATE OF "conferidoEm" ON "NestLancamento"
 BEGIN
   SELECT CASE WHEN OLD.apontamentoId IS NOT NULL OR OLD.conferidoEm IS NOT NULL
@@ -78,6 +90,7 @@ BEGIN
   ) THEN RAISE(ABORT, 'Finalize o corte e use um usuario autorizado a conferir.') END;
 END;
 
+--> statement-breakpoint
 CREATE TRIGGER "NestLancamento_apontar_conferencia" AFTER UPDATE OF "conferidoEm" ON "NestLancamento"
 WHEN OLD.conferidoEm IS NULL AND NEW.conferidoEm IS NOT NULL
 BEGIN

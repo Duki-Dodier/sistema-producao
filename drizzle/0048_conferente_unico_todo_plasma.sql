@@ -1,8 +1,10 @@
 -- Um único usuário, lotado no Plasma Chapa, confere os NESTs de toda a área
 -- Plasma (Chapa e Tubo). Nenhum apontamento novo do Plasma pode contornar a
 -- conferência do NEST.
+--> statement-breakpoint
 DROP TRIGGER IF EXISTS "NestLancamento_validar_conferencia";
 
+--> statement-breakpoint
 CREATE TRIGGER "NestLancamento_validar_conferencia" BEFORE UPDATE OF "conferidoEm" ON "NestLancamento"
 BEGIN
   SELECT CASE WHEN OLD.apontamentoId IS NOT NULL OR OLD.conferidoEm IS NOT NULL
@@ -30,6 +32,7 @@ BEGIN
   ) THEN RAISE(ABORT, 'Finalize o corte e use o conferente designado do Plasma.') END;
 END;
 
+--> statement-breakpoint
 CREATE TRIGGER "Apontamento_exigir_conferencia_plasma" BEFORE INSERT ON "Apontamento"
 WHEN COALESCE(NEW.origem, '') != 'NEST_CONFERIDO' AND EXISTS (
   SELECT 1 FROM "Setor" s
@@ -39,4 +42,5 @@ BEGIN
   SELECT RAISE(ABORT, 'No Plasma, o apontamento oficial exige conferencia do NEST.');
 END;
 
+--> statement-breakpoint
 PRAGMA optimize;

@@ -1,7 +1,9 @@
 -- O conferente conta o total físico e pode corrigir a classificação nos dois
 -- sentidos: uma boa pode virar perda e uma perda declarada pode virar boa.
+--> statement-breakpoint
 DROP TRIGGER IF EXISTS "NestLancamento_validar_conferencia";
 
+--> statement-breakpoint
 CREATE TRIGGER "NestLancamento_validar_conferencia" BEFORE UPDATE OF "conferidoEm" ON "NestLancamento"
 BEGIN
   SELECT CASE WHEN OLD.apontamentoId IS NOT NULL OR OLD.conferidoEm IS NOT NULL
@@ -29,4 +31,5 @@ BEGIN
   ) THEN RAISE(ABORT, 'Finalize o corte e use o conferente designado do Plasma.') END;
 END;
 
+--> statement-breakpoint
 PRAGMA optimize;
