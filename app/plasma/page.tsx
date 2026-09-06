@@ -255,7 +255,7 @@ export default async function PlasmaPage({
               </span>
             </span>
           )}
-          <Link href="/plasma#reposicao" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-rose-400/35 bg-rose-400/5 px-3 py-2.5 transition hover:border-rose-300 hover:bg-rose-400/10">
+          <Link href="/plasma/reposicao" className="group flex min-h-14 items-center justify-between gap-3 rounded-lg border border-rose-400/35 bg-rose-400/5 px-3 py-2.5 transition hover:border-rose-300 hover:bg-rose-400/10">
             <span>
               <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-200">Reposição</span>
               <span className="mt-1 block text-xs text-slate-400">{totalReposicao ? `${numero(totalReposicao)} peça(s) para repor` : "Nenhuma peça pendente"}</span>
@@ -380,14 +380,6 @@ export default async function PlasmaPage({
           {pendenciasConferencia.length > 0 && <p className="border-t border-slate-700 px-4 py-2 text-xs text-slate-500">{podeConferir ? "Seu usuário é o responsável por esta conferência." : conferentePlasma ? `Somente ${conferentePlasma.nome}, conferente designado, pode validar.` : "Aguardando a designação do conferente."}</p>}
         </section>
 
-        <section id="reposicao" className="scroll-mt-6 rounded-xl border border-rose-400/20 bg-[#202a36] shadow-lg shadow-black/10">
-          <div className="flex items-center justify-between gap-3 border-b border-rose-400/15 px-4 py-3"><div><h3 className="text-base font-bold text-rose-100">Peças perdidas para repor</h3><p className="mt-1 text-sm text-slate-400">Fila consolidada para programar várias reposições juntas.</p></div><strong className="text-2xl text-rose-200">{numero(totalReposicao)}</strong></div>
-          <div className="divide-y divide-slate-700/70">
-            {reposicoes.slice(0, 5).map(item => <div key={`${item.setorId}:${item.referencia}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span><strong className="text-slate-100">{item.codigo}</strong><span className="ml-2 text-slate-400">{item.opLabel}</span></span><strong className="shrink-0 text-rose-200">{item.reposicao} a repor</strong></div>)}
-            {!reposicoes.length && <p className="px-4 py-7 text-center text-sm text-slate-500">Nenhuma perda pendente de reposição.</p>}
-          </div>
-          {podeProgramar && reposicoes.length > 0 && <div className="border-t border-slate-700 p-3"><Link href="/plasma/novo?reposicao=1" className="block rounded bg-rose-300 px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:bg-rose-200">Programar reposições juntas</Link></div>}
-        </section>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
