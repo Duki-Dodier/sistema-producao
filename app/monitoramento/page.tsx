@@ -1020,6 +1020,13 @@ async function RastreamentoOPs({
         },
       },
       apontamentos: true,
+      itensNest: {
+        select: {
+          pecaId: true,
+          quantidadePlanejada: true,
+          nest: { select: { setorId: true, status: true } },
+        },
+      },
     },
     orderBy: { numeroSequencia: "asc" },
   });

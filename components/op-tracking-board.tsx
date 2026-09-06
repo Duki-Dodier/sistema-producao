@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { OPRastreada, ProcessoProgresso } from "@/lib/rastreamento";
+import { ehSetor } from "@/lib/setores";
 
 const ESTADO_CLS: Record<ProcessoProgresso["estado"], string> = {
   concluido: "border-emerald-400/50 bg-emerald-400/15 text-emerald-300",
@@ -120,22 +121,46 @@ export function OPTrackingBoard({ itens }: { itens: OPRastreada[] }) {
                             </span>
                           </div>
                           <div className="flex min-w-max items-stretch gap-1 overflow-x-auto pb-1">
-                            {peca.processos.map((processo, processoIndex) => (
-                              <div key={processo.codigo} className="flex items-center gap-1">
-                                <div className={`min-w-28 rounded border px-2.5 py-2 ${ESTADO_CLS[processo.estado]}`}>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="font-mono text-[10px] font-bold uppercase">{processo.nome}</span>
-                                    <span>{processo.estado === "concluido" ? "✓" : processo.estado === "andamento" ? "●" : processo.estado === "proximo" ? "→" : "○"}</span>
+                            {peca.processos.map((processo, processoIndex) => {
+                              const ehProgramacaoPlasma =
+                                ehSetor(setor.setorNome, "Plasma Chapa") && processo.codigo === "CORTE";
+
+                              return (
+                                <div key={processo.codigo} className="flex items-center gap-1">
+                                  {ehProgramacaoPlasma && (
+                                    <>
+                                      <div
+                                        className={`min-w-36 rounded border px-2.5 py-2 ${processo.programado ? "border-emerald-400/70 bg-emerald-400/15 text-emerald-200 shadow-[0_0_14px_rgba(52,211,153,.12)]" : "border-amber-400/70 bg-amber-400/10 text-amber-200"}`}
+                                        title={processo.programado ? "NEST programado" : "Aguardando programação do NEST"}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="font-mono text-[10px] font-bold uppercase">Programação NEST</span>
+                                          <span>{processo.programado ? "✓" : "!"}</span>
+                                        </div>
+                                        <p className="mt-1 font-mono text-[9px] font-bold uppercase tracking-wider">
+                                          {processo.programado ? "NEST programado" : "NEST pendente"}
+                                        </p>
+                                      </div>
+                                      <span className="text-slate-600">→</span>
+                                    </>
+                                  )}
+                                  <div
+                                    className={`min-w-28 rounded border px-2.5 py-2 ${ESTADO_CLS[processo.estado]}`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-mono text-[10px] font-bold uppercase">{processo.nome}</span>
+                                      <span>{processo.estado === "concluido" ? "✓" : processo.estado === "andamento" ? "●" : processo.estado === "proximo" ? "→" : "○"}</span>
+                                    </div>
+                                    <p className="mt-1 font-mono text-[10px] opacity-80">
+                                      {processo.quantidade}/{processo.necessaria}
+                                    </p>
                                   </div>
-                                  <p className="mt-1 font-mono text-[10px] opacity-80">
-                                    {processo.quantidade}/{processo.necessaria}
-                                  </p>
+                                  {processoIndex < peca.processos.length - 1 && (
+                                    <span className="text-slate-600">→</span>
+                                  )}
                                 </div>
-                                {processoIndex < peca.processos.length - 1 && (
-                                  <span className="text-slate-600">→</span>
-                                )}
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       ))}

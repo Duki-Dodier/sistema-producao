@@ -48,7 +48,7 @@ export default async function NestDetalhePage({
         programador: { select: { nome: true } },
         itens: {
           include: {
-            op: { select: { id: true, lote: true, modelo: { select: { codigo: true, nome: true } } } },
+            op: { select: { id: true, numeroSequencia: true, lote: true, modelo: { select: { codigo: true, nome: true } } } },
             peca: { select: { codigo: true, nome: true, medida: true, imagemUrl: true } },
             lancamentos: { include: { funcionario: { select: { nome: true } }, conferente: { select: { nome: true } } }, orderBy: { dataHora: "desc" } },
           },
@@ -81,6 +81,23 @@ export default async function NestDetalhePage({
   const eventoConclusao = nest.eventos.find((evento) => evento.tipo === "FIM") ?? null;
   const tempoEfetivo = segundosEfetivos(nest.eventos);
   const aguardandoConferencia = todosLancamentos.filter(lancamento => lancamento.apontamentoId === null).length;
+  const opsDoNest = [...nest.itens.reduce((porOp, item) => {
+    const atual = porOp.get(item.op.id);
+    porOp.set(item.op.id, {
+      id: item.op.id,
+      numeroSequencia: item.op.numeroSequencia,
+      lote: item.op.lote,
+      modeloCodigo: item.op.modelo.codigo,
+      quantidadePlanejada: (atual?.quantidadePlanejada ?? 0) + item.quantidadePlanejada,
+    });
+    return porOp;
+  }, new Map<number, {
+    id: number;
+    numeroSequencia: number;
+    lote: string | null;
+    modeloCodigo: string;
+    quantidadePlanejada: number;
+  }>()).values()];
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-5 p-4 sm:p-6">
@@ -102,6 +119,23 @@ export default async function NestDetalhePage({
           </div>
           <span className={`rounded border px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${aguardandoConferencia && nest.status === "CONCLUIDO" ? "border-amber-300/30 bg-amber-300/10 text-amber-100" : "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"}`}>{aguardandoConferencia && nest.status === "CONCLUIDO" ? "Aguardando conferência" : statusLabel[nest.status] ?? nest.status}</span>
         </div>
+
+        {opsDoNest.length > 0 && (
+          <div className="mt-4">
+            <p className="font-mono text-xs font-bold uppercase tracking-wider text-slate-400">OPs vinculadas ao NEST</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {opsDoNest.map((op) => (
+                <div key={op.id} className="min-w-52 rounded-lg border border-cyan-400/25 bg-slate-950/25 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-mono text-sm font-bold text-cyan-200">OP {op.numeroSequencia}</span>
+                    <span className="font-mono text-sm font-bold text-white">{op.quantidadePlanejada} peças</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">Lote: <span className="font-semibold text-slate-200">{op.lote ?? "Sem lote"}</span> · {op.modeloCodigo}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-5 grid gap-2 sm:grid-cols-3 xl:grid-cols-8">
           <Dado titulo="Planejado" valor={String(totalPlanejado)} />

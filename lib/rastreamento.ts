@@ -8,6 +8,18 @@ export type ProcessoProgresso = {
   quantidade: number;
   necessaria: number;
   estado: "concluido" | "andamento" | "proximo" | "pendente";
+  programado: boolean;
+};
+
+type OPComNests = OPComDados & {
+  itensNest?: {
+    pecaId: number;
+    quantidadePlanejada: number;
+    nest: {
+      setorId: number;
+      status: string;
+    };
+  }[];
 };
 
 export type PecaRastreada = {
@@ -43,8 +55,9 @@ export type OPRastreada = {
   gargalo: PecaRastreada | null;
 };
 
-export function calcularRastreamento(ops: OPComDados[]): OPRastreada[] {
+export function calcularRastreamento(ops: OPComNests[]): OPRastreada[] {
   return ops.map((op) => {
+    const itensNest = op.itensNest ?? [];
     const pecasOriginais = op.modelo.pecas
       .map((mp) => {
         const necessaria = op.quantidade * mp.quantidadeNecessaria;
@@ -107,6 +120,13 @@ export function calcularRastreamento(ops: OPComDados[]): OPRastreada[] {
                 : index === primeiroIncompleto
                   ? "proximo"
                   : "pendente";
+          const programado = itensNest.some(
+            (item) =>
+              item.pecaId === mp.pecaId &&
+              item.quantidadePlanejada > 0 &&
+              item.nest.setorId === etapa.setorId &&
+              item.nest.status !== "CANCELADO",
+          );
           return {
             ...etapa,
             codigo: etapa.processo,
@@ -114,6 +134,7 @@ export function calcularRastreamento(ops: OPComDados[]): OPRastreada[] {
             quantidade,
             necessaria,
             estado,
+            programado,
           };
         });
         const porSetor = new Map<number, typeof processos>();
@@ -137,12 +158,13 @@ export function calcularRastreamento(ops: OPComDados[]): OPRastreada[] {
             necessaria,
             pronta,
             falta: Math.max(necessaria - pronta, 0),
-            processos: processosDoSetor.map(({ codigo, nome, quantidade, necessaria: total, estado }) => ({
+            processos: processosDoSetor.map(({ codigo, nome, quantidade, necessaria: total, estado, programado }) => ({
               codigo,
               nome,
               quantidade,
               necessaria: total,
               estado,
+              programado,
             })),
           } satisfies PecaRastreada;
         });

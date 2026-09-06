@@ -152,7 +152,16 @@ export default async function PlasmaPage({
     buscarDemandaPlasma(),
     prisma.nestCorte.findMany({
       where: { setorId: setorPlasmaChapa?.id ?? -1, status: { in: ["PROGRAMADO", "EM_CORTE", "PAUSADO"] } },
-      include: { maquina: { select: { id: true, codigo: true, nome: true } }, itens: { include: { lancamentos: true } }, eventos: { select: { tipo: true, dataHora: true } } },
+      include: {
+        maquina: { select: { id: true, codigo: true, nome: true } },
+        itens: {
+          include: {
+            op: { select: { numeroSequencia: true, lote: true } },
+            lancamentos: true,
+          },
+        },
+        eventos: { select: { tipo: true, dataHora: true } },
+      },
       orderBy: { createdAt: "asc" },
     }),
     prisma.nestLancamento.findMany({
@@ -250,20 +259,77 @@ export default async function PlasmaPage({
           <div><h3 className="text-base font-bold uppercase tracking-wide text-slate-100">Máquinas · Plasma Chapa</h3><p className="mt-1 text-sm text-slate-400">Situação das seis máquinas e sua fila programada.</p></div>
           <span className="rounded border border-slate-600 px-2.5 py-1 text-xs font-bold text-slate-300">{maquinasChapa.length} máquinas ativas</span>
         </div>
-        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid items-start gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
           {maquinasChapa.map(maquina => {
             const fila = operacaoMaquinas.filter(nest => nest.maquinaId === maquina.id);
-            const atual = fila.find(nest => ["EM_CORTE", "PAUSADO"].includes(nest.status)) ?? fila[0];
-            const planejado = atual?.itens.reduce((s, item) => s + item.quantidadePlanejada, 0) ?? 0;
-            const declarado = atual?.itens.flatMap(item => item.lancamentos).reduce((s, item) => s + item.quantidadeBoa + item.quantidadeRefugo, 0) ?? 0;
+            const prioridadeStatus: Record<string, number> = { EM_CORTE: 0, PAUSADO: 1, PROGRAMADO: 2 };
+            const filaOrdenada = [...fila].sort((a, b) =>
+              (prioridadeStatus[a.status] ?? 9) - (prioridadeStatus[b.status] ?? 9),
+            );
+            const atual = filaOrdenada[0];
             const cor = atual?.status === "EM_CORTE" ? "border-emerald-400/40" : atual?.status === "PAUSADO" ? "border-amber-400/40" : atual ? "border-sky-400/30" : "border-slate-700";
+            const nestsVisiveis = filaOrdenada.slice(0, 4);
+            const nestsExtras = filaOrdenada.slice(4);
+            const renderNest = (nestFila: (typeof filaOrdenada)[number], indice: number) => {
+              const planejado = nestFila.itens.reduce((s, item) => s + item.quantidadePlanejada, 0);
+              const declarado = nestFila.itens.flatMap(item => item.lancamentos).reduce((s, item) => s + item.quantidadeBoa + item.quantidadeRefugo, 0);
+              const ops = [...new Map(nestFila.itens.map(item => [item.op.numeroSequencia, item.op])).values()];
+              const resumoOps = ops.map(op => `OP ${op.numeroSequencia}${op.lote ? ` · lote ${op.lote}` : " · sem lote"}`).join(" | ");
+              const posicaoProgramada = filaOrdenada.slice(0, indice + 1).filter(item => item.status === "PROGRAMADO").length;
+              const rotuloFila = nestFila.status === "PROGRAMADO" ? `${posicaoProgramada}º da fila` : statusLabel[nestFila.status];
+              const corNest = nestFila.status === "EM_CORTE"
+                ? "border-emerald-400/35 bg-emerald-400/5"
+                : nestFila.status === "PAUSADO"
+                  ? "border-amber-400/35 bg-amber-400/5"
+                  : "border-sky-400/25 bg-sky-400/[.04]";
+              const tempoOperacao = tempo(segundosEfetivos(nestFila.eventos));
+
+              return (
+                <Link
+                  key={nestFila.id}
+                  href={`/plasma/${nestFila.id}`}
+                  title={`${nestFila.codigo} · ${statusLabel[nestFila.status]} · ${resumoOps} · ${numero(planejado)} peças · declarado ${numero(declarado)}/${numero(planejado)} · tempo ${tempoOperacao}`}
+                  className={`min-w-0 rounded-md border p-2.5 transition hover:border-cyan-300/60 hover:bg-cyan-400/10 ${corNest}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{rotuloFila}</span>
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${nestFila.status === "EM_CORTE" ? "bg-emerald-400" : nestFila.status === "PAUSADO" ? "bg-amber-400" : "bg-sky-400"}`} />
+                  </div>
+                  <div className="mt-1 flex items-end justify-between gap-2">
+                    <strong className="truncate font-mono text-sm text-cyan-100">{nestFila.codigo}</strong>
+                    <span className="shrink-0 font-mono text-xs font-bold text-white">{numero(planejado)} pç</span>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] text-slate-400">{resumoOps}</p>
+                  <div className="mt-2 h-1 overflow-hidden rounded bg-slate-800"><div className="h-full bg-cyan-400" style={{ width: `${planejado ? Math.min(100, Math.round(declarado / planejado * 100)) : 0}%` }} /></div>
+                </Link>
+              );
+            };
             return <article key={maquina.id} className={`rounded-lg border ${cor} bg-[#111925]/65 p-4`}>
-              <div className="flex items-start justify-between gap-2"><div><p className="text-base font-bold text-white">{rotuloMaquina(maquina.codigo, maquina.nome)}</p><p className="mt-1 text-xs text-slate-500">{fila.length > 1 ? `${fila.length - 1} NEST(s) na fila` : "Sem fila adicional"}</p></div><span className={`h-2.5 w-2.5 rounded-full ${atual?.status === "EM_CORTE" ? "bg-emerald-400" : atual?.status === "PAUSADO" ? "bg-amber-400" : atual ? "bg-sky-400" : "bg-slate-600"}`} /></div>
-              {atual ? <Link href={`/plasma/${atual.id}`} className="mt-4 block rounded border border-white/5 bg-black/15 p-3 transition hover:border-cyan-400/30">
-                <div className="flex items-center justify-between gap-2"><strong className="font-mono text-sm text-cyan-100">{atual.codigo}</strong><span className="text-xs font-bold uppercase text-slate-400">{statusLabel[atual.status]}</span></div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded bg-slate-800"><div className="h-full bg-cyan-400" style={{ width: `${planejado ? Math.min(100, Math.round(declarado / planejado * 100)) : 0}%` }} /></div>
-                <p className="mt-2 text-xs text-slate-400">Declarado {declarado}/{planejado} · tempo {tempo(segundosEfetivos(atual.eventos))}</p>
-              </Link> : <div className="mt-4 rounded border border-dashed border-slate-700 px-3 py-5 text-center text-sm text-slate-500">Disponível</div>}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-base font-bold text-white">{rotuloMaquina(maquina.codigo, maquina.nome)}</p>
+                  <p className="mt-1 text-xs text-slate-500">{filaOrdenada.length ? `${filaOrdenada.length} NEST(s) ativo(s)` : "Nenhum NEST programado"}</p>
+                </div>
+                <span className={`h-2.5 w-2.5 rounded-full ${atual?.status === "EM_CORTE" ? "bg-emerald-400" : atual?.status === "PAUSADO" ? "bg-amber-400" : atual ? "bg-sky-400" : "bg-slate-600"}`} />
+              </div>
+              {filaOrdenada.length ? (
+                <div className="mt-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {nestsVisiveis.map((nestFila, indice) => renderNest(nestFila, indice))}
+                  </div>
+                  {nestsExtras.length > 0 && (
+                    <details className="mt-2 overflow-hidden rounded-md border border-slate-700/80 bg-black/10">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/[.03] hover:text-cyan-100">
+                        <span>{nestsExtras.length === 1 ? "Ver mais 1 NEST" : `Ver mais ${nestsExtras.length} NESTs`}</span>
+                        <span aria-hidden="true" className="text-base leading-none text-cyan-300">＋</span>
+                      </summary>
+                      <div className="grid grid-cols-2 gap-2 border-t border-slate-700/70 p-2">
+                        {nestsExtras.map((nestFila, indice) => renderNest(nestFila, indice + 4))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              ) : <div className="mt-3 rounded border border-dashed border-slate-700 px-3 py-3 text-center text-sm text-slate-500">Máquina disponível</div>}
             </article>;
           })}
         </div>

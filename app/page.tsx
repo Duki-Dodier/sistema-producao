@@ -42,6 +42,13 @@ export default async function PainelPcpPage({
           },
         },
         apontamentos: true,
+        itensNest: {
+          select: {
+            pecaId: true,
+            quantidadePlanejada: true,
+            nest: { select: { setorId: true, status: true } },
+          },
+        },
       },
     }),
     prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } }),

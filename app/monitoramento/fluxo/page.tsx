@@ -41,6 +41,13 @@ async function FluxoProducaoAtual({ searchParams }: FluxoPageProps) {
           },
         },
         apontamentos: true,
+        itensNest: {
+          select: {
+            pecaId: true,
+            quantidadePlanejada: true,
+            nest: { select: { setorId: true, status: true } },
+          },
+        },
       },
       orderBy: { numeroSequencia: "asc" },
     }),
@@ -127,6 +134,13 @@ async function FluxoFabricaAnterior({
           },
         },
         apontamentos: true,
+        itensNest: {
+          select: {
+            pecaId: true,
+            quantidadePlanejada: true,
+            nest: { select: { setorId: true, status: true } },
+          },
+        },
       },
       orderBy: { numeroSequencia: "asc" },
     }),
