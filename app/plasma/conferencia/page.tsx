@@ -28,7 +28,10 @@ export default async function PlasmaConferenciaPage() {
           <h1 className="mt-1 text-2xl font-bold uppercase text-white">CONFERÊNCIA</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-400">Valide os resultados declarados pelo operador antes de liberar a produção para o restante da fábrica.</p>
         </div>
-        <Link href="/plasma" className="rounded border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-300 hover:text-cyan-100">Ver painel Plasma</Link>
+        <div className="flex flex-wrap gap-2">
+          {podeConferir && <Link href="/plasma/conferencia/scanner" className="rounded bg-amber-300 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:bg-amber-200">Ler QR Code da OP</Link>}
+          <Link href="/plasma" className="rounded border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-300 hover:text-cyan-100">Ver painel Plasma</Link>
+        </div>
       </header>
 
       {!conferentePlasma && (

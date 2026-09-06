@@ -7,6 +7,7 @@ type BarcodeDetectorInstance = {
   detect: (source: HTMLVideoElement | HTMLCanvasElement) => Promise<Barcode[]>;
 };
 type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance;
+type ModoScanner = "apontamento" | "conferencia";
 
 declare global {
   interface Window {
@@ -14,7 +15,15 @@ declare global {
   }
 }
 
-function destinoDoQr(valor: string) {
+function destinoConferencia(op: number | string, setor?: number | string, peca?: number | string, quantidade?: number | string) {
+  const params = new URLSearchParams({ origem: "qrcode" });
+  if (setor) params.set("setor", String(setor));
+  if (peca) params.set("peca", String(peca));
+  if (quantidade) params.set("quantidade", String(quantidade));
+  return `/plasma/conferencia/op/${encodeURIComponent(String(op))}?${params.toString()}`;
+}
+
+function destinoDoQr(valor: string, modo: ModoScanner) {
   const texto = valor.trim();
   if (!texto) return null;
 
@@ -24,6 +33,9 @@ function destinoDoQr(valor: string) {
       return `/plasma/operar/${encodeURIComponent(String(dados.nest))}?origem=qrcode`;
     }
     if (dados && dados.op) {
+      if (modo === "conferencia") {
+        return destinoConferencia(dados.op, dados.setor, dados.peca, dados.quantidade);
+      }
       const params = new URLSearchParams({ origem: "qrcode", op: String(dados.op) });
       if (dados.setor) params.set("setor", String(dados.setor));
       if (dados.peca) params.set("peca", String(dados.peca));
@@ -44,6 +56,14 @@ function destinoDoQr(valor: string) {
       return `${url.pathname}?${url.searchParams.toString()}`;
     }
     if (url.pathname !== "/apontamentos" || !op || !/^\d+$/.test(op)) return null;
+    if (modo === "conferencia") {
+      return destinoConferencia(
+        op,
+        url.searchParams.get("setor") ?? undefined,
+        url.searchParams.get("peca") ?? undefined,
+        url.searchParams.get("quantidade") ?? undefined,
+      );
+    }
     url.searchParams.set("origem", "qrcode");
     return `${url.pathname}?${url.searchParams.toString()}`;
   } catch {
@@ -55,7 +75,7 @@ function formatarCodigo(valor: string) {
   return valor.length > 72 ? `${valor.slice(0, 72)}…` : valor;
 }
 
-export function QrScanner() {
+export function QrScanner({ modo = "apontamento" }: { modo?: ModoScanner }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -78,9 +98,11 @@ export function QrScanner() {
   };
 
   const abrirDestino = (valor: string) => {
-    const destino = destinoDoQr(valor);
+    const destino = destinoDoQr(valor, modo);
     if (!destino) {
-      setErro("QR Code encontrado, mas ele não contém um link válido de apontamento.");
+      setErro(modo === "conferencia"
+        ? "QR Code encontrado, mas ele não contém um link válido de OP do Plasma."
+        : "QR Code encontrado, mas ele não contém um link válido de apontamento.");
       setUltimoCodigo(formatarCodigo(valor));
       return false;
     }

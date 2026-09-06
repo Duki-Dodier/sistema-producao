@@ -20,6 +20,10 @@ export type ResultadoLancamentoNest =
   | { ok: true }
   | { ok: false; mensagem: string };
 
+export type ResultadoConferenciaNest =
+  | { ok: true }
+  | { ok: false; mensagem: string };
+
 function texto(valor: FormDataEntryValue | null, limite: number) {
   return String(valor ?? "").trim().slice(0, limite);
 }
@@ -565,5 +569,17 @@ export async function conferirLancamentoNest(formData: FormData) {
   });
   revalidarNests();
   revalidatePath(`/plasma/${registro.item.nestId}`);
+  revalidatePath("/plasma/conferencia");
+  revalidatePath(`/plasma/conferencia/op/${registro.item.opId}`);
+}
+
+export async function conferirLancamentoNestSeguro(_anterior: ResultadoConferenciaNest | null, formData: FormData): Promise<ResultadoConferenciaNest> {
+  try {
+    await conferirLancamentoNest(formData);
+    return { ok: true };
+  } catch (erro) {
+    if (ehRedirecionamento(erro)) throw erro;
+    return { ok: false, mensagem: mensagemDoErro(erro, "Não foi possível confirmar o corte.") };
+  }
 }
 
