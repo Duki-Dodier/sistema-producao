@@ -31,13 +31,9 @@ export function PlasmaConferenceForm({
     <form action={acao} className="mt-4 space-y-3 border-t border-amber-400/15 pt-4" onSubmit={(event) => {
       const dados = new FormData(event.currentTarget);
       const totalRecebido = Number(dados.get("quantidadeRecebida") ?? 0);
-      const motivo = String(dados.get("motivoConferencia") ?? "").trim();
       if (!Number.isInteger(totalRecebido) || totalRecebido < 0 || totalRecebido > totalDeclarado) {
         event.preventDefault();
         setErroLocal(`Informe um total recebido entre 0 e ${totalDeclarado}.`);
-      } else if (totalRecebido !== quantidadeBoa && !motivo) {
-        event.preventDefault();
-        setErroLocal("Informe o motivo da divergência.");
       } else {
         setErroLocal("");
       }

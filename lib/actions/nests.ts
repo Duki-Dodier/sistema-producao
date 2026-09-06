@@ -535,7 +535,6 @@ export async function conferirLancamentoNest(formData: FormData) {
   const faltaConferente = Math.max(0, registro.quantidadeBoa - recebidas);
   const acaoConferencia = texto(formData.get("acaoConferencia"), 32);
   const motivo = texto(formData.get("motivoConferencia"), 500);
-  if (recebidas !== registro.quantidadeBoa && !motivo) throw new Error("Informe o motivo da divergência.");
   const roteiroEtapa = await prisma.pecaRoteiro.findFirst({
     where: { pecaId: registro.item.pecaId, setorId: registro.item.nest.setorId, processo: "CORTE" },
     orderBy: { ordem: "asc" },
@@ -597,32 +596,31 @@ export async function conferirOpPlasma(formData: FormData) {
   const motivo = texto(formData.get("motivoConferencia"), 500);
   const acaoConferencia = texto(formData.get("acaoConferencia"), 32);
 
-  const resumo = await prisma.$transaction(async (tx) => {
-    const [setor, op] = await Promise.all([
-      tx.setor.findFirst({ where: { nome: "Plasma Chapa" }, select: { id: true, nome: true } }),
-      tx.oP.findUnique({
-        where: { id: opId },
-        select: {
-          id: true,
-          numeroSequencia: true,
-          quantidade: true,
-          modelo: {
-            select: {
-              pecas: {
-                where: { pecaId },
-                select: { quantidadeNecessaria: true, peca: { select: { codigo: true } } },
-              },
+  const [setor, op] = await Promise.all([
+    prisma.setor.findFirst({ where: { nome: "Plasma Chapa" }, select: { id: true, nome: true } }),
+    prisma.oP.findUnique({
+      where: { id: opId },
+      select: {
+        id: true,
+        numeroSequencia: true,
+        quantidade: true,
+        modelo: {
+          select: {
+            pecas: {
+              where: { pecaId },
+              select: { quantidadeNecessaria: true, peca: { select: { codigo: true } } },
             },
           },
         },
-      }),
-    ]);
+      },
+    }),
+  ]);
     if (!setor || !op) throw new Error("OP ou setor Plasma Chapa não encontrado.");
 
     const componente = op.modelo.pecas[0];
     if (!componente) throw new Error("A peça informada não pertence à OP.");
 
-    const itens = await tx.nestItem.findMany({
+    const itens = await prisma.nestItem.findMany({
       where: { opId, pecaId, nest: { setorId: setor.id } },
       select: {
         id: true,
@@ -672,7 +670,6 @@ export async function conferirOpPlasma(formData: FormData) {
     if (quantidadeRecebida + totalPerdasOperador > necessaria) throw new Error("Os lançamentos do operador e o total recebido não fecham com a quantidade da OP.");
 
     const faltaTotal = Math.max(0, necessaria - quantidadeRecebida);
-    if (faltaTotal > 0 && !motivo) throw new Error("Informe o motivo da falta da OP.");
     if (faltaTotal > 0 && acaoConferencia !== "falta") throw new Error("Use o botão de registrar falta para concluir uma conferência abaixo do total da OP.");
     if (faltaTotal === 0 && acaoConferencia === "falta") throw new Error("A OP está completa; use a confirmação do recebimento.");
 
@@ -695,7 +692,7 @@ export async function conferirOpPlasma(formData: FormData) {
     const perdasBase = alocacoes.reduce((soma, alocacao) => soma + alocacao.perdaBase, 0);
     if (perdasAConfirmar < perdasBase) throw new Error("Não foi possível distribuir a conferência sem alterar lançamentos já confirmados.");
     const perdaExtra = perdasAConfirmar - perdasBase;
-    const roteiroEtapa = await tx.pecaRoteiro.findFirst({
+    const roteiroEtapa = await prisma.pecaRoteiro.findFirst({
       where: { pecaId, setorId: setor.id, processo: "CORTE" },
       orderBy: { ordem: "asc" },
       select: { id: true },
@@ -709,10 +706,11 @@ export async function conferirOpPlasma(formData: FormData) {
         : "Conferente também notificou a falta já informada pelo operador; nenhuma reposição adicional foi criada."
       : "Recebimento total da OP confirmado pelo conferente.";
 
-    for (const [indice, alocacao] of alocacoes.entries()) {
+    const operacoes = alocacoes.flatMap((alocacao, indice) => {
       const quantidadeRefugo = alocacao.perdaBase + (indice === alocacoes.length - 1 ? perdaExtra : 0);
-      const apontamento = await tx.apontamento.create({
-        data: {
+      return [
+        prisma.apontamento.create({
+          data: {
           opId,
           setorId: setor.id,
           funcionarioId: usuario.id,
@@ -725,32 +723,33 @@ export async function conferirOpPlasma(formData: FormData) {
           roteiroEtapaId: roteiroEtapa?.id ?? null,
           origem: "NEST_CONFERIDO",
           maquinaId: alocacao.lancamento.maquinaId,
-        },
-      });
-      await tx.nestLancamento.update({
-        where: { id: alocacao.lancamento.id },
-        data: {
+            lancamentoNest: { connect: { id: alocacao.lancamento.id } },
+          },
+        }),
+        prisma.nestLancamento.update({
+          where: { id: alocacao.lancamento.id },
+          data: {
           conferenteId: usuario.id,
           conferidoEm: agora,
           quantidadeConferidaBoa: alocacao.boas,
           quantidadeConferidaRefugo: quantidadeRefugo,
           motivoConferencia: motivo || null,
-          apontamentoId: apontamento.id,
-        },
-      });
-      await tx.nestEvento.create({
-        data: {
+          },
+        }),
+        prisma.nestEvento.create({
+          data: {
           nestId: alocacao.lancamento.nestId,
           funcionarioId: usuario.id,
           tipo: "CONFERENCIA",
           descricao: `Conferência da OP ${op.numeroSequencia} · ${componente.peca.codigo}: ${alocacao.boas} recebidas / ${quantidadeRefugo} perdas. ${avisoFalta}${motivo ? ` ${motivo}` : ""}`,
           dataHora: agora,
-        },
-      });
-    }
+          },
+        }),
+      ];
+    });
+    await prisma.$transaction(operacoes);
 
-    return { nestId: pendentes[0].nestId, necessaria, quantidadeRecebida, faltaTotal };
-  });
+  const resumo = { nestId: pendentes[0].nestId, necessaria, quantidadeRecebida, faltaTotal };
 
   await registrarAlteracao({
     entidade: "NEST",

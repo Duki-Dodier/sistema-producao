@@ -39,9 +39,6 @@ export function PlasmaConferenciaOPForm({
       if (!Number.isInteger(valor) || valor < 0 || valor > necessaria) {
         event.preventDefault();
         setErroLocal(`Informe um total recebido entre 0 e ${necessaria}.`);
-      } else if (valor < necessaria && !motivo.trim()) {
-        event.preventDefault();
-        setErroLocal("Informe o motivo da falta antes de registrar a conferência.");
       } else if (valor < totalLiberado) {
         event.preventDefault();
         setErroLocal(`O total não pode ser menor que o já liberado (${totalLiberado}).`);
@@ -77,7 +74,7 @@ export function PlasmaConferenciaOPForm({
 
       <label className="block">
         <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Motivo da divergência ou observação</span>
-        <textarea name="motivoConferencia" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={2} placeholder={falta > 0 ? "Obrigatório quando faltar peça..." : "Opcional"} className="mt-1 w-full resize-none rounded-xl border border-slate-700 bg-slate-950/30 px-3 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-300" />
+        <textarea name="motivoConferencia" value={motivo} onChange={(event) => setMotivo(event.target.value)} rows={2} placeholder="Observação opcional" className="mt-1 w-full resize-none rounded-xl border border-slate-700 bg-slate-950/30 px-3 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-300" />
       </label>
 
       <button type="submit" name="acaoConferencia" value={acaoConferencia} disabled={pendente} className={`min-h-13 w-full rounded-xl px-4 py-3 text-sm font-black text-slate-950 transition disabled:cursor-wait disabled:opacity-60 ${falta > 0 ? "bg-rose-300 hover:bg-rose-200" : "bg-amber-300 hover:bg-amber-200"}`}>
