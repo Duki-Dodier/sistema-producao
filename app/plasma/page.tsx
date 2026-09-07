@@ -221,12 +221,6 @@ export default async function PlasmaPage({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">Painel de programação e corte</p>
             <h2 className="mt-1 text-2xl font-bold text-white">PLASMA</h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-300">Da programação à conferência: cada corte registra máquina, pessoas, tempo, boas e perdas.</p>
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-              <span className="rounded bg-sky-400/10 px-2.5 py-1.5 text-sky-200">1 Programação</span><span aria-hidden="true" className="text-slate-600">→</span>
-              <span className="rounded bg-emerald-400/10 px-2.5 py-1.5 text-emerald-200">2 Operação</span><span aria-hidden="true" className="text-slate-600">→</span>
-              <span className="rounded bg-amber-400/10 px-2.5 py-1.5 text-amber-200">3 Conferência</span><span aria-hidden="true" className="text-slate-600">→</span>
-              <span className="rounded bg-cyan-400/10 px-2.5 py-1.5 text-cyan-200">4 OP liberada</span>
-            </div>
           </div>
         </div>
       </section>
