@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { Prisma } from "@/app/generated/prisma/client";
 import { exigirUsuarioLogado, type OperadorLogado } from "@/lib/auth-operador";
 import { prisma } from "@/lib/prisma";
@@ -496,7 +497,16 @@ export async function registrarEventoNest(formData: FormData) {
   revalidatePath(`/plasma/apontar/${nestId}`);
   revalidatePath("/plasma/reposicao");
   revalidatePath("/plasma");
-  return faltasAutomaticas.reduce((soma, falta) => soma + falta.quantidade, 0);
+  const faltasEnviadas = faltasAutomaticas.reduce((soma, falta) => soma + falta.quantidade, 0);
+
+  // O operador do Plasma Chapa volta sempre à fila operacional após encerrar o corte.
+  // Este redirecionamento no servidor evita que a tela fique presa no NEST quando a
+  // conexão móvel demora a atualizar a interface.
+  if (tipo === "FIM" && ehSetor(nest.setor.nome, "Plasma Chapa")) {
+    redirect(`/apontamentos?setor=${nest.setor.id}&finalizado=1&repor=${faltasEnviadas}`);
+  }
+
+  return faltasEnviadas;
 }
 
 export async function registrarEventoNestSeguro(_anterior: ResultadoEventoNest | null, formData: FormData): Promise<ResultadoEventoNest> {
