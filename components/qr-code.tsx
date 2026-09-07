@@ -4,7 +4,7 @@ export async function QrCode({ value }: { value: string }) {
   const svg = await QRCode.toString(value, {
     type: "svg",
     errorCorrectionLevel: "H",
-    margin: 2,
+    margin: 4,
     color: {
       dark: "#000000",
       light: "#ffffff",

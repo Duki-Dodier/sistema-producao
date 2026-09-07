@@ -286,8 +286,8 @@ export default async function DocumentoOPPage({
                       const plasmaChapa = ehSetor(setorDaPeca.setorNome, "Plasma Chapa");
                       return (
                       <div key={setorDaPeca.setorId} className={`flex items-start ${plasmaChapa ? "gap-2" : ""}`}>
-                        <div className="w-24 shrink-0 text-center">
-                          <div className="mx-auto h-20 w-20 rounded-md border-2 border-slate-300 bg-white p-1.5 shadow-sm print:border-slate-500">
+                        <div className={`${plasmaChapa ? "w-32" : "w-28"} shrink-0 text-center`}>
+                          <div className={`mx-auto ${plasmaChapa ? "h-28 w-28 p-2" : "h-24 w-24 p-1.5"} rounded-md border-2 border-slate-300 bg-white shadow-sm print:border-slate-500`}>
                             <QrCode value={`${appOrigin}${destinoApontamento}`} />
                           </div>
                           <span className="mt-1 block text-[7px] font-bold uppercase leading-tight text-slate-600">
