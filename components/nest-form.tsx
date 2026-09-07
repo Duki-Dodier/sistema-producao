@@ -44,7 +44,7 @@ export function NestForm({
     }
   }, null);
   useEffect(() => {
-    if (resultado?.ok) router.push("/plasma?cadastrado=1");
+    if (resultado?.ok) router.replace("/plasma?cadastrado=1");
   }, [resultado, router]);
   const maquinasDoSetor = useMemo(() => maquinas.filter((maquina) => maquina.setorId === setorId), [maquinas, setorId]);
   const todasOpcoes = useMemo(() => opcoesOP.flatMap((op) => op.itens), [opcoesOP]);
@@ -397,7 +397,7 @@ export function NestForm({
           {pendente ? "Registrando…" : "Registrar nest programado"}
         </button>
       </div>
-      {(aviso || resultado) && <p role="status" className={`text-right text-xs ${resultado?.ok ? "text-emerald-200" : resultado && !resultado.ok ? "text-rose-200" : "text-amber-200"}`}>{resultado?.mensagem ?? aviso}</p>}
+      {(aviso || (resultado && !resultado.ok)) && <p role="status" className={`text-right text-xs ${resultado && !resultado.ok ? "text-rose-200" : "text-amber-200"}`}>{resultado && !resultado.ok ? resultado.mensagem : aviso}</p>}
     </form>
   );
 }

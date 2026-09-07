@@ -265,12 +265,27 @@ export default async function PlasmaPage({
       )}
 
       {cadastroConcluido && (
-        <section role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-emerald-100">NEST cadastrado com sucesso.</p>
-            <p className="mt-0.5 text-xs text-emerald-200/80">O novo NEST está no início da lista abaixo, aguardando o corte.</p>
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="nest-cadastrado-titulo"
+          aria-describedby="nest-cadastrado-descricao"
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-emerald-300/35 bg-[#162536] shadow-2xl shadow-black/50">
+            <div className="border-b border-emerald-300/15 bg-emerald-400/10 px-6 py-5 text-center">
+              <span aria-hidden="true" className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-emerald-200 bg-emerald-300 text-3xl font-black text-slate-950">✓</span>
+              <p className="mt-4 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200">Programação salva</p>
+              <h2 id="nest-cadastrado-titulo" className="mt-1 text-2xl font-black text-white">NEST REGISTRADO</h2>
+            </div>
+            <div className="px-6 py-5 text-center">
+              <p id="nest-cadastrado-descricao" className="text-sm leading-6 text-slate-300">A programação já foi colocada na fila da máquina e está aguardando o início do corte.</p>
+              <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                <Link href="/plasma/novo" className="flex min-h-12 items-center justify-center rounded-xl border border-cyan-300/35 px-4 py-3 text-sm font-bold text-cyan-100 transition hover:bg-cyan-400/10">Programar outro NEST</Link>
+                <Link href="/plasma" className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-200">Ver painel Plasma</Link>
+              </div>
+            </div>
           </div>
-          <Link href="/plasma" className="rounded border border-emerald-300/30 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-300/10">Fechar aviso</Link>
         </section>
       )}
 
