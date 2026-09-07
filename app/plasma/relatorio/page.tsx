@@ -5,6 +5,9 @@ import { rotuloMaquina } from "@/lib/maquinas";
 import { boasConferidas, segundosEfetivos } from "@/lib/plasma-regras";
 import { carregarRelatorioPlasma, type CategoriaRegistro, statusLabel } from "@/lib/plasma-relatorio";
 
+const ITENS_POR_PAGINA = 25;
+type ChavePagina = "paginaNests" | "paginaProducao" | "paginaPessoas" | "paginaRegistros";
+
 function parametro(valor: string | string[] | undefined) { return Array.isArray(valor) ? valor[0] ?? "" : valor ?? ""; }
 function numero(valor: number) { return new Intl.NumberFormat("pt-BR").format(valor); }
 function dataHora(valor: Date) { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(valor); }
@@ -12,44 +15,177 @@ function duracao(segundos: number) { if (segundos <= 0) return "—"; const hora
 function classeCategoria(categoria: CategoriaRegistro) { return { PROGRAMACAO: "border-sky-400/30 bg-sky-400/10 text-sky-200", OPERACAO: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200", LANCAMENTO: "border-amber-400/30 bg-amber-400/10 text-amber-200", CONFERENCIA: "border-violet-400/30 bg-violet-400/10 text-violet-200" }[categoria]; }
 function rotuloCategoria(categoria: CategoriaRegistro) { return { PROGRAMACAO: "Programação", OPERACAO: "Operação", LANCAMENTO: "Apontamento do operador", CONFERENCIA: "Conferência" }[categoria]; }
 
+function paginaSolicitada(valor: string) {
+  const pagina = Number(valor);
+  return Number.isInteger(pagina) && pagina > 0 ? pagina : 1;
+}
+
+function paginar<T>(itens: T[], solicitada: number) {
+  const totalPaginas = Math.max(1, Math.ceil(itens.length / ITENS_POR_PAGINA));
+  const pagina = Math.min(solicitada, totalPaginas);
+  const inicio = (pagina - 1) * ITENS_POR_PAGINA;
+  return { itens: itens.slice(inicio, inicio + ITENS_POR_PAGINA), pagina, totalPaginas };
+}
+
 export default async function PlasmaRelatorioPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>>; }) {
   const sp = await searchParams;
-  const filtros = { busca: parametro(sp.q), dataInicio: parametro(sp.dataInicio), dataFim: parametro(sp.dataFim), maquina: parametro(sp.maquina), operador: parametro(sp.operador), status: parametro(sp.status), tipo: parametro(sp.tipo) };
+  const filtros = {
+    busca: parametro(sp.q),
+    dataInicio: parametro(sp.dataInicio),
+    dataFim: parametro(sp.dataFim),
+    maquina: parametro(sp.maquina),
+    operador: parametro(sp.operador),
+    status: parametro(sp.status),
+    tipo: parametro(sp.tipo),
+  };
   const dados = await carregarRelatorioPlasma(filtros);
-  const { setor, maquinas, operadores, nests, apontamentos, registrosFiltrados, resumoOps, pessoas, totalProgramado, totalDeclarado, totalLiberado, totalPerdas, aguardandoConferencia, totalTempo, totalOps, filtrosAtivos, periodoInvalido } = dados;
-  const maquinaFiltro = Number(filtros.maquina); const operadorFiltro = Number(filtros.operador);
+  const {
+    setor,
+    maquinas,
+    operadores,
+    nests,
+    apontamentos,
+    registrosFiltrados,
+    resumoOps,
+    pessoas,
+    totalProgramado,
+    totalDeclarado,
+    totalLiberado,
+    totalPerdas,
+    aguardandoConferencia,
+    totalTempo,
+    totalOps,
+    filtrosAtivos,
+    periodoInvalido,
+  } = dados;
+  const maquinaFiltro = Number(filtros.maquina);
+  const operadorFiltro = Number(filtros.operador);
   const statusFiltro = Object.hasOwn(statusLabel, filtros.status) ? filtros.status : "";
   const categoriaFiltro = ["PROGRAMACAO", "OPERACAO", "LANCAMENTO", "CONFERENCIA"].includes(filtros.tipo) ? filtros.tipo : "";
-  const query = new URLSearchParams(); for (const [chave, valor] of Object.entries(filtros)) if (valor) query.set(chave, valor);
-  const pdfHref = `/plasma/relatorio/pdf${query.toString() ? `?${query.toString()}` : ""}`;
+
+  const nestsPaginados = paginar(nests, paginaSolicitada(parametro(sp.paginaNests)));
+  const producaoPaginada = paginar(resumoOps, paginaSolicitada(parametro(sp.paginaProducao)));
+  const pessoasPaginadas = paginar(pessoas, paginaSolicitada(parametro(sp.paginaPessoas)));
+  const registrosPaginados = paginar(registrosFiltrados, paginaSolicitada(parametro(sp.paginaRegistros)));
+  const paginasAtuais: Record<ChavePagina, number> = {
+    paginaNests: nestsPaginados.pagina,
+    paginaProducao: producaoPaginada.pagina,
+    paginaPessoas: pessoasPaginadas.pagina,
+    paginaRegistros: registrosPaginados.pagina,
+  };
+
+  const queryFiltros = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(filtros)) if (valor) queryFiltros.set(chave, valor);
+  const pdfHref = `/plasma/relatorio/pdf${queryFiltros.toString() ? `?${queryFiltros.toString()}` : ""}`;
+
+  function hrefPagina(chave: ChavePagina, destino: number, ancora: string) {
+    const parametros = new URLSearchParams(queryFiltros);
+    for (const [nome, paginaAtual] of Object.entries(paginasAtuais)) {
+      if (nome !== chave && paginaAtual > 1) parametros.set(nome, String(paginaAtual));
+    }
+    if (destino > 1) parametros.set(chave, String(destino));
+    const consulta = parametros.toString();
+    return `/plasma/relatorio${consulta ? `?${consulta}` : ""}${ancora}`;
+  }
 
   return <div className="mx-auto w-full max-w-[1700px] space-y-5 p-4 sm:p-6">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><Link href="/plasma" className="text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">← Voltar para o painel Plasma</Link><p className="mt-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-violet-300">Plasma Chapa · histórico operacional</p><h1 className="mt-1 text-2xl font-bold uppercase text-white">RELATÓRIO E RASTREABILIDADE</h1><p className="mt-1 max-w-4xl text-sm text-slate-400">Acompanhe toda a sequência do corte: programação, operação da máquina, quantidades declaradas, perdas, conferência e liberação.</p></div><Link href="/plasma" className="rounded border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-300 hover:text-cyan-100">Painel Plasma</Link></header>
+    <header className="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <Link href="/plasma" className="text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">← Voltar para o painel Plasma</Link>
+        <p className="mt-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-violet-300">Plasma Chapa · histórico operacional</p>
+        <h1 className="mt-1 text-2xl font-bold uppercase text-white">RELATÓRIO E RASTREABILIDADE</h1>
+        <p className="mt-1 max-w-4xl text-sm text-slate-400">Acompanhe toda a sequência do corte: programação, operação da máquina, quantidades declaradas, perdas, conferência e liberação.</p>
+      </div>
+      <Link href="/plasma" className="rounded border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-300 hover:text-cyan-100">Painel Plasma</Link>
+    </header>
+
     {!setor && <section role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-100">O setor Plasma Chapa não foi encontrado.</section>}
 
-    <section className="rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10"><form method="get" className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 xl:items-end">
-      <label className="block sm:col-span-2 xl:col-span-2"><span className={filterLabelClass}>Buscar OP, lote, NEST, peça ou nome</span><input name="q" defaultValue={filtros.busca} placeholder="Ex.: OP 29, NEST01 ou Tiago" className={filterInputClass} /></label>
-      <DateFilter name="dataInicio" label="Data inicial" defaultValue={filtros.dataInicio} inputClassName={filterInputClass} /><DateFilter name="dataFim" label="Data final" defaultValue={filtros.dataFim} inputClassName={filterInputClass} />
-      <label className="block"><span className={filterLabelClass}>Máquina</span><select name="maquina" defaultValue={Number.isInteger(maquinaFiltro) && maquinaFiltro > 0 ? String(maquinaFiltro) : ""} className={filterInputClass}><option value="">Todas</option>{maquinas.map((maquina) => <option key={maquina.id} value={maquina.id}>{rotuloMaquina(maquina.codigo, maquina.nome)}</option>)}</select></label>
-      <label className="block"><span className={filterLabelClass}>Pessoa</span><select name="operador" defaultValue={Number.isInteger(operadorFiltro) && operadorFiltro > 0 ? String(operadorFiltro) : ""} className={filterInputClass}><option value="">Todas</option>{operadores.map((operador) => <option key={operador.id} value={operador.id}>{operador.nome}</option>)}</select></label>
-      <label className="block"><span className={filterLabelClass}>Situação do NEST</span><select name="status" defaultValue={statusFiltro} className={filterInputClass}><option value="">Todas</option>{Object.entries(statusLabel).map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}</select></label>
-      <label className="block"><span className={filterLabelClass}>Tipo de registro</span><select name="tipo" defaultValue={categoriaFiltro} className={filterInputClass}><option value="">Todos</option><option value="PROGRAMACAO">Programação</option><option value="OPERACAO">Operação</option><option value="LANCAMENTO">Apontamento</option><option value="CONFERENCIA">Conferência</option></select></label>
-      <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4 xl:col-span-8"><button type="submit" className="rounded bg-violet-300 px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:bg-violet-200">Aplicar filtros</button>{filtrosAtivos && <Link href="/plasma/relatorio" className="rounded border border-slate-600 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-violet-300 hover:text-violet-100">Limpar</Link>}<a href={periodoInvalido ? undefined : pdfHref} aria-disabled={periodoInvalido} className={`rounded border px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${periodoInvalido ? "pointer-events-none border-slate-700 text-slate-600" : "border-cyan-300/60 text-cyan-100 hover:bg-cyan-300 hover:text-slate-950"}`}>Baixar PDF deste filtro</a></div>
-    </form><div className="border-t border-slate-700/80 px-4 py-2 text-xs text-slate-500">{periodoInvalido ? <span className="text-amber-200">A data inicial precisa ser anterior ou igual à data final.</span> : `${nests.length} NEST(s), ${apontamentos.length} apontamento(s) sem NEST e ${registrosFiltrados.length} registro(s) encontrados.`}</div></section>
+    <section className="rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
+      <form method="get" className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 xl:items-end">
+        <label className="block sm:col-span-2 xl:col-span-2"><span className={filterLabelClass}>Buscar OP, lote, NEST, peça ou nome</span><input name="q" defaultValue={filtros.busca} placeholder="Ex.: OP 29, NEST01 ou Tiago" className={filterInputClass} /></label>
+        <DateFilter name="dataInicio" label="Data inicial" defaultValue={filtros.dataInicio} inputClassName={filterInputClass} />
+        <DateFilter name="dataFim" label="Data final" defaultValue={filtros.dataFim} inputClassName={filterInputClass} />
+        <label className="block"><span className={filterLabelClass}>Máquina</span><select name="maquina" defaultValue={Number.isInteger(maquinaFiltro) && maquinaFiltro > 0 ? String(maquinaFiltro) : ""} className={filterInputClass}><option value="">Todas</option>{maquinas.map((maquina) => <option key={maquina.id} value={maquina.id}>{rotuloMaquina(maquina.codigo, maquina.nome)}</option>)}</select></label>
+        <label className="block"><span className={filterLabelClass}>Pessoa</span><select name="operador" defaultValue={Number.isInteger(operadorFiltro) && operadorFiltro > 0 ? String(operadorFiltro) : ""} className={filterInputClass}><option value="">Todas</option>{operadores.map((operador) => <option key={operador.id} value={operador.id}>{operador.nome}</option>)}</select></label>
+        <label className="block"><span className={filterLabelClass}>Situação do NEST</span><select name="status" defaultValue={statusFiltro} className={filterInputClass}><option value="">Todas</option>{Object.entries(statusLabel).map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}</select></label>
+        <label className="block"><span className={filterLabelClass}>Tipo de registro</span><select name="tipo" defaultValue={categoriaFiltro} className={filterInputClass}><option value="">Todos</option><option value="PROGRAMACAO">Programação</option><option value="OPERACAO">Operação</option><option value="LANCAMENTO">Apontamento</option><option value="CONFERENCIA">Conferência</option></select></label>
+        <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4 xl:col-span-8"><button type="submit" className="rounded bg-violet-300 px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:bg-violet-200">Aplicar filtros</button>{filtrosAtivos && <Link href="/plasma/relatorio" className="rounded border border-slate-600 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-violet-300 hover:text-violet-100">Limpar</Link>}<a href={periodoInvalido ? undefined : pdfHref} aria-disabled={periodoInvalido} className={`rounded border px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${periodoInvalido ? "pointer-events-none border-slate-700 text-slate-600" : "border-cyan-300/60 text-cyan-100 hover:bg-cyan-300 hover:text-slate-950"}`}>Baixar PDF deste filtro</a></div>
+      </form>
+      <div className="border-t border-slate-700/80 px-4 py-2 text-xs text-slate-500">{periodoInvalido ? <span className="text-amber-200">A data inicial precisa ser anterior ou igual à data final.</span> : `${nests.length} NEST(s), ${apontamentos.length} apontamento(s) sem NEST e ${registrosFiltrados.length} registro(s) encontrados.`}</div>
+    </section>
 
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8"><Kpi label="NESTs" value={numero(nests.length)} tone="violet" /><Kpi label="OPs" value={numero(totalOps)} tone="cyan" /><Kpi label="Pessoas" value={numero(pessoas.length)} tone="sky" /><Kpi label="Programadas" value={numero(totalProgramado)} tone="neutral" /><Kpi label="Boas declaradas" value={numero(totalDeclarado)} tone="sky" /><Kpi label="Liberadas" value={numero(totalLiberado)} tone="emerald" /><Kpi label="Perdas" value={numero(totalPerdas)} tone="rose" /><Kpi label="A conferir" value={numero(aguardandoConferencia)} tone="amber" /></section>
 
-    <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10"><SectionTitle title="NESTs e ordens rastreadas" subtitle={`${nests.length} programação(ões) · tempo efetivo acumulado ${duracao(totalTempo)}`} /><div className="overflow-x-auto"><table className="w-full min-w-[1250px] text-left text-sm"><thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">NEST / situação</th><th className="px-4 py-3">OPs e lotes</th><th className="px-4 py-3">Máquina</th><th className="px-4 py-3">Programador</th><th className="px-4 py-3">Datas</th><th className="px-4 py-3">Quantidades</th><th className="px-4 py-3">Tempo</th><th className="px-4 py-3"></th></tr></thead><tbody>{nests.map((nest) => { const lancamentosNest = nest.itens.flatMap((item: any) => item.lancamentos); const planejado = nest.itens.reduce((soma: number, item: any) => soma + item.quantidadePlanejada, 0); const declarado = lancamentosNest.reduce((soma: number, item: any) => soma + item.quantidadeBoa, 0); const liberado = lancamentosNest.reduce((soma: number, item: any) => soma + boasConferidas(item), 0); const perdas = lancamentosNest.reduce((soma: number, item: any) => soma + item.quantidadeRefugo, 0); const ops = [...new Map(nest.itens.map((item: any) => [item.op.id, item.op])).values()]; return <tr key={nest.id} className="border-b border-slate-700/60 align-top last:border-0"><td className="px-4 py-3"><div className="flex flex-wrap items-center gap-2"><strong className="font-mono text-cyan-100">{nest.codigo}</strong>{nest.refeitoDeId && <span className="rounded bg-rose-300/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-200">Reposição</span>}</div><span className="mt-1 inline-flex rounded border border-slate-600 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">{statusLabel[nest.status] ?? nest.status}</span></td><td className="px-4 py-3 text-xs text-slate-300">{ops.map((op: any) => <div key={op.id}><span className="font-mono text-cyan-200">OP {op.numeroSequencia}</span>{op.lote ? ` · lote ${op.lote}` : " · sem lote"}<span className="text-slate-500"> · {op.modelo.codigo}</span></div>)}</td><td className="px-4 py-3 text-slate-300">{rotuloMaquina(nest.maquina.codigo, nest.maquina.nome)}</td><td className="px-4 py-3"><div className="text-slate-200">{nest.programador.nome}</div><div className="mt-1 text-xs text-slate-500">{dataHora(nest.createdAt)}</div></td><td className="px-4 py-3 text-xs text-slate-400"><div>Início: {nest.iniciadoEm ? dataHora(nest.iniciadoEm) : "—"}</div><div className="mt-1">Fim: {nest.finalizadoEm ? dataHora(nest.finalizadoEm) : "—"}</div></td><td className="px-4 py-3 text-xs"><div><span className="text-slate-500">Programadas </span><strong className="text-white">{numero(planejado)}</strong></div><div className="mt-1"><span className="text-slate-500">Declaradas </span><strong className="text-sky-200">{numero(declarado)}</strong> · <span className="text-slate-500">Liberadas </span><strong className="text-emerald-200">{numero(liberado)}</strong> · <span className="text-slate-500">Perdas </span><strong className="text-rose-200">{numero(perdas)}</strong></div></td><td className="px-4 py-3 font-mono text-amber-200">{duracao(nest.tempoCorteSegundos ?? segundosEfetivos(nest.eventos))}</td><td className="px-4 py-3 text-right"><Link href={`/plasma/${nest.id}`} className="whitespace-nowrap text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">Ver NEST</Link></td></tr>; })}</tbody></table>{nests.length === 0 && <Empty text="Nenhum NEST encontrado com os filtros selecionados." />}</div></section>
+    <section id="nests" className="scroll-mt-5 overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
+      <SectionTitle title="NESTs e ordens rastreadas" subtitle={`${nests.length} programação(ões) · tempo efetivo acumulado ${duracao(totalTempo)}`} />
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1250px] text-left text-sm">
+          <thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">NEST / situação</th><th className="px-4 py-3">OPs e lotes</th><th className="px-4 py-3">Máquina</th><th className="px-4 py-3">Programador</th><th className="px-4 py-3">Datas</th><th className="px-4 py-3">Quantidades</th><th className="px-4 py-3">Tempo</th><th className="px-4 py-3"></th></tr></thead>
+          <tbody>{nestsPaginados.itens.map((nest) => {
+            const lancamentosNest = nest.itens.flatMap((item: any) => item.lancamentos);
+            const planejado = nest.itens.reduce((soma: number, item: any) => soma + item.quantidadePlanejada, 0);
+            const declarado = lancamentosNest.reduce((soma: number, item: any) => soma + item.quantidadeBoa, 0);
+            const liberado = lancamentosNest.reduce((soma: number, item: any) => soma + boasConferidas(item), 0);
+            const perdas = lancamentosNest.reduce((soma: number, item: any) => soma + item.quantidadeRefugo, 0);
+            const ops = [...new Map(nest.itens.map((item: any) => [item.op.id, item.op])).values()];
+            return <tr key={nest.id} className="border-b border-slate-700/60 align-top last:border-0"><td className="px-4 py-3"><div className="flex flex-wrap items-center gap-2"><strong className="font-mono text-cyan-100">{nest.codigo}</strong>{nest.refeitoDeId && <span className="rounded bg-rose-300/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-200">Reposição</span>}</div><span className="mt-1 inline-flex rounded border border-slate-600 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">{statusLabel[nest.status] ?? nest.status}</span></td><td className="px-4 py-3 text-xs text-slate-300">{ops.map((op: any) => <div key={op.id}><span className="font-mono text-cyan-200">OP {op.numeroSequencia}</span>{op.lote ? ` · lote ${op.lote}` : " · sem lote"}<span className="text-slate-500"> · {op.modelo.codigo}</span></div>)}</td><td className="px-4 py-3 text-slate-300">{rotuloMaquina(nest.maquina.codigo, nest.maquina.nome)}</td><td className="px-4 py-3"><div className="text-slate-200">{nest.programador.nome}</div><div className="mt-1 text-xs text-slate-500">{dataHora(nest.createdAt)}</div></td><td className="px-4 py-3 text-xs text-slate-400"><div>Início: {nest.iniciadoEm ? dataHora(nest.iniciadoEm) : "—"}</div><div className="mt-1">Fim: {nest.finalizadoEm ? dataHora(nest.finalizadoEm) : "—"}</div></td><td className="px-4 py-3 text-xs"><div><span className="text-slate-500">Programadas </span><strong className="text-white">{numero(planejado)}</strong></div><div className="mt-1"><span className="text-slate-500">Declaradas </span><strong className="text-sky-200">{numero(declarado)}</strong> · <span className="text-slate-500">Liberadas </span><strong className="text-emerald-200">{numero(liberado)}</strong> · <span className="text-slate-500">Perdas </span><strong className="text-rose-200">{numero(perdas)}</strong></div></td><td className="px-4 py-3 font-mono text-amber-200">{duracao(nest.tempoCorteSegundos ?? segundosEfetivos(nest.eventos))}</td><td className="px-4 py-3 text-right"><Link href={`/plasma/${nest.id}`} className="whitespace-nowrap text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">Ver NEST</Link></td></tr>;
+          })}</tbody>
+        </table>
+        {nests.length === 0 && <Empty text="Nenhum NEST encontrado com os filtros selecionados." />}
+      </div>
+      <PaginacaoRelatorio pagina={nestsPaginados.pagina} totalPaginas={nestsPaginados.totalPaginas} totalItens={nests.length} hrefParaPagina={(pagina) => hrefPagina("paginaNests", pagina, "#nests")} />
+    </section>
 
-    <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10"><SectionTitle title="Produção por OP e peça" subtitle="Planejado, declarado pelo operador, liberado pelo conferente e perdas identificadas." /><div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-left text-sm"><thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">OP / lote</th><th className="px-4 py-3">Peça</th><th className="px-4 py-3">Programado</th><th className="px-4 py-3">Declarado</th><th className="px-4 py-3">Liberado</th><th className="px-4 py-3">Perdas</th><th className="px-4 py-3">A conferir</th><th className="px-4 py-3">NESTs / pessoas</th></tr></thead><tbody>{resumoOps.map((item) => <tr key={item.chave} className="border-b border-slate-700/60 align-top last:border-0"><td className="px-4 py-3"><div className="font-mono font-bold text-cyan-200">OP {item.opNumero}</div><div className="mt-1 text-xs text-slate-500">{item.lote ? `Lote ${item.lote}` : "Sem lote"} · {item.modelo} · OP com {numero(item.opQuantidade)} un.</div></td><td className="px-4 py-3"><div className="font-mono font-semibold text-white">{item.pecaCodigo}</div><div className="mt-1 text-xs text-slate-400">{item.pecaNome}</div></td><td className="px-4 py-3 text-white">{numero(item.programado)}{item.reposicaoProgramada > 0 && <div className="mt-1 text-xs text-rose-200">{numero(item.reposicaoProgramada)} em reposição</div>}</td><td className="px-4 py-3 font-semibold text-sky-200">{numero(item.declarado)}</td><td className="px-4 py-3 font-semibold text-emerald-200">{numero(item.liberado)}</td><td className="px-4 py-3 font-semibold text-rose-200">{numero(item.perdas)}</td><td className="px-4 py-3 font-semibold text-amber-200">{numero(item.aguardando)}</td><td className="px-4 py-3 text-xs text-slate-400"><div><span className="text-slate-500">NESTs:</span> {[...item.nests].join(", ") || "Sem NEST"}</div><div className="mt-1"><span className="text-slate-500">Operadores:</span> {[...item.operadores].join(", ") || "—"}</div><div className="mt-1"><span className="text-slate-500">Conferentes:</span> {[...item.conferentes].join(", ") || "—"}</div></td></tr>)}</tbody></table>{resumoOps.length === 0 && <Empty text="Nenhuma OP ou peça encontrada com os filtros selecionados." />}</div></section>
+    <section id="producao" className="scroll-mt-5 overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
+      <SectionTitle title="Produção por OP e peça" subtitle="Planejado, declarado pelo operador, liberado pelo conferente e perdas identificadas." />
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1200px] text-left text-sm">
+          <thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">OP / lote</th><th className="px-4 py-3">Peça</th><th className="px-4 py-3">Programado</th><th className="px-4 py-3">Declarado</th><th className="px-4 py-3">Liberado</th><th className="px-4 py-3">Perdas</th><th className="px-4 py-3">A conferir</th><th className="px-4 py-3">NESTs / pessoas</th></tr></thead>
+          <tbody>{producaoPaginada.itens.map((item) => <tr key={item.chave} className="border-b border-slate-700/60 align-top last:border-0"><td className="px-4 py-3"><div className="font-mono font-bold text-cyan-200">OP {item.opNumero}</div><div className="mt-1 text-xs text-slate-500">{item.lote ? `Lote ${item.lote}` : "Sem lote"} · {item.modelo} · OP com {numero(item.opQuantidade)} un.</div></td><td className="px-4 py-3"><div className="font-mono font-semibold text-white">{item.pecaCodigo}</div><div className="mt-1 text-xs text-slate-400">{item.pecaNome}</div></td><td className="px-4 py-3 text-white">{numero(item.programado)}{item.reposicaoProgramada > 0 && <div className="mt-1 text-xs text-rose-200">{numero(item.reposicaoProgramada)} em reposição</div>}</td><td className="px-4 py-3 font-semibold text-sky-200">{numero(item.declarado)}</td><td className="px-4 py-3 font-semibold text-emerald-200">{numero(item.liberado)}</td><td className="px-4 py-3 font-semibold text-rose-200">{numero(item.perdas)}</td><td className="px-4 py-3 font-semibold text-amber-200">{numero(item.aguardando)}</td><td className="px-4 py-3 text-xs text-slate-400"><div><span className="text-slate-500">NESTs:</span> {[...item.nests].join(", ") || "Sem NEST"}</div><div className="mt-1"><span className="text-slate-500">Operadores:</span> {[...item.operadores].join(", ") || "—"}</div><div className="mt-1"><span className="text-slate-500">Conferentes:</span> {[...item.conferentes].join(", ") || "—"}</div></td></tr>)}</tbody>
+        </table>
+        {resumoOps.length === 0 && <Empty text="Nenhuma OP ou peça encontrada com os filtros selecionados." />}
+      </div>
+      <PaginacaoRelatorio pagina={producaoPaginada.pagina} totalPaginas={producaoPaginada.totalPaginas} totalItens={resumoOps.length} hrefParaPagina={(pagina) => hrefPagina("paginaProducao", pagina, "#producao")} />
+    </section>
 
-    <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10"><SectionTitle title="Pessoas envolvidas" subtitle="Responsabilidades e registros individuais no período selecionado." /><div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-sm"><thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">Pessoa</th><th className="px-4 py-3">Atuação</th><th className="px-4 py-3">Programações</th><th className="px-4 py-3">Eventos da máquina</th><th className="px-4 py-3">Lançamentos</th><th className="px-4 py-3">Conferências</th><th className="px-4 py-3">Boas / perdas declaradas</th><th className="px-4 py-3">Peças liberadas</th></tr></thead><tbody>{pessoas.map((item) => <tr key={item.id} className="border-b border-slate-700/60 last:border-0"><td className="px-4 py-3 font-semibold text-white">{item.nome}</td><td className="px-4 py-3 text-xs text-slate-400">{[...item.funcoes].join(" · ")}</td><td className="px-4 py-3 text-sky-200">{numero(item.programacoes)}</td><td className="px-4 py-3 text-emerald-200">{numero(item.eventos)}</td><td className="px-4 py-3 text-amber-200">{numero(item.lancamentos)}</td><td className="px-4 py-3 text-violet-200">{numero(item.conferencias)}</td><td className="px-4 py-3"><span className="text-sky-200">{numero(item.boasDeclaradas)}</span><span className="text-slate-500"> / </span><span className="text-rose-200">{numero(item.perdasDeclaradas)}</span></td><td className="px-4 py-3 font-semibold text-emerald-200">{numero(item.boasLiberadas)}</td></tr>)}</tbody></table>{pessoas.length === 0 && <Empty text="Nenhuma pessoa encontrada com os filtros selecionados." />}</div></section>
+    <section id="pessoas" className="scroll-mt-5 overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
+      <SectionTitle title="Pessoas envolvidas" subtitle="Responsabilidades e registros individuais no período selecionado." />
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1000px] text-left text-sm">
+          <thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">Pessoa</th><th className="px-4 py-3">Atuação</th><th className="px-4 py-3">Programações</th><th className="px-4 py-3">Eventos da máquina</th><th className="px-4 py-3">Lançamentos</th><th className="px-4 py-3">Conferências</th><th className="px-4 py-3">Boas / perdas declaradas</th><th className="px-4 py-3">Peças liberadas</th></tr></thead>
+          <tbody>{pessoasPaginadas.itens.map((item) => <tr key={item.id} className="border-b border-slate-700/60 last:border-0"><td className="px-4 py-3 font-semibold text-white">{item.nome}</td><td className="px-4 py-3 text-xs text-slate-400">{[...item.funcoes].join(" · ")}</td><td className="px-4 py-3 text-sky-200">{numero(item.programacoes)}</td><td className="px-4 py-3 text-emerald-200">{numero(item.eventos)}</td><td className="px-4 py-3 text-amber-200">{numero(item.lancamentos)}</td><td className="px-4 py-3 text-violet-200">{numero(item.conferencias)}</td><td className="px-4 py-3"><span className="text-sky-200">{numero(item.boasDeclaradas)}</span><span className="text-slate-500"> / </span><span className="text-rose-200">{numero(item.perdasDeclaradas)}</span></td><td className="px-4 py-3 font-semibold text-emerald-200">{numero(item.boasLiberadas)}</td></tr>)}</tbody>
+        </table>
+        {pessoas.length === 0 && <Empty text="Nenhuma pessoa encontrada com os filtros selecionados." />}
+      </div>
+      <PaginacaoRelatorio pagina={pessoasPaginadas.pagina} totalPaginas={pessoasPaginadas.totalPaginas} totalItens={pessoas.length} hrefParaPagina={(pagina) => hrefPagina("paginaPessoas", pagina, "#pessoas")} />
+    </section>
 
-    <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10"><SectionTitle title="Linha do tempo completa" subtitle={`${registrosFiltrados.length} evento(s) em ordem do mais recente para o mais antigo.`} /><div className="overflow-x-auto"><table className="w-full min-w-[1450px] text-left text-sm"><thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">Data e hora</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Ação</th><th className="px-4 py-3">Responsável</th><th className="px-4 py-3">NEST / máquina</th><th className="px-4 py-3">OP / peça</th><th className="px-4 py-3">Boas / perdas</th><th className="px-4 py-3">Registro</th></tr></thead><tbody>{registrosFiltrados.map((registro) => <tr key={registro.id} className="border-b border-slate-700/60 align-top last:border-0"><td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">{dataHora(registro.dataHora)}</td><td className="px-4 py-3"><span className={`inline-flex rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${classeCategoria(registro.categoria)}`}>{rotuloCategoria(registro.categoria)}</span></td><td className="px-4 py-3"><div className="font-semibold text-white">{registro.acao}</div><div className="mt-1 text-xs text-slate-500">{registro.detalhe}</div></td><td className="px-4 py-3 text-slate-200">{registro.usuario}</td><td className="px-4 py-3">{registro.nestId ? <Link href={`/plasma/${registro.nestId}`} className="font-mono font-semibold text-cyan-200 hover:text-cyan-100">{registro.nestCodigo}</Link> : <span className="font-mono text-xs text-slate-500">{registro.nestCodigo}</span>}<div className="mt-1 text-xs text-slate-500">{registro.maquina}</div></td><td className="px-4 py-3 text-xs text-slate-300"><div>{registro.op}</div><div className="mt-1 text-slate-500">{registro.peca}</div></td><td className="px-4 py-3">{registro.boas === null ? <span className="text-slate-600">—</span> : <><span className="font-semibold text-emerald-200">{numero(registro.boas)}</span><span className="text-slate-500"> / </span><span className="font-semibold text-rose-200">{numero(registro.perdas ?? 0)}</span></>}</td><td className="px-4 py-3 font-mono text-xs text-slate-500">{registro.apontamentoId ? `Apontamento #${registro.apontamentoId}` : registro.id}</td></tr>)}</tbody></table>{registrosFiltrados.length === 0 && <Empty text="Nenhum registro encontrado com os filtros selecionados." />}</div></section>
+    <section id="registros" className="scroll-mt-5 overflow-hidden rounded-xl border border-slate-700 bg-[#202a36] shadow-lg shadow-black/10">
+      <SectionTitle title="Linha do tempo completa" subtitle={`${registrosFiltrados.length} evento(s) em ordem do mais recente para o mais antigo.`} />
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1450px] text-left text-sm">
+          <thead><tr className="border-b border-slate-700 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">Data e hora</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Ação</th><th className="px-4 py-3">Responsável</th><th className="px-4 py-3">NEST / máquina</th><th className="px-4 py-3">OP / peça</th><th className="px-4 py-3">Boas / perdas</th><th className="px-4 py-3">Registro</th></tr></thead>
+          <tbody>{registrosPaginados.itens.map((registro) => <tr key={registro.id} className="border-b border-slate-700/60 align-top last:border-0"><td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">{dataHora(registro.dataHora)}</td><td className="px-4 py-3"><span className={`inline-flex rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${classeCategoria(registro.categoria)}`}>{rotuloCategoria(registro.categoria)}</span></td><td className="px-4 py-3"><div className="font-semibold text-white">{registro.acao}</div><div className="mt-1 text-xs text-slate-500">{registro.detalhe}</div></td><td className="px-4 py-3 text-slate-200">{registro.usuario}</td><td className="px-4 py-3">{registro.nestId ? <Link href={`/plasma/${registro.nestId}`} className="font-mono font-semibold text-cyan-200 hover:text-cyan-100">{registro.nestCodigo}</Link> : <span className="font-mono text-xs text-slate-500">{registro.nestCodigo}</span>}<div className="mt-1 text-xs text-slate-500">{registro.maquina}</div></td><td className="px-4 py-3 text-xs text-slate-300"><div>{registro.op}</div><div className="mt-1 text-slate-500">{registro.peca}</div></td><td className="px-4 py-3">{registro.boas === null ? <span className="text-slate-600">—</span> : <><span className="font-semibold text-emerald-200">{numero(registro.boas)}</span><span className="text-slate-500"> / </span><span className="font-semibold text-rose-200">{numero(registro.perdas ?? 0)}</span></>}</td><td className="px-4 py-3 font-mono text-xs text-slate-500">{registro.apontamentoId ? `Apontamento #${registro.apontamentoId}` : registro.id}</td></tr>)}</tbody>
+        </table>
+        {registrosFiltrados.length === 0 && <Empty text="Nenhum registro encontrado com os filtros selecionados." />}
+      </div>
+      <PaginacaoRelatorio pagina={registrosPaginados.pagina} totalPaginas={registrosPaginados.totalPaginas} totalItens={registrosFiltrados.length} hrefParaPagina={(pagina) => hrefPagina("paginaRegistros", pagina, "#registros")} />
+    </section>
   </div>;
 }
 
-function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) { return <div className="border-b border-slate-700 bg-[#172238] px-4 py-3"><h2 className="text-sm font-bold uppercase tracking-wide text-slate-100">{title}</h2><p className="mt-1 text-xs text-slate-500">{subtitle}</p></div>; }
+function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {
+  return <div className="border-b border-slate-700 bg-[#172238] px-4 py-3"><h2 className="text-sm font-bold uppercase tracking-wide text-slate-100">{title}</h2><p className="mt-1 text-xs text-slate-500">{subtitle}</p></div>;
+}
+
+function PaginacaoRelatorio({ pagina, totalPaginas, totalItens, hrefParaPagina }: { pagina: number; totalPaginas: number; totalItens: number; hrefParaPagina: (pagina: number) => string }) {
+  if (totalItens <= ITENS_POR_PAGINA) return null;
+  const primeiro = (pagina - 1) * ITENS_POR_PAGINA + 1;
+  const ultimo = Math.min(pagina * ITENS_POR_PAGINA, totalItens);
+  return <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-[#172238] px-4 py-3 text-xs text-slate-400"><span>Exibindo {numero(primeiro)}–{numero(ultimo)} de {numero(totalItens)} registros · {ITENS_POR_PAGINA} por página</span><div className="flex gap-2"><Link aria-label="Página anterior" aria-disabled={pagina <= 1} className={`rounded border border-slate-600 px-3 py-1.5 font-semibold transition hover:border-cyan-300 hover:text-cyan-100 ${pagina <= 1 ? "pointer-events-none opacity-40" : ""}`} href={hrefParaPagina(Math.max(1, pagina - 1))}>Anterior</Link><Link aria-label="Próxima página" aria-disabled={pagina >= totalPaginas} className={`rounded border border-slate-600 px-3 py-1.5 font-semibold transition hover:border-cyan-300 hover:text-cyan-100 ${pagina >= totalPaginas ? "pointer-events-none opacity-40" : ""}`} href={hrefParaPagina(Math.min(totalPaginas, pagina + 1))}>Próxima</Link></div></footer>;
+}
+
 function Empty({ text }: { text: string }) { return <p className="px-4 py-10 text-center text-sm text-slate-500">{text}</p>; }
 function Kpi({ label, value, tone }: { label: string; value: string; tone: "violet" | "cyan" | "sky" | "emerald" | "rose" | "amber" | "neutral" }) { const classes = { violet: "border-violet-400/25 bg-violet-400/5 text-violet-200", cyan: "border-cyan-400/25 bg-cyan-400/5 text-cyan-200", sky: "border-sky-400/25 bg-sky-400/5 text-sky-200", emerald: "border-emerald-400/25 bg-emerald-400/5 text-emerald-200", rose: "border-rose-400/25 bg-rose-400/5 text-rose-200", amber: "border-amber-400/25 bg-amber-400/5 text-amber-200", neutral: "border-slate-700 bg-slate-900/25 text-slate-100" }[tone]; return <article className={`rounded-xl border p-4 ${classes}`}><p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p><p className="mt-2 text-2xl font-black">{value}</p></article>; }
 const filterLabelClass = "mb-1 block font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500";
