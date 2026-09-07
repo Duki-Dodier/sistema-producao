@@ -322,7 +322,7 @@ export function RelatoriosProducao({
     <div className="flex flex-col gap-5">
       <section className="overflow-hidden rounded-xl border border-violet-400/25 bg-[#131b2e]">
         <SectionTitle title="Capacidade dos setores" subtitle="Visão diária de fila, produção, tempo médio, capacidade estimada e gargalos." />
-        <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead><tr className="border-b border-white/10 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">Setor</th><th className="px-4 py-3">Em fila</th><th className="px-4 py-3">Produzida hoje</th><th className="px-4 py-3">Tempo médio</th><th className="px-4 py-3">Capacidade estimada/dia</th><th className="px-4 py-3">Gargalo atual</th><th className="px-4 py-3">Máquina mais usada</th></tr></thead><tbody>{capacidadeSetores.map((item) => <tr key={item.setorNome} className="border-b border-white/5 last:border-0"><td className="px-4 py-3 font-semibold text-white">{item.setorNome}</td><td className={`px-4 py-3 font-mono ${item.fila > 0 ? "text-amber-200" : "text-slate-400"}`}>{item.fila}</td><td className="px-4 py-3 font-mono text-emerald-300">{item.produzidaHoje}</td><td className="px-4 py-3 font-mono text-cyan-200">{item.tempoMedioSegundos === null ? "—" : formatDuracao(item.tempoMedioSegundos)}</td><td className="px-4 py-3 font-mono text-violet-200">{item.capacidadeEstimada === null ? "—" : item.capacidadeEstimada.toFixed(1)}</td><td className={`px-4 py-3 text-xs ${item.fila > 0 ? "text-amber-200" : "text-emerald-300"}`}>{item.gargalo}</td><td className="px-4 py-3 font-mono text-slate-300">{item.maquinaMaisUsada}</td></tr>)}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead><tr className="border-b border-white/10 font-mono text-[10px] uppercase tracking-wider text-slate-500"><th className="px-4 py-3">Setor</th><th className="px-4 py-3">Em fila</th><th className="px-4 py-3">Produzida hoje</th><th className="px-4 py-3">Tempo médio</th><th className="px-4 py-3">Capacidade estimada/dia</th><th className="px-4 py-3">Gargalo atual</th><th className="px-4 py-3">Máquina mais usada</th></tr></thead><tbody>{capacidadeSetores.map((item) => <tr key={item.setorNome} className="border-b border-white/5 last:border-0"><td className="px-4 py-3 font-semibold text-white">{item.setorNome.toLocaleUpperCase("pt-BR")}</td><td className={`px-4 py-3 font-mono ${item.fila > 0 ? "text-amber-200" : "text-slate-400"}`}>{item.fila}</td><td className="px-4 py-3 font-mono text-emerald-300">{item.produzidaHoje}</td><td className="px-4 py-3 font-mono text-cyan-200">{item.tempoMedioSegundos === null ? "—" : formatDuracao(item.tempoMedioSegundos)}</td><td className="px-4 py-3 font-mono text-violet-200">{item.capacidadeEstimada === null ? "—" : item.capacidadeEstimada.toFixed(1)}</td><td className={`px-4 py-3 text-xs ${item.fila > 0 ? "text-amber-200" : "text-emerald-300"}`}>{item.gargalo}</td><td className="px-4 py-3 font-mono text-slate-300">{item.maquinaMaisUsada}</td></tr>)}</tbody></table></div>
       </section>
       <section className="overflow-hidden rounded-xl border border-emerald-400/25 bg-[#131b2e]">
         <SectionTitle
@@ -448,7 +448,7 @@ export function RelatoriosProducao({
                 <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300">Relatório do produto principal</div>
                 <h2 className="mt-1 text-xl font-bold text-white">{codigoPrincipal}</h2>
               </div>
-              <div className="text-right text-xs text-slate-400">{resumoProduto.ops.length} OP(s) analisada(s)<br />{resumoProduto.setores || "Setor ainda não informado"}</div>
+              <div className="text-right text-xs text-slate-400">{resumoProduto.ops.length} OP(s) analisada(s)<br />{resumoProduto.setores ? resumoProduto.setores.toLocaleUpperCase("pt-BR") : "Setor ainda não informado"}</div>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               <Kpi label="Tempo total das OPs" value={formatDuracao(resumoProduto.tempoTotal)} tone="cyan" />
@@ -465,7 +465,7 @@ export function RelatoriosProducao({
               </div>
               <div className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1326]">
                 <div className="border-b border-white/10 px-4 py-3"><h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-300">Peças do produto</h3><p className="mt-1 text-xs text-slate-500">Tempo médio por peça/OP e tempo aproximado por unidade.</p></div>
-                <div className="max-h-72 overflow-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-white/10 font-mono text-[10px] uppercase text-slate-500"><th className="px-4 py-3">Peça</th><th className="px-4 py-3">Setor</th><th className="px-4 py-3">Média peça/OP</th><th className="px-4 py-3">Quantidade</th></tr></thead><tbody>{resumoProduto.pecas.map((peca) => <tr key={`${peca.pecaCodigo}-${peca.setorNome}`} className="border-b border-white/5 last:border-0"><td className="px-4 py-3"><div className="font-semibold text-white">{peca.pecaCodigo}</div><div className="text-xs text-slate-400">{peca.pecaNome}</div></td><td className="px-4 py-3 text-xs text-slate-400">{peca.setorNome}</td><td className="px-4 py-3 font-mono text-amber-200">{formatDuracao(peca.tempoSegundos / peca.ops.size)}</td><td className="px-4 py-3 text-emerald-300">{peca.quantidade}</td></tr>)}</tbody></table></div>
+                <div className="max-h-72 overflow-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-white/10 font-mono text-[10px] uppercase text-slate-500"><th className="px-4 py-3">Peça</th><th className="px-4 py-3">Setor</th><th className="px-4 py-3">Média peça/OP</th><th className="px-4 py-3">Quantidade</th></tr></thead><tbody>{resumoProduto.pecas.map((peca) => <tr key={`${peca.pecaCodigo}-${peca.setorNome}`} className="border-b border-white/5 last:border-0"><td className="px-4 py-3"><div className="font-semibold text-white">{peca.pecaCodigo}</div><div className="text-xs text-slate-400">{peca.pecaNome}</div></td><td className="px-4 py-3 text-xs text-slate-400">{peca.setorNome.toLocaleUpperCase("pt-BR")}</td><td className="px-4 py-3 font-mono text-amber-200">{formatDuracao(peca.tempoSegundos / peca.ops.size)}</td><td className="px-4 py-3 text-emerald-300">{peca.quantidade}</td></tr>)}</tbody></table></div>
               </div>
             </div>
             <p className="mt-3 text-xs text-slate-500">Máquinas utilizadas: {resumoProduto.maquinas || "ainda não informadas"}.</p>
@@ -476,7 +476,7 @@ export function RelatoriosProducao({
           <div className="border-t border-white/10 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><div className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">Relatório do operador</div><h2 className="mt-1 text-xl font-bold text-white">{operadorRelatorio}</h2></div>
-              <div className="text-right text-xs text-slate-400">{resumoOperador.ops} OP(s) · {resumoOperador.registros} lançamento(s)<br />{resumoOperador.setores || "Setor ainda não informado"}</div>
+              <div className="text-right text-xs text-slate-400">{resumoOperador.ops} OP(s) · {resumoOperador.registros} lançamento(s)<br />{resumoOperador.setores ? resumoOperador.setores.toLocaleUpperCase("pt-BR") : "Setor ainda não informado"}</div>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               <Kpi label="Tempo total" value={formatDuracao(resumoOperador.tempoTotal)} tone="emerald" />
@@ -529,7 +529,7 @@ export function RelatoriosProducao({
           />
           <select value={setor} onChange={(event) => { setSetor(event.target.value); setOperador(""); setMaquina(""); }} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
             <option value="">Todos os setores</option>
-            {opcoes.setores.map((item) => <option key={item} value={item}>{item}</option>)}
+            {opcoes.setores.map((item) => <option key={item} value={item}>{item.toLocaleUpperCase("pt-BR")}</option>)}
           </select>
           <select value={operador} onChange={(event) => setOperador(event.target.value)} className="rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300">
             <option value="">Todos os operadores</option>
@@ -568,7 +568,7 @@ export function RelatoriosProducao({
                 <tr key={item.id} className="border-b border-white/5 last:border-0">
                   <td className="px-4 py-3"><div className="font-mono text-cyan-300">OP {item.opNumero} · {item.modeloCodigo}</div></td>
                   <td className="px-4 py-3 text-slate-200">{item.pecaNome ?? "Produto principal"}</td>
-                  <td className="px-4 py-3 text-slate-400">{item.setorNome}</td>
+                  <td className="px-4 py-3 text-slate-400">{item.setorNome.toLocaleUpperCase("pt-BR")}</td>
                   <td className="px-4 py-3 text-slate-200">{item.usuario}</td>
                   <td className="px-4 py-3 font-mono text-amber-200">{item.maquinaCodigo}</td>
                   <td className="px-4 py-3 font-mono text-amber-200">{formatDuracao(agora ? Math.max(0, Math.floor((agora - new Date(item.iniciadoEm).getTime()) / 1000)) : 0)}</td>
@@ -616,7 +616,7 @@ export function RelatoriosProducao({
               <tr key={`${peca.opNumero}-${peca.pecaCodigo}-${peca.setorNome}`} className="border-b border-white/5 last:border-0">
                 <td className="px-4 py-3 font-mono text-cyan-300">OP {peca.opNumero} · {peca.modeloCodigo}</td>
                 <td className="px-4 py-3"><div className="font-semibold text-white">{peca.pecaCodigo}</div><div className="text-xs text-slate-400">{peca.pecaNome}</div></td>
-                <td className="px-4 py-3 text-slate-400">{peca.setorNome}</td>
+                <td className="px-4 py-3 text-slate-400">{peca.setorNome.toLocaleUpperCase("pt-BR")}</td>
                 <td className="px-4 py-3 text-emerald-300">{peca.quantidade}</td>
                 <td className="px-4 py-3 font-mono text-amber-200">{formatDuracao(peca.tempoSegundos)}</td>
                 <td className="px-4 py-3 text-xs text-slate-300">{[...peca.operadores].join(", ")}</td>
