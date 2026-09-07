@@ -26,7 +26,21 @@ function numero(valor: number) { return valor.toLocaleString("pt-BR"); }
 function dataHora(valor: Date) { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(valor); }
 function duracao(segundos: number) { if (!segundos || segundos <= 0) return "-"; const horas = Math.floor(segundos / 3600); const minutos = Math.floor((segundos % 3600) / 60); const resto = segundos % 60; return [horas, minutos, resto].map((parte) => String(parte).padStart(2, "0")).join(":"); }
 function conjunto(valor: Set<string>) { return [...valor].join(", ") || "-"; }
-function filtroTexto(filtros: FiltrosRelatorioPlasma) { const itens = [`Busca: ${filtros.busca || "todas"}`, `Período: ${filtros.dataInicio || "início"} a ${filtros.dataFim || "hoje"}`, `Máquina: ${filtros.maquina || "todas"}`, `Pessoa: ${filtros.operador || "todas"}`, `Situação: ${filtros.status || "todas"}`, `Tipo: ${filtros.tipo || "todos"}`]; return itens.join("  |  "); }
+function filtroTexto(filtros: FiltrosRelatorioPlasma, dados: DadosRelatorioPlasma) {
+  const maquinaId = Number(filtros.maquina);
+  const operadorId = Number(filtros.operador);
+  const maquina = dados.maquinas.find((item) => item.id === maquinaId);
+  const operador = dados.operadores.find((item) => item.id === operadorId);
+  const itens = [
+    `Busca: ${filtros.busca || "todas"}`,
+    `Período: ${filtros.dataInicio || "início"} a ${filtros.dataFim || "hoje"}`,
+    `Máquina: ${maquina ? rotuloMaquina(maquina.codigo, maquina.nome) : "todas"}`,
+    `Pessoa: ${operador?.nome || "todas"}`,
+    `Situação: ${filtros.status || "todas"}`,
+    `Tipo: ${filtros.tipo || "todos"}`,
+  ];
+  return itens.join("  |  ");
+}
 
 export function gerarPdfRelatorioPlasma(dados: DadosRelatorioPlasma, filtros: FiltrosRelatorioPlasma, logo?: Uint8Array) {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape", compress: true });
@@ -57,7 +71,7 @@ export function gerarPdfRelatorioPlasma(dados: DadosRelatorioPlasma, filtros: Fi
   doc.setProperties({ title: "Relatório de rastreabilidade - Plasma Chapa", subject: "Produção e rastreabilidade", author: "Engates Brucke" });
   cabecalho(true);
   secao("Filtros aplicados");
-  garantir(14); doc.setFillColor(...PALE); doc.setDrawColor(...LINE); doc.roundedRect(margem, y - 5, largura, 14, 1, 1, "FD"); texto(filtroTexto(filtros), margem + 4, y + 3, 7, false, INK); y += 16;
+  garantir(14); doc.setFillColor(...PALE); doc.setDrawColor(...LINE); doc.roundedRect(margem, y - 5, largura, 14, 1, 1, "FD"); texto(filtroTexto(filtros, dados), margem + 4, y + 3, 7, false, INK); y += 16;
 
   secao("Indicadores gerais");
   const kpis: Array<[string, string]> = [["NESTs", numero(dados.nests.length)], ["OPs", numero(dados.totalOps)], ["Pessoas", numero(dados.pessoas.length)], ["Programadas", numero(dados.totalProgramado)], ["Boas declaradas", numero(dados.totalDeclarado)], ["Liberadas", numero(dados.totalLiberado)], ["Perdas", numero(dados.totalPerdas)], ["A conferir", numero(dados.aguardandoConferencia)]];

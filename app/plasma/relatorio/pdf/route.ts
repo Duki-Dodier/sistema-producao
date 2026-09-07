@@ -36,11 +36,13 @@ export async function GET(request: Request) {
   } catch { /* O cabeçalho usa a marca textual como contingência. */ }
 
   const pdf = gerarPdfRelatorioPlasma(dados, filtros, logo);
-  const data = new Date().toISOString().slice(0, 10);
+  const periodo = filtros.dataInicio || filtros.dataFim
+    ? `${filtros.dataInicio || "inicio"}-a-${filtros.dataFim || "hoje"}`
+    : new Date().toISOString().slice(0, 10);
   return new Response(pdf, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="relatorio-plasma-${nomeArquivo(data)}.pdf"`,
+      "Content-Disposition": `attachment; filename="relatorio-plasma-${nomeArquivo(periodo)}.pdf"`,
       "Cache-Control": "no-store",
     },
   });
