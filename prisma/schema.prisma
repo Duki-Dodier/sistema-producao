@@ -38,9 +38,10 @@ model Setor {
   roteirosPeca            PecaRoteiro[]
   funcionarios            Funcionario[]
   recebimentosAgrupamento RecebimentoAgrupamento[]
-  maquinas               Maquina[]
-  producoesEmAndamento   ProducaoEmAndamento[]
-  nestsCorte             NestCorte[]
+  maquinas                Maquina[]
+  producoesEmAndamento    ProducaoEmAndamento[]
+  nestsCorte              NestCorte[]
+  planosCorteTubo         PlanoCorteTubo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -61,16 +62,19 @@ model Funcionario {
   administrador Boolean @default(false)
   bancada       String? // bancada/box fixa do soldador, editável em Configurações
 
-  setor               Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  processosPermitidos FuncionarioProcesso[]
-  apontamentos        Apontamento[]
-  sessoes             OperadorSessao[]
-  ajustesAutorizados  AjusteApontamento[]
-  producoesEmAndamento ProducaoEmAndamento[]
-  nestsProgramados     NestCorte[]       @relation("NestProgramador")
-  eventosNest          NestEvento[]
-  lancamentosNest      NestLancamento[] @relation("NestLancamentoOperador")
-  conferenciasNest     NestLancamento[] @relation("NestLancamentoConferente")
+  setor                     Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  processosPermitidos       FuncionarioProcesso[]
+  apontamentos              Apontamento[]
+  sessoes                   OperadorSessao[]
+  ajustesAutorizados        AjusteApontamento[]
+  producoesEmAndamento      ProducaoEmAndamento[]
+  nestsProgramados          NestCorte[]           @relation("NestProgramador")
+  eventosNest               NestEvento[]
+  lancamentosNest           NestLancamento[]      @relation("NestLancamentoOperador")
+  conferenciasNest          NestLancamento[]      @relation("NestLancamentoConferente")
+  planosCorteTuboCriados    PlanoCorteTubo[]      @relation("PlanoTuboCriador")
+  planosCorteTuboConcluidos PlanoCorteTubo[]      @relation("PlanoTuboConcluidor")
+  planosCorteTuboCancelados PlanoCorteTubo[]      @relation("PlanoTuboCancelador")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -93,16 +97,17 @@ model FuncionarioProcesso {
 /// Máquina/posto de produção disponível em um setor. Os códigos iniciais são
 /// fictícios e podem ser trocados pelos nomes reais sem alterar os registros.
 model Maquina {
-  id       Int     @id @default(autoincrement())
-  codigo   String
-  nome     String
-  setorId  Int
-  ativo    Boolean @default(true)
+  id      Int     @id @default(autoincrement())
+  codigo  String
+  nome    String
+  setorId Int
+  ativo   Boolean @default(true)
 
-  setor        Setor          @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  apontamentos Apontamento[]
+  setor                Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  apontamentos         Apontamento[]
   producoesEmAndamento ProducaoEmAndamento[]
-  nestsCorte NestCorte[]
+  nestsCorte           NestCorte[]
+  planosCorteTubo      PlanoCorteTubo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -163,13 +168,14 @@ model Peca {
   processos     String? // roteiro interno ordenado: CORTE,FURACAO,DOBRA,CORTE_GRAU
   observacao    String? // impresso na ficha técnica da OP, ex.: "CORTE EM GRAU", "ITEM RETO"
 
-  setor        Setor         @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  modelos      ModeloPeca[]
-  apontamentos Apontamento[]
-  producoesEmAndamento ProducaoEmAndamento[]
-  roteiro      PecaRoteiro[]
-  curvas       PecaCurva[]
-  itensNest    NestItem[]
+  setor                          Setor                  @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  modelos                        ModeloPeca[]
+  apontamentos                   Apontamento[]
+  producoesEmAndamento           ProducaoEmAndamento[]
+  roteiro                        PecaRoteiro[]
+  curvas                         PecaCurva[]
+  itensNest                      NestItem[]
+  itensPlanoCorteTubo            PlanoCorteTuboItem[]
   configuracoesPonteiraComoTubo  ConfiguracaoPonteira[] @relation("PonteiraTubo")
   configuracoesPonteiraComoChapa ConfiguracaoPonteira[] @relation("PonteiraChapa")
 
@@ -203,9 +209,9 @@ model ConfiguracaoPonteira {
 /// Histórico geral de alterações para rastreabilidade de cadastros e produção.
 model HistoricoAlteracao {
   id          Int      @id @default(autoincrement())
-  entidade    String   // MODELO | BOM | ROTEIRO | ESTOQUE | OP | NEST | FUNCIONARIO
+  entidade    String // MODELO | BOM | ROTEIRO | ESTOQUE | OP | NEST | FUNCIONARIO
   entidadeId  Int?
-  acao        String   // CRIADO | ATUALIZADO | EXCLUIDO | MOVIMENTADO
+  acao        String // CRIADO | ATUALIZADO | EXCLUIDO | MOVIMENTADO
   descricao   String
   usuario     String
   dadosAntes  String?
@@ -219,11 +225,11 @@ model HistoricoAlteracao {
 /// Saldo físico livre das ponteiras e dos componentes já cortados.
 /// Os saldos são separados das OPs, que têm o próprio rastreamento de produção.
 model EstoquePonteira {
-  id               Int @id @default(autoincrement())
-  tamanho          String @unique // PEQUENA | MEDIA | GRANDE
-  quantidadePronta Int @default(0)
-  tubosCortados    Int @default(0)
-  chapasCortadas   Int @default(0)
+  id               Int      @id @default(autoincrement())
+  tamanho          String   @unique // PEQUENA | MEDIA | GRANDE
+  quantidadePronta Int      @default(0)
+  tubosCortados    Int      @default(0)
+  chapasCortadas   Int      @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -289,9 +295,9 @@ model PecaRoteiro {
   processo String
   ordem    Int
 
-  peca         Peca          @relation(fields: [pecaId], references: [id], onDelete: Cascade)
-  setor        Setor         @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  apontamentos Apontamento[]
+  peca                 Peca                  @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  setor                Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  apontamentos         Apontamento[]
   producoesEmAndamento ProducaoEmAndamento[]
 
   @@unique([pecaId, ordem])
@@ -312,9 +318,9 @@ model Modelo {
   regulador       Int? // legado: não é usado na operação; o valor vigente é estoqueMinimo
   linhaProduto    String  @default("BRUCKE") // "BRUCKE" | "REFORCEL"
 
-  roteiro ModeloRoteiro[]
-  ops     OP[]
-  pecas   ModeloPeca[]
+  roteiro              ModeloRoteiro[]
+  ops                  OP[]
+  pecas                ModeloPeca[]
   configuracaoPonteira ConfiguracaoPonteira?
 
   createdAt DateTime @default(now())
@@ -356,6 +362,7 @@ model OP {
   entradasEstoque         EntradaEstoque[]
   producoesEmAndamento    ProducaoEmAndamento[]
   itensNest               NestItem[]
+  itensPlanoCorteTubo     PlanoCorteTuboItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -397,33 +404,33 @@ model EntradaEstoque {
 /// Apontamento de produção: "na OP X, no setor Y, o líder produziu N boas / M refugo".
 /// É por OP+setor (quantidade), não por peça individual.
 model Apontamento {
-  id                Int      @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   opId              Int
   setorId           Int
   funcionarioId     Int?
   usuario           String // líder do setor que lançou
-  quantidadeBoa     Int      @default(0)
-  quantidadeRefugo  Int      @default(0)
-  dataHora          DateTime @default(now())
+  quantidadeBoa     Int       @default(0)
+  quantidadeRefugo  Int       @default(0)
+  dataHora          DateTime  @default(now())
   soldador          String? // só usado em apontamentos do setor Solda
   bancada           String? // ex.: "BOX 22" — só usado em apontamentos do setor Solda
   abastecedor       String? // quem abasteceu a bancada — só usado em apontamentos do setor Solda
-  quantidadeSoldada Int      @default(0) // nos envios de Solda: quanto do abastecido já foi soldado de fato
+  quantidadeSoldada Int       @default(0) // nos envios de Solda: quanto do abastecido já foi soldado de fato
   pecaId            Int? // se o setor tem peças (BOM) cadastradas, aponta para qual peça
   processo          String? // CORTE | FURACAO | DOBRA | CORTE_GRAU
   roteiroEtapaId    Int? // etapa exata do roteiro entre setores
-  origem            String   @default("OPERADOR") // OPERADOR | LEGADO
+  origem            String    @default("OPERADOR") // OPERADOR | LEGADO
   maquinaId         Int? // máquina/posto usado no apontamento
   tempoSegundos     Int? // tempo efetivo informado pelo operador/monitor
   inicioEm          DateTime? // início estimado do ciclo; dataHora é o fim
 
-  op           OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
-  setor        Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  funcionario  Funcionario?        @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
-  peca         Peca?               @relation(fields: [pecaId], references: [id], onDelete: SetNull)
-  roteiroEtapa PecaRoteiro?        @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
-  maquina      Maquina?             @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
-  ajustes      AjusteApontamento[]
+  op             OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
+  setor          Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  funcionario    Funcionario?        @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
+  peca           Peca?               @relation(fields: [pecaId], references: [id], onDelete: SetNull)
+  roteiroEtapa   PecaRoteiro?        @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
+  maquina        Maquina?            @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
+  ajustes        AjusteApontamento[]
   lancamentoNest NestLancamento?
 
   @@index([opId])
@@ -438,36 +445,36 @@ model Apontamento {
 /// Programação de corte criada no Libellula (ou equivalente). Um nest pode
 /// aproveitar uma única chapa para atender peças de diversas OPs.
 model NestCorte {
-  id                    Int      @id @default(autoincrement())
-  codigo                String   @unique // Ex.: NEST3530
-  nomeArquivo           String?
-  arquivoPdfUrl         String?  // PDF de agrupamento exportado pelo Libellula
-  setorId               Int
-  maquinaId             Int
-  programadorId         Int
-  material              String   @default("Aço")
-  espessuraMm           Float?
-  larguraChapaMm        Float?
-  alturaChapaMm         Float?
-  pesoChapaKg           Float?
-  pesoPecasKg           Float?
-  pesoSobraKg           Float?
-  aproveitamentoPct     Float?
-  quantidadeChapas      Int      @default(1)
-  numeroPiercings       Int?
-  comprimentoCorteMm    Float?
-  comprimentoRapidoMm   Float?
-  tempoCorteSegundos    Int?
+  id                        Int       @id @default(autoincrement())
+  codigo                    String    @unique // Ex.: NEST3530
+  nomeArquivo               String?
+  arquivoPdfUrl             String? // PDF de agrupamento exportado pelo Libellula
+  setorId                   Int
+  maquinaId                 Int
+  programadorId             Int
+  material                  String    @default("Aço")
+  espessuraMm               Float?
+  larguraChapaMm            Float?
+  alturaChapaMm             Float?
+  pesoChapaKg               Float?
+  pesoPecasKg               Float?
+  pesoSobraKg               Float?
+  aproveitamentoPct         Float?
+  quantidadeChapas          Int       @default(1)
+  numeroPiercings           Int?
+  comprimentoCorteMm        Float?
+  comprimentoRapidoMm       Float?
+  tempoCorteSegundos        Int?
   tempoDeslocamentoSegundos Int?
-  status                String   @default("PROGRAMADO") // PROGRAMADO | EM_CORTE | PAUSADO | CONCLUIDO | CANCELADO
-  iniciadoEm            DateTime?
-  finalizadoEm          DateTime?
-  refeitoDeId           Int? // NEST original que originou esta nova programação
-  observacao            String?
+  status                    String    @default("PROGRAMADO") // PROGRAMADO | EM_CORTE | PAUSADO | CONCLUIDO | CANCELADO
+  iniciadoEm                DateTime?
+  finalizadoEm              DateTime?
+  refeitoDeId               Int? // NEST original que originou esta nova programação
+  observacao                String?
 
-  setor       Setor       @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  maquina     Maquina     @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
-  programador Funcionario @relation("NestProgramador", fields: [programadorId], references: [id], onDelete: Restrict)
+  setor       Setor        @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  maquina     Maquina      @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
+  programador Funcionario  @relation("NestProgramador", fields: [programadorId], references: [id], onDelete: Restrict)
   itens       NestItem[]
   eventos     NestEvento[]
 
@@ -481,15 +488,15 @@ model NestCorte {
 
 /// Peça planejada dentro de um nest, vinculada à OP que ela deve atender.
 model NestItem {
-  id                   Int @id @default(autoincrement())
-  nestId               Int
-  opId                 Int
-  pecaId               Int
-  quantidadePlanejada  Int
+  id                  Int @id @default(autoincrement())
+  nestId              Int
+  opId                Int
+  pecaId              Int
+  quantidadePlanejada Int
 
-  nest        NestCorte       @relation(fields: [nestId], references: [id], onDelete: Cascade)
-  op          OP              @relation(fields: [opId], references: [id], onDelete: Restrict)
-  peca        Peca            @relation(fields: [pecaId], references: [id], onDelete: Restrict)
+  nest        NestCorte        @relation(fields: [nestId], references: [id], onDelete: Cascade)
+  op          OP               @relation(fields: [opId], references: [id], onDelete: Restrict)
+  peca        Peca             @relation(fields: [pecaId], references: [id], onDelete: Restrict)
   lancamentos NestLancamento[]
 
   createdAt DateTime @default(now())
@@ -505,7 +512,7 @@ model NestEvento {
   id            Int      @id @default(autoincrement())
   nestId        Int
   funcionarioId Int
-  tipo          String   // PROGRAMADO | INICIO | PAUSA | RETORNO | FIM | CANCELAMENTO | CONFERENCIA | REPOSICAO_SOLICITADA | REPOSICAO_VISUALIZADA
+  tipo          String // PROGRAMADO | INICIO | PAUSA | RETORNO | FIM | CANCELAMENTO | CONFERENCIA | REPOSICAO_SOLICITADA | REPOSICAO_VISUALIZADA
   descricao     String?
   dataHora      DateTime @default(now())
 
@@ -536,8 +543,8 @@ model NestLancamento {
   quantidadeConferidaRefugo Int?
   motivoConferencia         String?
 
-  item        NestItem    @relation(fields: [nestItemId], references: [id], onDelete: Cascade)
-  funcionario Funcionario @relation("NestLancamentoOperador", fields: [funcionarioId], references: [id], onDelete: Restrict)
+  item        NestItem     @relation(fields: [nestItemId], references: [id], onDelete: Cascade)
+  funcionario Funcionario  @relation("NestLancamentoOperador", fields: [funcionarioId], references: [id], onDelete: Restrict)
   conferente  Funcionario? @relation("NestLancamentoConferente", fields: [conferenteId], references: [id], onDelete: Restrict)
   apontamento Apontamento? @relation(fields: [apontamentoId], references: [id], onDelete: SetNull)
 
@@ -549,24 +556,24 @@ model NestLancamento {
 /// concluída. A linha vira um Apontamento no encerramento, preservando o
 /// horário real de início e o tempo efetivo do processo.
 model ProducaoEmAndamento {
-  id              Int      @id @default(autoincrement())
-  opId            Int
-  setorId         Int
-  funcionarioId   Int
-  pecaId          Int?
-  roteiroEtapaId  Int?
-  processo        String?
-  maquinaId       Int
-  usuario         String
-  iniciadoEm      DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  opId               Int
+  setorId            Int
+  funcionarioId      Int
+  pecaId             Int?
+  roteiroEtapaId     Int?
+  processo           String?
+  maquinaId          Int
+  usuario            String
+  iniciadoEm         DateTime @default(now())
   quantidadePrevista Int?
 
-  op           OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
-  setor        Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  funcionario  Funcionario         @relation(fields: [funcionarioId], references: [id], onDelete: Restrict)
-  peca         Peca?               @relation(fields: [pecaId], references: [id], onDelete: SetNull)
-  roteiroEtapa PecaRoteiro?        @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
-  maquina      Maquina             @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
+  op           OP           @relation(fields: [opId], references: [id], onDelete: Cascade)
+  setor        Setor        @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  funcionario  Funcionario  @relation(fields: [funcionarioId], references: [id], onDelete: Restrict)
+  peca         Peca?        @relation(fields: [pecaId], references: [id], onDelete: SetNull)
+  roteiroEtapa PecaRoteiro? @relation(fields: [roteiroEtapaId], references: [id], onDelete: SetNull)
+  maquina      Maquina      @relation(fields: [maquinaId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -611,3 +618,113 @@ model ConferenciaPCPItem {
   @@index([conferenciaId])
 }
 
+/// Plano emitido para otimizar o corte de tubos de 6 metros.
+model PlanoCorteTubo {
+  id                          Int       @id @default(autoincrement())
+  codigo                      String    @unique
+  setorId                     Int
+  maquinaId                   Int?
+  criadoPorId                 Int
+  concluidoPorId              Int?
+  canceladoPorId              Int?
+  status                      String    @default("EMITIDO") // EMITIDO | CONCLUIDO | CANCELADO
+  comprimentoBarraMm          Float     @default(6000)
+  perdaCorteMm                Float
+  margemInicialMm             Float
+  margemFinalMm               Float
+  minimoSobraMm               Float
+  snapshotHash                String    @unique
+  totalBarrasNovas            Int       @default(0)
+  totalSobrasUsadas           Int       @default(0)
+  totalPecas                  Int       @default(0)
+  comprimentoPecasMm          Float     @default(0)
+  perdaCortesTotalMm          Float     @default(0)
+  sobraReutilizavelPrevistaMm Float     @default(0)
+  desperdicioPrevistoMm       Float     @default(0)
+  aproveitamentoPct           Float     @default(0)
+  emitidoEm                   DateTime  @default(now())
+  concluidoEm                 DateTime?
+  canceladoEm                 DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+
+  setor            Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  maquina          Maquina?              @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
+  criadoPor        Funcionario           @relation("PlanoTuboCriador", fields: [criadoPorId], references: [id], onDelete: Restrict)
+  concluidoPor     Funcionario?          @relation("PlanoTuboConcluidor", fields: [concluidoPorId], references: [id], onDelete: SetNull)
+  canceladoPor     Funcionario?          @relation("PlanoTuboCancelador", fields: [canceladoPorId], references: [id], onDelete: SetNull)
+  barras           PlanoCorteTuboBarra[]
+  sobrasOrigem     SobraTubo[]           @relation("SobraPlanoOrigem")
+  sobrasReservadas SobraTubo[]           @relation("SobraPlanoReserva")
+  sobrasConsumidas SobraTubo[]           @relation("SobraPlanoConsumo")
+
+  @@index([setorId, status])
+  @@index([emitidoEm])
+}
+
+model PlanoCorteTuboBarra {
+  id                     Int    @id @default(autoincrement())
+  planoId                Int
+  ordem                  Int
+  perfilA                Float
+  perfilB                Float?
+  espessuraMm            Float
+  origem                 String // NOVA | SOBRA
+  comprimentoOrigemMm    Float
+  sobraOrigemId          Int?
+  comprimentoConsumidoMm Float
+  sobraPrevistaMm        Float
+  sobraRealMm            Float?
+  aproveitamentoPct      Float
+
+  plano PlanoCorteTubo       @relation(fields: [planoId], references: [id], onDelete: Cascade)
+  itens PlanoCorteTuboItem[]
+
+  @@unique([planoId, ordem])
+  @@index([planoId])
+  @@index([sobraOrigemId])
+}
+
+model PlanoCorteTuboItem {
+  id                    Int   @id @default(autoincrement())
+  barraId               Int
+  opId                  Int
+  pecaId                Int
+  ordem                 Int
+  quantidade            Int   @default(1)
+  comprimentoUnitarioMm Float
+  consumoTotalMm        Float
+
+  barra PlanoCorteTuboBarra @relation(fields: [barraId], references: [id], onDelete: Cascade)
+  op    OP                  @relation(fields: [opId], references: [id], onDelete: Restrict)
+  peca  Peca                @relation(fields: [pecaId], references: [id], onDelete: Restrict)
+
+  @@unique([barraId, ordem])
+  @@index([opId])
+  @@index([pecaId])
+}
+
+/// Estoque auditável de pontas de tubo que ainda podem ser reaproveitadas.
+model SobraTubo {
+  id             Int      @id @default(autoincrement())
+  codigo         String   @unique
+  perfilA        Float
+  perfilB        Float?
+  espessuraMm    Float
+  comprimentoMm  Float
+  status         String   @default("DISPONIVEL") // DISPONIVEL | RESERVADA | CONSUMIDA | DESCARTADA
+  planoOrigemId  Int?
+  planoReservaId Int?
+  planoConsumoId Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  planoOrigem  PlanoCorteTubo? @relation("SobraPlanoOrigem", fields: [planoOrigemId], references: [id], onDelete: SetNull)
+  planoReserva PlanoCorteTubo? @relation("SobraPlanoReserva", fields: [planoReservaId], references: [id], onDelete: SetNull)
+  planoConsumo PlanoCorteTubo? @relation("SobraPlanoConsumo", fields: [planoConsumoId], references: [id], onDelete: SetNull)
+
+  @@index([status, perfilA, perfilB, espessuraMm])
+  @@index([planoOrigemId])
+  @@index([planoReservaId])
+  @@index([planoConsumoId])
+}

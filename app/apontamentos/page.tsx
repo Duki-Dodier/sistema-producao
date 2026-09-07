@@ -81,9 +81,10 @@ export default async function ApontamentosPage({
 
   const setorSolda = ehSetor(setor.nome, "Solda");
   const setorPlasmaChapa = ehSetor(setor.nome, "Plasma Chapa");
+  const setorTubo = ehSetor(setor.nome, "Tubo");
 
-  if (setorPlasmaChapa && Number.isInteger(opIdFiltro) && opIdFiltro > 0) {
-    const conferencia = Number.isInteger(opIdFiltro) && opIdFiltro > 0 && Number.isInteger(pecaIdFiltro) && pecaIdFiltro > 0
+  if (setorPlasmaChapa && opIdFiltro !== null && Number.isInteger(opIdFiltro) && opIdFiltro > 0) {
+    const conferencia = pecaIdFiltro !== null && Number.isInteger(pecaIdFiltro) && pecaIdFiltro > 0
       ? await buscarConferenciaPlasmaFabrica({ opId: opIdFiltro, pecaId: pecaIdFiltro, setorId: setor.id })
       : null;
 
@@ -485,6 +486,13 @@ export default async function ApontamentosPage({
         subtitle="Tela simples do operador · OP, peça, processo atual e quantidade executada."
       />
 
+      {setorTubo && (
+        <nav className="inline-flex w-fit rounded-xl border border-slate-700 bg-slate-900 p-1">
+          <span className="rounded-lg bg-cyan-400/15 px-5 py-2.5 font-mono text-xs font-black uppercase tracking-wider text-cyan-300">Produção</span>
+          <Link href="/tubo/plano-corte" className="rounded-lg px-5 py-2.5 font-mono text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white">Plano de corte</Link>
+        </nav>
+      )}
+
       <div className="flex items-center gap-2 overflow-x-auto rounded-lg border border-slate-700 bg-[#131b2e] p-3">
         <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
           {modoQr ? "Setor do QR" : "Posto / setor"}
@@ -514,13 +522,13 @@ export default async function ApontamentosPage({
         <PlasmaApontamentoFabrica nests={nestsPlasmaParaApontamento} />
       ) : (
         <>
-          <section className="flex flex-col gap-3 rounded-xl border border-cyan-400/20 bg-gradient-to-r from-cyan-400/10 to-transparent p-4 sm:flex-row sm:items-center sm:justify-between">
+          {!setorTubo && <section className="flex flex-col gap-3 rounded-xl border border-cyan-400/20 bg-gradient-to-r from-cyan-400/10 to-transparent p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">Operação móvel do Plasma</p>
               <p className="mt-1 text-sm text-slate-300">O operador pode ler o QR Code do NEST pelo celular e registrar o corte em uma tela própria.</p>
             </div>
             <Link href="/apontamentos/scanner?destino=plasma" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-cyan-300">Abrir scanner do Plasma</Link>
-          </section>
+          </section>}
 
           <OperadorApontamentoKiosk
             setorId={setor.id}
