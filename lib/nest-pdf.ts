@@ -37,7 +37,7 @@ export function gerarPdfNest(dados: DadosPdfNest, qrDataUrl: string, logo?: Uint
     if (logo) doc.addImage(logo, "PNG", margem + 2, 9, 27, 17, undefined, "FAST"); else texto("BRUCKE", margem + 15.5, 20, 11, true, NAVY, { align: "center" });
     texto("ORDEM TÉCNICA DE CORTE", 50, 13, 9, true, [148, 220, 235]); texto(dados.codigo, 50, 24, 17, true, [255, 255, 255]);
     texto(`${dados.setor}  |  ${dados.maquina}`, 50, 31, 8, false, [207, 226, 243]);
-    doc.setFillColor(255, 255, 255); doc.roundedRect(169, 4.5, 27, 27, 1.2, 1.2, "F"); doc.addImage(qrDataUrl, "PNG", 171, 6.5, 23, 23);
+    doc.setFillColor(255, 255, 255); doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.45); doc.roundedRect(169, 4.5, 27, 27, 1.2, 1.2, "FD"); doc.addImage(qrDataUrl, "PNG", 171, 6.5, 23, 23);
     texto("LER PARA OPERAR", 182.5, 35, 6, true, [226, 232, 240], { align: "center" });
   }
   function novaPagina() { doc.addPage(); cabecalho(); y = 28; }
