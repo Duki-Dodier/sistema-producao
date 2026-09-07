@@ -75,7 +75,7 @@ function formatarCodigo(valor: string) {
   return valor.length > 72 ? `${valor.slice(0, 72)}…` : valor;
 }
 
-export function QrScanner({ modo = "apontamento" }: { modo?: ModoScanner }) {
+export function QrScanner({ modo = "apontamento", iniciarAutomaticamente = false }: { modo?: ModoScanner; iniciarAutomaticamente?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -201,7 +201,17 @@ export function QrScanner({ modo = "apontamento" }: { modo?: ModoScanner }) {
     }
   };
 
-  useEffect(() => () => pararCamera(), []);
+  useEffect(() => {
+    const timer = iniciarAutomaticamente
+      ? window.setTimeout(() => void iniciarCamera(), 0)
+      : null;
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      pararCamera();
+    };
+    // A inicialização deve ocorrer somente quando o modo automático for ativado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iniciarAutomaticamente]);
 
   return (
     <div className="w-full max-w-xl rounded-2xl border border-[#2d3449] bg-[#0b1326] p-4 shadow-2xl sm:p-6">

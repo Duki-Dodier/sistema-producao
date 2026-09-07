@@ -20,7 +20,7 @@ export default async function ScannerApontamentoPage({ searchParams }: { searchP
             Voltar
           </Link>
         </div>
-        <QrScanner />
+        <QrScanner iniciarAutomaticamente={scannerPlasma} />
       </div>
     </div>
   );
