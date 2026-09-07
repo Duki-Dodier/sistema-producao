@@ -586,7 +586,7 @@ async function CockpitSetor({
         )}
       </div>
 
-      <MonitorProducaoTable registros={registrosMonitoramento} />
+      <MonitorProducaoTable registros={registrosMonitoramento} setorId={setor.id} mes={fmtParam(inicioMes)} />
 
       {/* CONFIG DO SETOR (meta + líder) */}
       <details
