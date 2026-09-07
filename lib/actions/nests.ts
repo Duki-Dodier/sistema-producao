@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@/app/generated/prisma/client";
 import { exigirUsuarioLogado, type OperadorLogado } from "@/lib/auth-operador";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
@@ -8,12 +9,13 @@ import { salvarPdf } from "@/lib/upload";
 import { registrarAlteracao } from "@/lib/auditoria";
 import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
 import { podeConferirPlasma } from "@/lib/plasma-regras";
+import { buscarAvisoReposicaoPlasma, eventoReposicaoSolicitada, eventoReposicaoVisualizada } from "@/lib/plasma-reposicao-aviso";
 
 type StatusNest = "PROGRAMADO" | "EM_CORTE" | "PAUSADO" | "CONCLUIDO" | "CANCELADO";
 const EVENTOS_NEST = ["INICIO", "PAUSA", "RETORNO", "FIM", "CANCELAMENTO"] as const;
 
 export type ResultadoEventoNest =
-  | { ok: true; tipo: string }
+  | { ok: true; tipo: string; faltasEnviadas?: number }
   | { ok: false; mensagem: string };
 
 export type ResultadoLancamentoNest =
@@ -380,7 +382,15 @@ export async function registrarEventoNest(formData: FormData) {
       iniciadoEm: true,
       maquinaId: true,
       setor: { select: { id: true, nome: true } },
-      itens: { select: { quantidadePlanejada: true, lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true } } } },
+      itens: {
+        select: {
+          id: true,
+          quantidadePlanejada: true,
+          op: { select: { numeroSequencia: true, lote: true } },
+          peca: { select: { codigo: true } },
+          lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true } },
+        },
+      },
     },
   });
   if (!nest) throw new Error("Nest não encontrado.");
@@ -413,37 +423,86 @@ export async function registrarEventoNest(formData: FormData) {
     });
     if (ocupante) throw new Error(`A máquina já está em uso pelo ${ocupante.codigo}.`);
   }
+  const faltasAutomaticas: Array<{ itemId: number; quantidade: number; opNumero: number; lote: string | null; pecaCodigo: string }> = [];
   if (tipo === "FIM") {
-    const incompletos = nest.itens.filter((item) => {
-      const total = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa + lancamento.quantidadeRefugo, 0);
-      return total !== item.quantidadePlanejada;
-    });
-    if (incompletos.length) throw new Error("Informe boas e perdas de todas as peças antes de finalizar.");
+    if (ehSetor(nest.setor.nome, "Plasma Chapa")) {
+      for (const item of nest.itens) {
+        const declarado = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa + lancamento.quantidadeRefugo, 0);
+        const falta = Math.max(0, item.quantidadePlanejada - declarado);
+        if (falta > 0) {
+          faltasAutomaticas.push({
+            itemId: item.id,
+            quantidade: falta,
+            opNumero: item.op.numeroSequencia,
+            lote: item.op.lote,
+            pecaCodigo: item.peca.codigo,
+          });
+        }
+      }
+    } else {
+      const incompletos = nest.itens.filter((item) => {
+        const total = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa + lancamento.quantidadeRefugo, 0);
+        return total !== item.quantidadePlanejada;
+      });
+      if (incompletos.length) throw new Error("Informe boas e perdas de todas as peças antes de finalizar.");
+    }
   }
 
-  await prisma.nestEvento.create({
-    data: { nestId, funcionarioId: usuario.id, tipo, descricao: texto(formData.get("descricao"), 500) || null, dataHora: agora },
-  });
-  await prisma.nestCorte.update({
+  const descricao = texto(formData.get("descricao"), 500) || null;
+  const operacoes: Prisma.PrismaPromise<unknown>[] = [];
+  for (const falta of faltasAutomaticas) {
+    operacoes.push(prisma.nestLancamento.create({
+      data: {
+        nestItemId: falta.itemId,
+        funcionarioId: usuario.id,
+        tipo: "PRODUCAO",
+        quantidadeBoa: 0,
+        quantidadeRefugo: falta.quantidade,
+        motivoRefugo: "Falta apurada ao finalizar o corte",
+        observacao: "Saldo não produzido enviado automaticamente para a reposição.",
+        dataHora: agora,
+      },
+    }));
+  }
+  if (faltasAutomaticas.length > 0) {
+    const resumo = faltasAutomaticas.map((falta) => `OP ${falta.opNumero}${falta.lote ? ` · lote ${falta.lote}` : ""} · ${falta.pecaCodigo}: ${falta.quantidade}`).join(" | ");
+    operacoes.push(prisma.nestEvento.create({
+      data: {
+        nestId,
+        funcionarioId: usuario.id,
+        tipo: eventoReposicaoSolicitada(),
+        descricao: `Falta do operador enviada para reposição ao finalizar o corte. ${resumo}`,
+        dataHora: agora,
+      },
+    }));
+  }
+  operacoes.push(prisma.nestEvento.create({
+    data: { nestId, funcionarioId: usuario.id, tipo, descricao, dataHora: agora },
+  }));
+  operacoes.push(prisma.nestCorte.update({
     where: { id: nestId },
     data: {
       status: novoStatus,
       iniciadoEm: tipo === "INICIO" ? (nest.iniciadoEm ?? agora) : undefined,
       finalizadoEm: ["FIM", "CANCELAMENTO"].includes(tipo) ? agora : undefined,
     },
-  });
-  await registrarAlteracao({ entidade: "NEST", entidadeId: nestId, acao: "ATUALIZADO", descricao: `Evento ${tipo} registrado no nest ${nestId}.`, usuario: usuario.nome, dadosDepois: { tipo, novoStatus } });
+  }));
+  await prisma.$transaction(operacoes);
+  await registrarAlteracao({ entidade: "NEST", entidadeId: nestId, acao: "ATUALIZADO", descricao: `Evento ${tipo} registrado no nest ${nestId}.`, usuario: usuario.nome, dadosDepois: { tipo, novoStatus, faltasEnviadas: faltasAutomaticas.reduce((soma, falta) => soma + falta.quantidade, 0) } });
 
   revalidarNests();
   revalidatePath(`/plasma/${nestId}`);
   revalidatePath(`/plasma/operar/${nestId}`);
   revalidatePath(`/plasma/apontar/${nestId}`);
+  revalidatePath("/plasma/reposicao");
+  revalidatePath("/plasma");
+  return faltasAutomaticas.reduce((soma, falta) => soma + falta.quantidade, 0);
 }
 
 export async function registrarEventoNestSeguro(_anterior: ResultadoEventoNest | null, formData: FormData): Promise<ResultadoEventoNest> {
   try {
-    await registrarEventoNest(formData);
-    return { ok: true, tipo: texto(formData.get("tipo"), 24).toUpperCase() };
+    const faltasEnviadas = await registrarEventoNest(formData);
+    return { ok: true, tipo: texto(formData.get("tipo"), 24).toUpperCase(), faltasEnviadas };
   } catch (erro) {
     if (ehRedirecionamento(erro)) throw erro;
     return { ok: false, mensagem: mensagemDoErro(erro, "Não foi possível registrar o evento do NEST.") };
@@ -487,7 +546,7 @@ export async function registrarLancamentoNest(formData: FormData) {
   }
   if (quantidadeRefugo && !texto(formData.get("motivoRefugo"), 300)) throw new Error("Informe o motivo da perda.");
   const agora = new Date();
-  await prisma.nestLancamento.create({
+  const operacoes: Prisma.PrismaPromise<unknown>[] = [prisma.nestLancamento.create({
     data: {
       nestItemId,
       funcionarioId: usuario.id,
@@ -498,7 +557,19 @@ export async function registrarLancamentoNest(formData: FormData) {
       observacao: texto(formData.get("observacao"), 500) || null,
       dataHora: agora,
     },
-  });
+  })];
+  if (quantidadeRefugo > 0) {
+    operacoes.push(prisma.nestEvento.create({
+      data: {
+        nestId: item.nest.id,
+        funcionarioId: usuario.id,
+        tipo: eventoReposicaoSolicitada(),
+        descricao: `Perda do operador enviada para reposição: ${quantidadeRefugo} peça(s).`,
+        dataHora: agora,
+      },
+    }));
+  }
+  await prisma.$transaction(operacoes);
   await registrarAlteracao({ entidade: "NEST", entidadeId: item.nest.id, acao: "ATUALIZADO", descricao: `Lançamento de corte registrado no nest ${item.nest.id}.`, usuario: usuario.nome, dadosDepois: { nestItemId, quantidadeBoa, quantidadeRefugo, tipo } });
 
   revalidarNests();
@@ -515,6 +586,44 @@ export async function registrarLancamentoNestSeguro(_anterior: ResultadoLancamen
     if (ehRedirecionamento(erro)) throw erro;
     return { ok: false, mensagem: mensagemDoErro(erro, "Não foi possível salvar a produção.") };
   }
+}
+
+function podeProgramarReposicaoPlasma(usuario: OperadorLogado, setorId: number) {
+  return Boolean(
+    usuario.administrador ||
+      usuario.papel === "PCP" ||
+      (["LIDER", "OPERADOR"].includes(usuario.papel) && usuario.setorId === setorId),
+  );
+}
+
+export async function reconhecerReposicaoPlasma(formData: FormData) {
+  const usuario = await exigirUsuarioLogado();
+  const eventoId = inteiro(formData.get("eventoId"), "Evento de reposição", 1);
+  const setores = (await prisma.setor.findMany({ select: { id: true, nome: true } }))
+    .filter((setor) => ehSetor(setor.nome, "Plasma Chapa"));
+  const setor = setores[0];
+  if (!setor || !podeProgramarReposicaoPlasma(usuario, setor.id)) return;
+
+  const evento = await prisma.nestEvento.findFirst({
+    where: { id: eventoId, tipo: eventoReposicaoSolicitada(), nest: { setorId: setor.id } },
+    select: { id: true, nestId: true },
+  });
+  if (!evento) return;
+
+  const aviso = await buscarAvisoReposicaoPlasma(setor.id);
+  if (!aviso.ultimaSolicitacao || evento.id > aviso.ultimaSolicitacao.id || evento.id <= aviso.visualizadoAte) return;
+
+  await prisma.nestEvento.create({
+    data: {
+      nestId: evento.nestId,
+      funcionarioId: usuario.id,
+      tipo: eventoReposicaoVisualizada(),
+      descricao: `Fila de reposição visualizada até o evento ${evento.id}.`,
+      dataHora: new Date(),
+    },
+  });
+  revalidatePath("/plasma");
+  revalidatePath("/plasma/reposicao");
 }
 
 export async function conferirLancamentoNest(formData: FormData) {
@@ -569,6 +678,17 @@ export async function conferirLancamentoNest(formData: FormData) {
       dataHora: new Date(),
     },
   });
+  if (totalDeclarado - recebidas > 0) {
+    await prisma.nestEvento.create({
+      data: {
+        nestId: registro.item.nestId,
+        funcionarioId: usuario.id,
+        tipo: eventoReposicaoSolicitada(),
+        descricao: `Falta confirmada pelo conferente: ${totalDeclarado - recebidas} peça(s). A ocorrência foi registrada na reposição.`,
+        dataHora: new Date(),
+      },
+    });
+  }
   revalidarNests();
   revalidatePath(`/plasma/${registro.item.nestId}`);
   revalidatePath("/plasma/conferencia");
@@ -748,6 +868,17 @@ export async function conferirOpPlasma(formData: FormData) {
         }),
       ];
     });
+    if (faltaTotal > 0) {
+      operacoes.push(prisma.nestEvento.create({
+        data: {
+          nestId: pendentes[0].nestId,
+          funcionarioId: usuario.id,
+          tipo: eventoReposicaoSolicitada(),
+          descricao: `Falta do conferente registrada para a OP ${op.numeroSequencia} · ${componente.peca.codigo}: ${faltaTotal} peça(s). ${avisoFalta}`,
+          dataHora: agora,
+        },
+      }));
+    }
     await prisma.$transaction(operacoes);
 
   const resumo = { nestId: pendentes[0].nestId, necessaria, quantidadeRecebida, faltaTotal };

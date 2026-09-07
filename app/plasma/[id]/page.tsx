@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PlasmaConferenceForm } from "@/components/plasma-conference-form";
+import { PlasmaEventForm, type FaltaNestItem } from "@/components/plasma-event-form";
 import { Thumb } from "@/components/thumb";
 import { TempoOperacao } from "@/components/tempo-operacao";
-import { registrarEventoNest, registrarLancamentoNest } from "@/lib/actions/nests";
+import { registrarLancamentoNest } from "@/lib/actions/nests";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { rotuloMaquina } from "@/lib/maquinas";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +13,7 @@ import { boasConferidas, perdasEfetivas, podeConferirPlasma, segundosEfetivos } 
 import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
 
 const statusLabel: Record<string, string> = { PROGRAMADO: "Programado", EM_CORTE: "Em corte", PAUSADO: "Pausado", CONCLUIDO: "Concluído", CANCELADO: "Cancelado" };
-const eventoLabel: Record<string, string> = { PROGRAMADO: "Programação criada", INICIO: "Corte iniciado", PAUSA: "Corte pausado", RETORNO: "Corte retomado", FIM: "Corte concluído", CANCELAMENTO: "Nest cancelado", CONFERENCIA: "Corte conferido" };
+const eventoLabel: Record<string, string> = { PROGRAMADO: "Programação criada", INICIO: "Corte iniciado", PAUSA: "Corte pausado", RETORNO: "Corte retomado", FIM: "Corte concluído", CANCELAMENTO: "Nest cancelado", CONFERENCIA: "Corte conferido", REPOSICAO_SOLICITADA: "Reposição solicitada", REPOSICAO_VISUALIZADA: "Reposição visualizada" };
 
 function dataHora(data: Date) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);
@@ -99,9 +100,29 @@ export default async function NestDetalhePage({
     modeloCodigo: string;
     quantidadePlanejada: number;
   }>()).values()];
+  const faltas: FaltaNestItem[] = nest.itens.map((item) => {
+    const boas = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa, 0);
+    const perdas = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeRefugo, 0);
+    return {
+      pecaCodigo: item.peca.codigo,
+      pecaNome: item.peca.nome,
+      opNumero: item.op.numeroSequencia,
+      lote: item.op.lote,
+      planejado: item.quantidadePlanejada,
+      boas,
+      perdas,
+      falta: Math.max(0, item.quantidadePlanejada - boas - perdas),
+    };
+  });
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-5 p-4 sm:p-6">
+      {sp.finalizado === "1" && (
+        <div role="status" className="rounded-xl border border-emerald-300/35 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+          <p className="font-bold">Corte finalizado com sucesso.</p>
+          <p className="mt-1 text-xs text-emerald-100/75">O tempo foi encerrado e o registro ficou salvo na rastreabilidade. {Number(sp.repor) > 0 ? `${sp.repor} peça(s) foram enviadas à reposição.` : "Nenhuma peça ficou pendente."}</p>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/plasma" className="text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">← Voltar para Plasma</Link>
@@ -234,16 +255,16 @@ export default async function NestDetalhePage({
             <div className="p-4">
               <div className="mb-4 rounded border border-white/5 bg-slate-950/30 p-3"><p className="text-xs uppercase tracking-wider text-slate-500">Tempo efetivo</p><p className="mt-1 text-2xl font-bold text-cyan-100"><TempoOperacao segundosIniciais={tempoEfetivo} rodando={nest.status === "EM_CORTE"} /></p><p className="mt-1 text-xs text-slate-500">{totalProcessado}/{totalPlanejado} peças classificadas</p></div>
               {podeOperar && emAberto ? (
-                <form action={registrarEventoNest} className="space-y-3">
-                  <input type="hidden" name="nestId" value={nest.id} />
-                  <label className="block"><span className={labelClass}>Observação do evento</span><input name="descricao" placeholder="Motivo da pausa, troca de chapa..." className={inputClass} /></label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {nest.status === "PROGRAMADO" && <BotaoEvento tipo="INICIO" texto="Iniciar corte" className="col-span-2 bg-emerald-400 text-slate-950 hover:bg-emerald-300" />}
-                    {nest.status === "EM_CORTE" && <><BotaoEvento tipo="PAUSA" texto="Pausar" className="border border-amber-400/40 text-amber-200 hover:bg-amber-400/10" />{totalProcessado === totalPlanejado && <BotaoEvento tipo="FIM" texto="Concluir nest" className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" />}</>}
-                    {nest.status === "PAUSADO" && <><BotaoEvento tipo="RETORNO" texto="Retomar" className="border border-emerald-400/40 text-emerald-200 hover:bg-emerald-400/10" />{totalProcessado === totalPlanejado && <BotaoEvento tipo="FIM" texto="Concluir nest" className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" />}</>}
-                  </div>
-                  {totalProcessado !== totalPlanejado && nest.status !== "PROGRAMADO" && <p className="text-xs text-amber-200">Classifique todas as {totalPlanejado} peças como boas ou perdas antes de concluir.</p>}
-                </form>
+                <PlasmaEventForm
+                  nestId={nest.id}
+                  status={nest.status as "PROGRAMADO" | "EM_CORTE" | "PAUSADO"}
+                  podeFinalizar={totalProcessado === totalPlanejado}
+                  quantidadePendente={Math.max(0, totalPlanejado - totalProcessado)}
+                  faltas={faltas}
+                  plasmaChapa={ehSetor(nest.setor.nome, "Plasma Chapa")}
+                  rotaDepoisFinalizar={`/plasma/${nest.id}`}
+                  mostrarDescricao
+                />
               ) : <p className="text-xs text-slate-500">{emAberto ? "Seu acesso não permite operar este nest." : "Este nest está encerrado; sua rastreabilidade permanece disponível."}</p>}
             </div>
           </section>
@@ -260,6 +281,5 @@ export default async function NestDetalhePage({
 
 function Dado({ titulo, valor, conteudo, cor = "text-slate-100" }: { titulo: string; valor: string; conteudo?: React.ReactNode; cor?: string }) { return <div className="rounded border border-white/5 bg-slate-950/30 px-2.5 py-2"><p className="font-mono text-[9px] uppercase tracking-wider text-slate-500">{titulo}</p><p className={`mt-1 text-sm font-bold ${cor}`}>{conteudo ?? valor}</p></div>; }
 function Resumo({ titulo, valor, cor = "text-slate-200" }: { titulo: string; valor: number; cor?: string }) { return <div className="rounded border border-slate-700 bg-slate-950/25 px-2 py-1"><p className="font-mono text-[8px] uppercase tracking-wider text-slate-500">{titulo}</p><p className={`mt-0.5 font-bold ${cor}`}>{valor}</p></div>; }
-function BotaoEvento({ tipo, texto, className }: { tipo: string; texto: string; className: string }) { return <button type="submit" name="tipo" value={tipo} className={`rounded px-2.5 py-2 text-xs font-bold transition ${className}`}>{texto}</button>; }
 const inputClass = "mt-1 w-full rounded border border-slate-700 bg-[#111925] px-2.5 py-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30";
 const labelClass = "font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500";

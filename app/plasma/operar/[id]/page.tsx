@@ -6,7 +6,7 @@ import { boasConferidas, perdasEfetivas, segundosEfetivos } from "@/lib/plasma-r
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
 import { TempoOperacao } from "@/components/tempo-operacao";
-import { PlasmaEventForm } from "@/components/plasma-event-form";
+import { PlasmaEventForm, type FaltaNestItem } from "@/components/plasma-event-form";
 import { PlasmaProductionForm } from "@/components/plasma-production-form";
 
 const statusLabel: Record<string, string> = {
@@ -22,7 +22,7 @@ export default async function OperacaoPlasmaMobilePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ finalizado?: string }>;
+  searchParams?: Promise<{ finalizado?: string; repor?: string }>;
 }) {
   const { id: idRaw } = await params;
   const filtros = await searchParams;
@@ -63,6 +63,21 @@ export default async function OperacaoPlasmaMobilePage({
   const encerrado = ["CONCLUIDO", "CANCELADO"].includes(nest.status);
   const podeOperar = usuario?.papel !== "CONFERENTE";
   const tempoInicial = segundosEfetivos(nest.eventos);
+  const plasmaChapa = ehSetor(nest.setor.nome, "Plasma Chapa");
+  const faltas: FaltaNestItem[] = nest.itens.map((item) => {
+    const boas = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa, 0);
+    const perdas = item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeRefugo, 0);
+    return {
+      pecaCodigo: item.peca.codigo,
+      pecaNome: item.peca.nome,
+      opNumero: item.op.numeroSequencia,
+      lote: item.op.lote,
+      planejado: item.quantidadePlanejada,
+      boas,
+      perdas,
+      falta: Math.max(0, item.quantidadePlanejada - boas - perdas),
+    };
+  });
 
   return (
     <main className="min-h-full bg-[#07101f] px-3 py-4 text-slate-100 sm:px-5 sm:py-6">
@@ -74,7 +89,7 @@ export default async function OperacaoPlasmaMobilePage({
         {filtros?.finalizado === "1" && (
           <div role="status" className="rounded-2xl border border-emerald-300/35 bg-emerald-400/10 p-4 text-sm text-emerald-100">
             <p className="font-bold">Corte finalizado com sucesso.</p>
-            <p className="mt-1 text-xs text-emerald-100/75">O tempo foi encerrado e o registro ficou salvo na rastreabilidade.</p>
+            <p className="mt-1 text-xs text-emerald-100/75">O tempo foi encerrado e o registro ficou salvo na rastreabilidade. {Number(filtros.repor) > 0 ? `${filtros.repor} peça(s) foram enviadas à reposição.` : "Nenhuma peça ficou pendente."}</p>
           </div>
         )}
 
@@ -122,7 +137,14 @@ export default async function OperacaoPlasmaMobilePage({
 
         {!encerrado && podeOperar && <section className="rounded-2xl border border-slate-700 bg-[#111b2b] p-4">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Comando da máquina</p>
-          <PlasmaEventForm nestId={nest.id} status={nest.status as "PROGRAMADO" | "EM_CORTE" | "PAUSADO"} podeFinalizar={declarado === planejado} quantidadePendente={Math.max(0, planejado - declarado)} />
+          <PlasmaEventForm
+            nestId={nest.id}
+            status={nest.status as "PROGRAMADO" | "EM_CORTE" | "PAUSADO"}
+            podeFinalizar={declarado === planejado}
+            quantidadePendente={Math.max(0, planejado - declarado)}
+            faltas={faltas}
+            plasmaChapa={plasmaChapa}
+          />
         </section>}
 
         <section className="rounded-2xl border border-slate-700 bg-[#111b2b] p-4">

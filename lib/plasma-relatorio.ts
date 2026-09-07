@@ -19,6 +19,8 @@ export const eventoLabel: Record<string, string> = {
   RETORNO: "Corte retomado",
   FIM: "Corte concluído",
   CANCELAMENTO: "NEST cancelado",
+  REPOSICAO_SOLICITADA: "Reposição solicitada",
+  REPOSICAO_VISUALIZADA: "Reposição visualizada",
 };
 
 export type CategoriaRegistro = "PROGRAMACAO" | "OPERACAO" | "LANCAMENTO" | "CONFERENCIA";

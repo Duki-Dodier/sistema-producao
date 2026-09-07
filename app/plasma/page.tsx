@@ -6,6 +6,7 @@ import { ehSetor } from "@/lib/setores";
 import { DateFilter } from "@/components/date-filter";
 import { boasConferidas, perdasEfetivas, segundosEfetivos } from "@/lib/plasma-regras";
 import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
+import { buscarAvisoReposicaoPlasma } from "@/lib/plasma-reposicao-aviso";
 
 const statusLabel: Record<string, string> = {
   PROGRAMADO: "Programado",
@@ -30,6 +31,8 @@ const eventoLabel: Record<string, string> = {
   RETORNO: "Corte retomado",
   FIM: "Corte concluído",
   CANCELAMENTO: "Nest cancelado",
+  REPOSICAO_SOLICITADA: "Reposição solicitada",
+  REPOSICAO_VISUALIZADA: "Reposição visualizada",
 };
 
 function ehPlasma(nome: string) {
@@ -173,6 +176,9 @@ export default async function PlasmaPage({
   ]);
 
   const statusTotal = (status: string) => statusResumo.find((item) => item.status === status)?._count._all ?? 0;
+  const avisoReposicao = setorPlasmaChapa
+    ? await buscarAvisoReposicaoPlasma(setorPlasmaChapa.id)
+    : { ultimaSolicitacao: null, visualizadoAte: 0, temNovidade: false };
   const nestsProgramados = statusTotal("PROGRAMADO");
   const nestsEmCorte = statusTotal("EM_CORTE");
   const nestsPausados = statusTotal("PAUSADO");
@@ -236,9 +242,10 @@ export default async function PlasmaPage({
               PROGRAMAR NOVO NEST · ACESSO RESTRITO
             </span>
           )}
-          <Link href="/plasma/reposicao" className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-rose-400/35 bg-rose-400/5 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-100 transition hover:border-rose-300 hover:bg-rose-400/10">
+          <Link href="/plasma/reposicao" aria-label={avisoReposicao.temNovidade ? "Reposição com novas faltas" : "Abrir reposição"} className={`flex min-h-11 items-center justify-center gap-2 rounded-md border border-rose-400/35 bg-rose-400/5 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-100 transition hover:border-rose-300 hover:bg-rose-400/10 ${avisoReposicao.temNovidade ? "animate-pulse border-rose-200 bg-rose-400/20 shadow-[0_0_18px_rgba(251,113,133,0.35)]" : ""}`}>
             REPOSIÇÃO
             <span className="rounded bg-rose-300/15 px-1.5 py-0.5 text-[9px] text-rose-200">{numero(totalReposicao)}</span>
+            {avisoReposicao.temNovidade && <span className="rounded bg-rose-200 px-1.5 py-0.5 text-[9px] text-rose-950">NOVO</span>}
           </Link>
           <Link href="/plasma/conferencia" className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-400/35 bg-amber-400/5 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-100 transition hover:border-amber-300 hover:bg-amber-400/10">
             CONFERÊNCIA

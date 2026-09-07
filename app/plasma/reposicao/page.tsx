@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
+import { buscarAvisoReposicaoPlasma } from "@/lib/plasma-reposicao-aviso";
 import { ehSetor } from "@/lib/setores";
 import { prisma } from "@/lib/prisma";
+import { MarcarReposicaoVisualizada } from "@/components/marcar-reposicao-visualizada";
 
 function numero(valor: number) {
   return new Intl.NumberFormat("pt-BR").format(valor);
@@ -35,6 +37,7 @@ export default async function PlasmaReposicaoPage() {
   const setorPlasmaChapa = setores.find((setor) => ehSetor(setor.nome, "Plasma Chapa"));
   const setorIds = setores.map((setor) => setor.id);
   const demanda = await buscarDemandaPlasma();
+  const avisoReposicao = setorPlasmaChapa ? await buscarAvisoReposicaoPlasma(setorPlasmaChapa.id) : null;
   const demandasChapa = demanda.filter((item) => item.setorId === setorPlasmaChapa?.id);
   const reposicoes = demandasChapa.filter((item) => item.reposicao > 0);
   const demandasComFalta = demandasChapa.filter((item) => item.perdas > 0);
@@ -82,6 +85,7 @@ export default async function PlasmaReposicaoPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-5 p-4 sm:p-6">
+      {avisoReposicao?.ultimaSolicitacao && <MarcarReposicaoVisualizada eventoId={avisoReposicao.ultimaSolicitacao.id} />}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link href="/plasma" className="text-xs font-semibold text-cyan-200 transition hover:text-cyan-100">← Voltar para o painel Plasma</Link>

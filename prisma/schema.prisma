@@ -505,7 +505,7 @@ model NestEvento {
   id            Int      @id @default(autoincrement())
   nestId        Int
   funcionarioId Int
-  tipo          String   // PROGRAMADO | INICIO | PAUSA | RETORNO | FIM | CANCELAMENTO
+  tipo          String   // PROGRAMADO | INICIO | PAUSA | RETORNO | FIM | CANCELAMENTO | CONFERENCIA | REPOSICAO_SOLICITADA | REPOSICAO_VISUALIZADA
   descricao     String?
   dataHora      DateTime @default(now())
 
