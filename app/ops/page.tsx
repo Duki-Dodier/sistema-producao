@@ -46,6 +46,7 @@ export default async function OpsPage({
         status: true,
         modelo: {
           select: {
+            id: true,
             codigo: true,
             tipo: true,
             tamanhoPonteira: true,
@@ -248,7 +249,7 @@ export default async function OpsPage({
                       Ficha OP
                     </Link>
                     <Link
-                      href={`/ops/${op.id}`}
+                      href={`/registros/${op.modelo.id}`}
                       className="rounded-md border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-bold text-cyan-200 transition hover:border-cyan-200/60 hover:bg-cyan-400/20"
                     >
                       Abrir OP
