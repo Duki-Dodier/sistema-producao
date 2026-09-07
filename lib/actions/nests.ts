@@ -713,8 +713,10 @@ export async function conferirOpPlasma(formData: FormData) {
   const opId = inteiro(formData.get("opId"), "OP", 1);
   const pecaId = inteiro(formData.get("pecaId"), "Peça", 1);
   const quantidadeRecebida = inteiro(formData.get("quantidadeRecebida"), "Total recebido");
-  const motivo = texto(formData.get("motivoConferencia"), 500);
-  const acaoConferencia = texto(formData.get("acaoConferencia"), 32);
+  const acaoConferencia = texto(formData.get("acaoConferencia"), 32).toLowerCase();
+  if (acaoConferencia !== "confirmar" && acaoConferencia !== "falta") {
+    throw new Error("Escolha entre confirmar o total ou informar falta.");
+  }
 
   const [setores, op] = await Promise.all([
     prisma.setor.findMany({ select: { id: true, nome: true } }),
@@ -735,162 +737,190 @@ export async function conferirOpPlasma(formData: FormData) {
       },
     }),
   ]);
-    const setor = setores.find((item) => ehSetor(item.nome, "Plasma Chapa"));
-    if (!setor || !op) throw new Error(!setor ? "Setor Plasma Chapa não encontrado." : "OP não encontrada.");
+  const setor = setores.find((item) => ehSetor(item.nome, "Plasma Chapa"));
+  if (!setor || !op) throw new Error(!setor ? "Setor Plasma Chapa não encontrado." : "OP não encontrada.");
 
-    const componente = op.modelo.pecas[0];
-    if (!componente) throw new Error("A peça informada não pertence à OP.");
+  const componente = op.modelo.pecas[0];
+  if (!componente) throw new Error("A peça informada não pertence à OP.");
 
-    const itens = await prisma.nestItem.findMany({
-      where: { opId, pecaId, nest: { setorId: setor.id } },
-      select: {
-        id: true,
-        nestId: true,
-        nest: { select: { id: true, codigo: true, status: true, maquinaId: true } },
-        lancamentos: {
-          orderBy: [{ dataHora: "asc" }, { id: "asc" }],
-          select: {
-            id: true,
-            funcionarioId: true,
-            quantidadeBoa: true,
-            quantidadeRefugo: true,
-            apontamentoId: true,
-            quantidadeConferidaBoa: true,
-            quantidadeConferidaRefugo: true,
-            dataHora: true,
-          },
+  const itens = await prisma.nestItem.findMany({
+    where: { opId, pecaId, nest: { setorId: setor.id } },
+    select: {
+      nestId: true,
+      nest: { select: { status: true, maquinaId: true } },
+      lancamentos: {
+        orderBy: [{ dataHora: "asc" }, { id: "asc" }],
+        select: {
+          id: true,
+          funcionarioId: true,
+          quantidadeBoa: true,
+          quantidadeRefugo: true,
+          apontamentoId: true,
+          quantidadeConferidaBoa: true,
+          quantidadeConferidaRefugo: true,
+          dataHora: true,
         },
       },
-    });
-    if (!itens.length) throw new Error("Não há NESTs cadastrados para esta OP e peça no Plasma Chapa.");
-    if (!itens.every((item) => ["CONCLUIDO", "CANCELADO"].includes(item.nest.status))) {
-      throw new Error("Aguarde o encerramento de todos os NESTs desta OP antes da conferência.");
-    }
+    },
+  });
+  if (!itens.length) throw new Error("Não há NESTs cadastrados para esta OP e peça no Plasma Chapa.");
+  if (!itens.every((item) => ["CONCLUIDO", "CANCELADO"].includes(item.nest.status))) {
+    throw new Error("Aguarde o encerramento de todos os NESTs desta OP antes da conferência.");
+  }
 
-    const lancamentos = itens.flatMap((item) => item.lancamentos.map((lancamento) => ({
-      ...lancamento,
-      nestId: item.nestId,
-      nestCodigo: item.nest.codigo,
-      maquinaId: item.nest.maquinaId,
-    }))).sort((a, b) => +a.dataHora - +b.dataHora || a.id - b.id);
-    const pendentes = lancamentos.filter((lancamento) => lancamento.apontamentoId === null);
-    if (!pendentes.length) throw new Error("Todos os lançamentos desta OP já foram conferidos.");
-    if (!usuario.administrador && pendentes.some((lancamento) => lancamento.funcionarioId === usuario.id)) {
-      throw new Error("Outro usuário deve conferir os lançamentos feitos pelo próprio conferente.");
-    }
+  const lancamentos = itens.flatMap((item) => item.lancamentos.map((lancamento) => ({
+    ...lancamento,
+    nestId: item.nestId,
+    maquinaId: item.nest.maquinaId,
+  }))).sort((a, b) => +a.dataHora - +b.dataHora || a.id - b.id);
+  const pendentes = lancamentos.filter((lancamento) => lancamento.apontamentoId === null);
+  if (!pendentes.length) throw new Error("Todos os lançamentos desta OP já foram conferidos.");
+  if (!usuario.administrador && pendentes.some((lancamento) => lancamento.funcionarioId === usuario.id)) {
+    throw new Error("Outro usuário deve conferir os lançamentos feitos pelo próprio conferente.");
+  }
 
-    const necessaria = op.quantidade * componente.quantidadeNecessaria;
-    const totalDeclarado = lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa + lancamento.quantidadeRefugo, 0);
-    const totalPerdasOperador = lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeRefugo, 0);
-    const totalLiberado = lancamentos.reduce((soma, lancamento) => soma + (lancamento.apontamentoId === null ? 0 : lancamento.quantidadeConferidaBoa ?? lancamento.quantidadeBoa), 0);
-    const perdasJaConferidas = lancamentos.reduce((soma, lancamento) => soma + (lancamento.apontamentoId === null ? 0 : lancamento.quantidadeConferidaRefugo ?? lancamento.quantidadeRefugo), 0);
+  const necessaria = op.quantidade * componente.quantidadeNecessaria;
+  const totalLiberado = lancamentos.reduce(
+    (soma, lancamento) => soma + (lancamento.apontamentoId === null ? 0 : lancamento.quantidadeConferidaBoa ?? lancamento.quantidadeBoa),
+    0,
+  );
+  const boasPendentes = pendentes.reduce((soma, lancamento) => soma + (lancamento.quantidadeConferidaBoa ?? lancamento.quantidadeBoa), 0);
+  const totalDisponivel = totalLiberado + boasPendentes;
+  if (quantidadeRecebida > necessaria) throw new Error(`O total recebido não pode superar a quantidade da OP (${necessaria}).`);
+  if (quantidadeRecebida < totalLiberado) throw new Error(`O total não pode ser menor que o já liberado (${totalLiberado}).`);
 
-    if (quantidadeRecebida > necessaria) throw new Error(`O total recebido não pode superar a quantidade da OP (${necessaria}).`);
-    if (quantidadeRecebida > totalDeclarado) throw new Error("O total recebido não pode superar o total declarado pelos operadores.");
-    if (quantidadeRecebida < totalLiberado) throw new Error(`O total recebido não pode ser menor que o já liberado (${totalLiberado}).`);
-    if (quantidadeRecebida + totalPerdasOperador > necessaria) throw new Error("Os lançamentos do operador e o total recebido não fecham com a quantidade da OP.");
+  const roteiroEtapa = await prisma.pecaRoteiro.findFirst({
+    where: { pecaId, setorId: setor.id, processo: "CORTE" },
+    orderBy: { ordem: "asc" },
+    select: { id: true },
+  });
+  const agora = new Date();
 
-    const faltaTotal = Math.max(0, necessaria - quantidadeRecebida);
-    if (faltaTotal > 0 && acaoConferencia !== "falta") throw new Error("Use o botão de registrar falta para concluir uma conferência abaixo do total da OP.");
-    if (faltaTotal === 0 && acaoConferencia === "falta") throw new Error("A OP está completa; use a confirmação do recebimento.");
+  if (acaoConferencia === "confirmar") {
+    if (quantidadeRecebida !== necessaria) throw new Error("A confirmação total deve usar a quantidade completa da OP.");
+    if (totalDisponivel < necessaria) throw new Error("A quantidade total ainda não foi concluída. Aguarde o corte ou a reposição.");
 
-    const boasAConfirmar = quantidadeRecebida - totalLiberado;
-    const perdasAConfirmar = faltaTotal - perdasJaConferidas;
-    if (perdasAConfirmar < 0) throw new Error("Os lançamentos já conferidos ultrapassam a falta calculada da OP.");
-
-    let boasRestantes = boasAConfirmar;
+    let boasRestantes = necessaria - totalLiberado;
     const alocacoes = pendentes.map((lancamento) => {
-      const boas = Math.min(lancamento.quantidadeBoa, Math.max(0, boasRestantes));
+      const boasDisponiveis = lancamento.quantidadeConferidaBoa ?? lancamento.quantidadeBoa;
+      const boas = Math.min(boasDisponiveis, Math.max(0, boasRestantes));
       boasRestantes -= boas;
       return {
         lancamento,
         boas,
-        perdaBase: Math.max(0, lancamento.quantidadeBoa - boas) + lancamento.quantidadeRefugo,
+        perdas: lancamento.quantidadeConferidaRefugo ?? lancamento.quantidadeRefugo,
       };
     });
-    if (boasRestantes > 0) throw new Error("O total recebido é maior que as peças disponíveis nos lançamentos pendentes.");
+    if (boasRestantes > 0) throw new Error("Não há peças suficientes nos lançamentos pendentes para concluir a OP.");
 
-    const perdasBase = alocacoes.reduce((soma, alocacao) => soma + alocacao.perdaBase, 0);
-    if (perdasAConfirmar < perdasBase) throw new Error("Não foi possível distribuir a conferência sem alterar lançamentos já confirmados.");
-    const perdaExtra = perdasAConfirmar - perdasBase;
-    const roteiroEtapa = await prisma.pecaRoteiro.findFirst({
-      where: { pecaId, setorId: setor.id, processo: "CORTE" },
-      orderBy: { ordem: "asc" },
-      select: { id: true },
-    });
-    const agora = new Date();
-    const faltaOperador = Math.min(totalPerdasOperador, faltaTotal);
-    const faltaConferente = Math.max(0, faltaTotal - faltaOperador);
-    const avisoFalta = faltaTotal > 0
-      ? faltaConferente > 0
-        ? `Falta adicional identificada pelo conferente: ${faltaConferente} peça(s).`
-        : "Conferente também notificou a falta já informada pelo operador; nenhuma reposição adicional foi criada."
-      : "Recebimento total da OP confirmado pelo conferente.";
-
-    const operacoes = alocacoes.flatMap((alocacao, indice) => {
-      const quantidadeRefugo = alocacao.perdaBase + (indice === alocacoes.length - 1 ? perdaExtra : 0);
-      return [
+    const operacoes: Prisma.PrismaPromise<unknown>[] = [];
+    for (const alocacao of alocacoes) {
+      operacoes.push(
         prisma.apontamento.create({
           data: {
-          opId,
-          setorId: setor.id,
-          funcionarioId: usuario.id,
-          usuario: usuario.nome,
-          quantidadeBoa: alocacao.boas,
-          quantidadeRefugo,
-          dataHora: agora,
-          pecaId,
-          processo: "CORTE",
-          roteiroEtapaId: roteiroEtapa?.id ?? null,
-          origem: "NEST_CONFERIDO",
-          maquinaId: alocacao.lancamento.maquinaId,
+            opId,
+            setorId: setor.id,
+            funcionarioId: usuario.id,
+            usuario: usuario.nome,
+            quantidadeBoa: alocacao.boas,
+            quantidadeRefugo: alocacao.perdas,
+            dataHora: agora,
+            pecaId,
+            processo: "CORTE",
+            roteiroEtapaId: roteiroEtapa?.id ?? null,
+            origem: "NEST_CONFERIDO",
+            maquinaId: alocacao.lancamento.maquinaId,
             lancamentoNest: { connect: { id: alocacao.lancamento.id } },
           },
         }),
         prisma.nestLancamento.update({
           where: { id: alocacao.lancamento.id },
           data: {
-          conferenteId: usuario.id,
-          conferidoEm: agora,
-          quantidadeConferidaBoa: alocacao.boas,
-          quantidadeConferidaRefugo: quantidadeRefugo,
-          motivoConferencia: motivo || null,
+            conferenteId: usuario.id,
+            conferidoEm: agora,
+            quantidadeConferidaBoa: alocacao.boas,
+            quantidadeConferidaRefugo: alocacao.perdas,
+            motivoConferencia: null,
           },
         }),
         prisma.nestEvento.create({
           data: {
-          nestId: alocacao.lancamento.nestId,
-          funcionarioId: usuario.id,
-          tipo: "CONFERENCIA",
-          descricao: `Conferência da OP ${op.numeroSequencia} · ${componente.peca.codigo}: ${alocacao.boas} recebidas / ${quantidadeRefugo} perdas. ${avisoFalta}${motivo ? ` ${motivo}` : ""}`,
-          dataHora: agora,
+            nestId: alocacao.lancamento.nestId,
+            funcionarioId: usuario.id,
+            tipo: "CONFERENCIA",
+            descricao: `Recebimento total confirmado: OP ${op.numeroSequencia} · ${componente.peca.codigo} · ${alocacao.boas} peça(s) liberada(s).`,
+            dataHora: agora,
           },
         }),
-      ];
-    });
-    if (faltaTotal > 0) {
-      operacoes.push(prisma.nestEvento.create({
-        data: {
-          nestId: pendentes[0].nestId,
-          funcionarioId: usuario.id,
-          tipo: eventoReposicaoSolicitada(),
-          descricao: `Falta do conferente registrada para a OP ${op.numeroSequencia} · ${componente.peca.codigo}: ${faltaTotal} peça(s). ${avisoFalta}`,
-          dataHora: agora,
-        },
-      }));
+      );
     }
     await prisma.$transaction(operacoes);
+    await registrarAlteracao({
+      entidade: "NEST",
+      entidadeId: pendentes[0].nestId,
+      acao: "ATUALIZADO",
+      descricao: `Conferência total da OP ${opId}, peça ${pecaId}: ${necessaria}/${necessaria} recebidas.`,
+      usuario: usuario.nome,
+      dadosDepois: { opId, pecaId, necessaria, quantidadeRecebida, situacao: "LIBERADO" },
+    });
+  } else {
+    if (quantidadeRecebida >= necessaria) throw new Error("A OP está completa; use a confirmação do recebimento total.");
+    if (quantidadeRecebida > totalDisponivel) throw new Error("A quantidade recebida não pode superar as peças registradas nos NESTs.");
 
-  const resumo = { nestId: pendentes[0].nestId, necessaria, quantidadeRecebida, faltaTotal };
+    let boasRestantes = quantidadeRecebida - totalLiberado;
+    let faltaAdicional = 0;
+    const alocacoes = pendentes.map((lancamento) => {
+      const boasDisponiveis = lancamento.quantidadeConferidaBoa ?? lancamento.quantidadeBoa;
+      const perdasAtuais = lancamento.quantidadeConferidaRefugo ?? lancamento.quantidadeRefugo;
+      const boas = Math.min(boasDisponiveis, Math.max(0, boasRestantes));
+      boasRestantes -= boas;
+      const perdas = perdasAtuais + Math.max(0, boasDisponiveis - boas);
+      faltaAdicional += Math.max(0, perdas - perdasAtuais);
+      return { lancamento, boas, perdas };
+    });
+    if (boasRestantes > 0) throw new Error("Não foi possível distribuir a quantidade recebida entre os lançamentos pendentes.");
 
-  await registrarAlteracao({
-    entidade: "NEST",
-    entidadeId: resumo.nestId,
-    acao: "ATUALIZADO",
-    descricao: `Conferência consolidada da OP ${opId}, peça ${pecaId}: ${resumo.quantidadeRecebida}/${resumo.necessaria} recebidas.`,
-    usuario: usuario.nome,
-    dadosDepois: resumo,
-  });
+    const operacoes: Prisma.PrismaPromise<unknown>[] = alocacoes.map((alocacao) => prisma.nestLancamento.update({
+      where: { id: alocacao.lancamento.id },
+      data: {
+        conferenteId: usuario.id,
+        conferidoEm: agora,
+        quantidadeConferidaBoa: alocacao.boas,
+        quantidadeConferidaRefugo: alocacao.perdas,
+        motivoConferencia: "Falta confirmada pelo conferente",
+      },
+    }));
+    operacoes.push(prisma.nestEvento.create({
+      data: {
+        nestId: pendentes[0].nestId,
+        funcionarioId: usuario.id,
+        tipo: "CONFERENCIA",
+        descricao: `Conferente registrou ${quantidadeRecebida}/${necessaria} peça(s) recebida(s) na OP ${op.numeroSequencia} · ${componente.peca.codigo}.`,
+        dataHora: agora,
+      },
+    }));
+    operacoes.push(prisma.nestEvento.create({
+      data: {
+        nestId: pendentes[0].nestId,
+        funcionarioId: usuario.id,
+        tipo: eventoReposicaoSolicitada(),
+        descricao: faltaAdicional > 0
+          ? `Falta adicional identificada pelo conferente: ${faltaAdicional} peça(s) na OP ${op.numeroSequencia} · ${componente.peca.codigo}.`
+          : `Conferente também confirmou a falta já informada na OP ${op.numeroSequencia} · ${componente.peca.codigo}; sem nova reposição.`,
+        dataHora: agora,
+      },
+    }));
+    await prisma.$transaction(operacoes);
+    await registrarAlteracao({
+      entidade: "NEST",
+      entidadeId: pendentes[0].nestId,
+      acao: "ATUALIZADO",
+      descricao: `Falta conferida na OP ${opId}, peça ${pecaId}: ${quantidadeRecebida}/${necessaria} recebidas.`,
+      usuario: usuario.nome,
+      dadosDepois: { opId, pecaId, necessaria, quantidadeRecebida, faltaAdicional, situacao: "REPOSICAO" },
+    });
+  }
+
   revalidarNests();
   revalidatePath(`/plasma/conferencia/op/${opId}`);
   revalidatePath("/plasma/conferencia");

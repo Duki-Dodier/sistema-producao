@@ -20,7 +20,7 @@ function destinoApontamento(op: number | string, setor?: number | string, peca?:
   if (setor) params.set("setor", String(setor));
   if (peca) params.set("peca", String(peca));
   if (quantidade) params.set("quantidade", String(quantidade));
-  return `/plasma/conferencia/op/${encodeURIComponent(String(op))}?${params.toString()}`;
+  return `/apontamentos?op=${encodeURIComponent(String(op))}&${params.toString()}`;
 }
 
 function destinoDoQr(valor: string, modo: ModoScanner) {

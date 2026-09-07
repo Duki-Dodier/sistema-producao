@@ -54,6 +54,7 @@ export default async function ApontamentosPage({
   }
   if (
     operadorLogado &&
+    !operadorLogado.administrador &&
     operadorLogado.papel !== "PCP" &&
     operadorLogado.setorId !== setor.id
   ) {
@@ -86,17 +87,34 @@ export default async function ApontamentosPage({
       ? await buscarConferenciaPlasmaFabrica({ opId: opIdFiltro, pecaId: pecaIdFiltro, setorId: setor.id })
       : null;
 
+    return <div className="min-h-full bg-[#07101f] p-4 sm:p-6"><PlasmaConferenciaApontamentoFabrica dados={conferencia} podeConferir={podeConferirPlasma(operadorLogado)} /></div>;
+  }
+
+  if (setorPlasmaChapa) {
+    const nestsPlasma = await prisma.nestCorte.findMany({
+      where: { setorId: setor.id, status: { in: ["PROGRAMADO", "EM_CORTE", "PAUSADO"] } },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        codigo: true,
+        status: true,
+        maquina: { select: { codigo: true, nome: true } },
+        itens: {
+          select: {
+            quantidadePlanejada: true,
+            op: { select: { numeroSequencia: true, lote: true } },
+            lancamentos: { select: { quantidadeBoa: true, quantidadeRefugo: true } },
+          },
+        },
+      },
+    });
     return (
-      <div className="flex flex-col gap-4 p-3 sm:gap-6 sm:p-6">
-        <PageHeader
-          title="Apontamentos da Fábrica"
-          subtitle="Conferência final do Plasma Chapa · sem iniciar corte e sem controle de tempo."
+      <div className="min-h-full bg-[#07101f] p-4 sm:p-6">
+        <PlasmaApontamentoFabrica
+          nests={nestsPlasma as NestApontamentoFabrica[]}
+          finalizado={sp.finalizado === "1"}
+          reposicao={Number(sp.repor) || 0}
         />
-        <div className="flex items-center gap-2 overflow-x-auto rounded-lg border border-amber-400/25 bg-[#202a36] p-3">
-          <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">Setor do QR</span>
-          <span className="whitespace-nowrap rounded border border-amber-300/35 bg-amber-300/10 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-amber-100">Plasma Chapa</span>
-        </div>
-        <PlasmaConferenciaApontamentoFabrica dados={conferencia} podeConferir={podeConferirPlasma(operadorLogado)} />
       </div>
     );
   }

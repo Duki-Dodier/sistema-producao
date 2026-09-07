@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { PlasmaConferenceForm } from "@/components/plasma-conference-form";
 import { PlasmaEventForm, type FaltaNestItem } from "@/components/plasma-event-form";
 import { Thumb } from "@/components/thumb";
 import { TempoOperacao } from "@/components/tempo-operacao";
@@ -9,7 +8,7 @@ import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { rotuloMaquina } from "@/lib/maquinas";
 import { prisma } from "@/lib/prisma";
 import { ehSetor } from "@/lib/setores";
-import { boasConferidas, perdasEfetivas, podeConferirPlasma, segundosEfetivos } from "@/lib/plasma-regras";
+import { boasConferidas, perdasEfetivas, segundosEfetivos } from "@/lib/plasma-regras";
 import { buscarDemandaPlasma } from "@/lib/plasma-saldo";
 
 const statusLabel: Record<string, string> = { PROGRAMADO: "Programado", EM_CORTE: "Em corte", PAUSADO: "Pausado", CONCLUIDO: "Concluído", CANCELADO: "Cancelado" };
@@ -70,7 +69,6 @@ export default async function NestDetalhePage({
   const usuarioNoPlasma = Boolean(usuario && (usuario.administrador || usuario.papel === "PCP" || usuario.setorId === nest.setor.id));
   const setorEhPlasma = ehSetor(nest.setor.nome, "Plasma Chapa") || ehSetor(nest.setor.nome, "Plasma Tubo");
   const podeOperar = usuarioNoPlasma && setorEhPlasma && usuario?.papel !== "CONFERENTE";
-  const podeConferir = podeConferirPlasma(usuario);
   const emAberto = !["CONCLUIDO", "CANCELADO"].includes(nest.status);
   const totalPlanejado = nest.itens.reduce((total, item) => total + item.quantidadePlanejada, 0);
   const totalDeclarado = nest.itens.reduce((total, item) => total + item.lancamentos.reduce((soma, lancamento) => soma + lancamento.quantidadeBoa, 0), 0);
@@ -215,11 +213,6 @@ export default async function NestDetalhePage({
                     {item.lancamentos.length > 0 && (
                       <div className="mt-3 space-y-2">{item.lancamentos.map((lancamento) => <div key={lancamento.id} className={`rounded border p-3 ${lancamento.apontamentoId === null ? "border-amber-400/25 bg-amber-400/5" : "border-emerald-400/20 bg-emerald-400/5"}`}>
                         <div className="flex flex-wrap items-start justify-between gap-3 text-sm"><div><p className="font-semibold text-slate-200">{lancamento.funcionario.nome} · {dataHora(lancamento.dataHora)}</p><p className="mt-1 text-xs text-slate-500">{lancamento.tipo === "RETRABALHO" ? "Reposição" : "Produção"}{lancamento.motivoRefugo ? ` · ${lancamento.motivoRefugo}` : ""}</p></div><div className="text-right"><p><strong className="text-sky-200">{lancamento.quantidadeBoa}</strong> boas · <strong className="text-rose-200">{lancamento.quantidadeRefugo}</strong> perdas</p><p className={`mt-1 text-xs font-bold uppercase ${lancamento.apontamentoId === null ? "text-amber-200" : "text-emerald-200"}`}>{lancamento.apontamentoId === null ? "Aguardando conferência" : lancamento.conferente ? `Conferido por ${lancamento.conferente.nome}` : "Produção liberada (histórico)"}</p></div></div>
-                        {podeConferir && !emAberto && lancamento.apontamentoId === null && <PlasmaConferenceForm
-                          lancamentoId={lancamento.id}
-                          quantidadeBoa={lancamento.quantidadeBoa}
-                          quantidadeRefugo={lancamento.quantidadeRefugo}
-                        />}
                       </div>)}</div>
                     )}
                   </article>
@@ -262,7 +255,7 @@ export default async function NestDetalhePage({
                   quantidadePendente={Math.max(0, totalPlanejado - totalProcessado)}
                   faltas={faltas}
                   plasmaChapa={ehSetor(nest.setor.nome, "Plasma Chapa")}
-                  rotaDepoisFinalizar={`/plasma/${nest.id}`}
+                  rotaDepoisFinalizar={ehSetor(nest.setor.nome, "Plasma Chapa") ? `/apontamentos?setor=${nest.setor.id}` : `/plasma/${nest.id}`}
                   mostrarDescricao
                 />
               ) : <p className="text-xs text-slate-500">{emAberto ? "Seu acesso não permite operar este nest." : "Este nest está encerrado; sua rastreabilidade permanece disponível."}</p>}

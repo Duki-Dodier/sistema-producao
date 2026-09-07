@@ -25,6 +25,7 @@ export default async function RootLayout({
   const requestHeaders = await headers();
   const pathname = requestHeaders.get("x-mes-pathname") ?? "/";
   const paginaApontamento = pathname.startsWith("/apontamentos") || pathname.startsWith("/plasma/operar") || pathname.startsWith("/plasma/apontar") || pathname.startsWith("/plasma/conferencia/scanner") || pathname.startsWith("/plasma/conferencia/op");
+  const telaFocadaConferencia = pathname === "/plasma/conferencia" || pathname.startsWith("/plasma/conferencia/");
 
   if (pathname === "/login") {
     return (
@@ -47,7 +48,7 @@ export default async function RootLayout({
         <div className="flex h-full print:h-auto print:block">
           
           {/* Barra lateral: expande ao passar o mouse para revelar os nomes. */}
-          <aside className={`${paginaApontamento ? "hidden sm:flex" : "flex"} group/sidebar relative w-16 shrink-0 flex-col overflow-hidden border-r border-white/5 bg-[#1A222C] shadow-xl transition-[width] duration-500 ease-out hover:w-60 z-20 print:hidden`}>
+          <aside className={`${telaFocadaConferencia ? "hidden" : paginaApontamento ? "hidden sm:flex" : "flex"} group/sidebar relative w-16 shrink-0 flex-col overflow-hidden border-r border-white/5 bg-[#1A222C] shadow-xl transition-[width] duration-500 ease-out hover:w-60 z-20 print:hidden`}>
             {/* Top Logo / App Icon */}
             <div className="flex h-14 items-center justify-center bg-[#1A222C] px-1 shadow-md shadow-black/20 transition-all duration-500 group-hover/sidebar:justify-start group-hover/sidebar:px-3">
               <img
@@ -83,7 +84,7 @@ export default async function RootLayout({
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible print:block">
             
             {/* TOPBAR (HEADER) */}
-            <header className="flex h-14 shrink-0 items-center justify-between bg-[#202A36] px-3 shadow-sm shadow-black/20 z-10 border-b border-white/5 sm:px-6 print:hidden">
+            <header className={`${telaFocadaConferencia ? "hidden" : "flex"} h-14 shrink-0 items-center justify-between bg-[#202A36] px-3 shadow-sm shadow-black/20 z-10 border-b border-white/5 sm:px-6 print:hidden`}>
               <div className="flex items-center gap-4">
                  <div className={`leading-tight ${paginaApontamento ? "hidden sm:block" : ""}`}>
                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-amber-300">ENGATES BRUCKE</p>

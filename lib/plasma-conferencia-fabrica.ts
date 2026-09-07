@@ -50,10 +50,81 @@ export type ConferenciaPlasmaFabrica = {
   totalPerdasDeclaradas: number;
   totalLiberado: number;
   totalPerdasLiberadas: number;
+  totalBoasPendentes: number;
   pendentes: number;
   todosNestsFinalizados: boolean;
+  prontaParaConferir: boolean;
   itens: ItemConferenciaFabrica[];
 };
+
+export type ItemFilaConferenciaPlasma = {
+  opId: number;
+  numeroSequencia: number;
+  lote: string | null;
+  modeloCodigo: string;
+  pecaId: number;
+  pecaCodigo: string;
+  pecaNome: string;
+  necessaria: number;
+  primeiroLancamentoEm: string;
+};
+
+function boasEfetivas(item: Pick<LancamentoConferenciaFabrica, "quantidadeBoa" | "quantidadeConferidaBoa">) {
+  return item.quantidadeConferidaBoa ?? item.quantidadeBoa;
+}
+
+function perdasEfetivas(item: Pick<LancamentoConferenciaFabrica, "quantidadeRefugo" | "quantidadeConferidaRefugo">) {
+  return item.quantidadeConferidaRefugo ?? item.quantidadeRefugo;
+}
+
+function resumirConferencia({
+  opId,
+  numeroSequencia,
+  lote,
+  modeloCodigo,
+  modeloNome,
+  pecaId,
+  pecaCodigo,
+  pecaNome,
+  necessaria,
+  itens,
+}: Omit<ConferenciaPlasmaFabrica, "totalPlanejado" | "totalDeclarado" | "totalBoasDeclaradas" | "totalPerdasDeclaradas" | "totalLiberado" | "totalPerdasLiberadas" | "totalBoasPendentes" | "pendentes" | "todosNestsFinalizados" | "prontaParaConferir">): ConferenciaPlasmaFabrica {
+  const lancamentos = itens.flatMap((item) => item.lancamentos);
+  const pendentes = lancamentos.filter((item) => item.apontamentoId === null);
+  const totalLiberado = lancamentos.reduce(
+    (soma, item) => soma + (item.apontamentoId === null ? 0 : boasEfetivas(item)),
+    0,
+  );
+  const totalPerdasLiberadas = lancamentos.reduce(
+    (soma, item) => soma + (item.apontamentoId === null ? 0 : perdasEfetivas(item)),
+    0,
+  );
+  const totalBoasPendentes = pendentes.reduce((soma, item) => soma + boasEfetivas(item), 0);
+  const todosNestsFinalizados = itens.length > 0 && itens.every((item) => STATUS_FINALIZADO.has(item.nestStatus));
+
+  return {
+    opId,
+    numeroSequencia,
+    lote,
+    modeloCodigo,
+    modeloNome,
+    pecaId,
+    pecaCodigo,
+    pecaNome,
+    necessaria,
+    totalPlanejado: itens.reduce((soma, item) => soma + item.quantidadePlanejada, 0),
+    totalDeclarado: lancamentos.reduce((soma, item) => soma + item.quantidadeBoa + item.quantidadeRefugo, 0),
+    totalBoasDeclaradas: lancamentos.reduce((soma, item) => soma + item.quantidadeBoa, 0),
+    totalPerdasDeclaradas: lancamentos.reduce((soma, item) => soma + item.quantidadeRefugo, 0),
+    totalLiberado,
+    totalPerdasLiberadas,
+    totalBoasPendentes,
+    pendentes: pendentes.length,
+    todosNestsFinalizados,
+    prontaParaConferir: todosNestsFinalizados && pendentes.length > 0 && totalLiberado + totalBoasPendentes >= necessaria,
+    itens,
+  };
+}
 
 export async function buscarConferenciaPlasmaFabrica({
   opId,
@@ -126,7 +197,7 @@ export async function buscarConferenciaPlasmaFabrica({
   const componente = op?.modelo.pecas[0];
   if (!op || !componente || componente.peca.id !== pecaId) return null;
 
-  const itensConvertidos = itens.map((item) => ({
+  const itensConvertidos: ItemConferenciaFabrica[] = itens.map((item) => ({
     id: item.id,
     quantidadePlanejada: item.quantidadePlanejada,
     nestId: item.nest.id,
@@ -156,14 +227,7 @@ export async function buscarConferenciaPlasmaFabrica({
     })),
   }));
 
-  const lancamentos = itensConvertidos.flatMap((item) => item.lancamentos);
-  const totalDeclarado = lancamentos.reduce((soma, item) => soma + item.quantidadeBoa + item.quantidadeRefugo, 0);
-  const totalBoasDeclaradas = lancamentos.reduce((soma, item) => soma + item.quantidadeBoa, 0);
-  const totalPerdasDeclaradas = lancamentos.reduce((soma, item) => soma + item.quantidadeRefugo, 0);
-  const totalLiberado = lancamentos.reduce((soma, item) => soma + (item.apontamentoId === null ? 0 : item.quantidadeConferidaBoa ?? item.quantidadeBoa), 0);
-  const totalPerdasLiberadas = lancamentos.reduce((soma, item) => soma + (item.apontamentoId === null ? 0 : item.quantidadeConferidaRefugo ?? item.quantidadeRefugo), 0);
-
-  return {
+  return resumirConferencia({
     opId: op.id,
     numeroSequencia: op.numeroSequencia,
     lote: op.lote,
@@ -173,14 +237,82 @@ export async function buscarConferenciaPlasmaFabrica({
     pecaCodigo: componente.peca.codigo,
     pecaNome: componente.peca.nome,
     necessaria: op.quantidade * componente.quantidadeNecessaria,
-    totalPlanejado: itensConvertidos.reduce((soma, item) => soma + item.quantidadePlanejada, 0),
-    totalDeclarado,
-    totalBoasDeclaradas,
-    totalPerdasDeclaradas,
-    totalLiberado,
-    totalPerdasLiberadas,
-    pendentes: lancamentos.filter((item) => item.apontamentoId === null).length,
-    todosNestsFinalizados: itensConvertidos.length > 0 && itensConvertidos.every((item) => STATUS_FINALIZADO.has(item.nestStatus)),
     itens: itensConvertidos,
-  };
+  });
+}
+
+/** Lista simplificada: uma peça por OP, pronta somente quando o corte está completo. */
+export async function buscarFilaConferenciaPlasma(setorId: number): Promise<ItemFilaConferenciaPlasma[]> {
+  const itens = await prisma.nestItem.findMany({
+    where: { nest: { setorId }, op: { status: "ABERTA" } },
+    orderBy: [{ opId: "asc" }, { pecaId: "asc" }, { nestId: "asc" }],
+    select: {
+      opId: true,
+      pecaId: true,
+      op: {
+        select: {
+          numeroSequencia: true,
+          lote: true,
+          quantidade: true,
+          modelo: {
+            select: {
+              codigo: true,
+              pecas: { select: { pecaId: true, quantidadeNecessaria: true } },
+            },
+          },
+        },
+      },
+      peca: { select: { codigo: true, nome: true } },
+      nest: { select: { status: true } },
+      lancamentos: {
+        orderBy: [{ dataHora: "asc" }, { id: "asc" }],
+        select: {
+          id: true,
+          quantidadeBoa: true,
+          apontamentoId: true,
+          quantidadeConferidaBoa: true,
+          dataHora: true,
+        },
+      },
+    },
+  });
+
+  type ItemFilaBruto = (typeof itens)[number];
+  const grupos = new Map<string, ItemFilaBruto[]>();
+  for (const item of itens) {
+    const chave = `${item.opId}:${item.pecaId}`;
+    grupos.set(chave, [...(grupos.get(chave) ?? []), item]);
+  }
+
+  const fila: ItemFilaConferenciaPlasma[] = [];
+  for (const grupo of grupos.values()) {
+    const primeiro = grupo[0];
+    const componente = primeiro.op.modelo.pecas.find((item) => item.pecaId === primeiro.pecaId);
+    if (!componente) continue;
+    const necessaria = primeiro.op.quantidade * componente.quantidadeNecessaria;
+    const lancamentos = grupo.flatMap((item) => item.lancamentos);
+    const pendentes = lancamentos.filter((item) => item.apontamentoId === null);
+    const totalLiberado = lancamentos.reduce(
+      (soma, item) => soma + (item.apontamentoId === null ? 0 : item.quantidadeConferidaBoa ?? item.quantidadeBoa),
+      0,
+    );
+    const boasPendentes = pendentes.reduce((soma, item) => soma + (item.quantidadeConferidaBoa ?? item.quantidadeBoa), 0);
+    const todosFinalizados = grupo.every((item) => STATUS_FINALIZADO.has(item.nest.status));
+    if (!todosFinalizados || !pendentes.length || totalLiberado + boasPendentes < necessaria) continue;
+
+    const primeiroLancamento = lancamentos[0]?.dataHora ?? new Date();
+    fila.push({
+      opId: primeiro.opId,
+      numeroSequencia: primeiro.op.numeroSequencia,
+      lote: primeiro.op.lote,
+      modeloCodigo: primeiro.op.modelo.codigo,
+      pecaId: primeiro.pecaId,
+      pecaCodigo: primeiro.peca.codigo,
+      pecaNome: primeiro.peca.nome,
+      necessaria,
+      primeiroLancamentoEm: primeiroLancamento.toISOString(),
+    });
+  }
+
+  return fila.sort((a, b) => +new Date(a.primeiroLancamentoEm) - +new Date(b.primeiroLancamentoEm) || a.opId - b.opId || a.pecaId - b.pecaId);
 }

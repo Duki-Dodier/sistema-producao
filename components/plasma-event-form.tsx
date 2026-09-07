@@ -45,7 +45,9 @@ export function PlasmaEventForm({
   useEffect(() => {
     if (!resultado?.ok) return;
     if (resultado.tipo === "FIM" || resultado.tipo === "CANCELAMENTO") {
-      router.replace(`${rotaDepoisFinalizar ?? `/plasma/operar/${nestId}`}?finalizado=1&repor=${resultado.faltasEnviadas ?? 0}`);
+      const destino = rotaDepoisFinalizar ?? `/plasma/operar/${nestId}`;
+      const separador = destino.includes("?") ? "&" : "?";
+      router.replace(`${destino}${separador}finalizado=1&repor=${resultado.faltasEnviadas ?? 0}`);
       return;
     }
     router.refresh();

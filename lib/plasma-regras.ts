@@ -46,7 +46,11 @@ export function saldoProgramacao(necessaria: number, oficial: number, itens: {
       perdasOperadorTotal += perdasOperador(registro);
       perdasConferenteTotal += perdasConferente(registro);
       if (registro.conferenteId != null && perdasEfetivas(registro) > 0) conferenteNotificou = true;
-      if (registro.apontamentoId === null) aguardando += registro.quantidadeBoa;
+      // Antes da liberação oficial, a conferência pode corrigir a quantidade
+      // física recebida. Nesse caso, a reposição deve considerar o valor
+      // conferido — e não voltar a reservar a quantidade declarada pelo
+      // operador.
+      if (registro.apontamentoId === null) aguardando += registro.quantidadeConferidaBoa ?? registro.quantidadeBoa;
     }
     if (["PROGRAMADO", "EM_CORTE", "PAUSADO"].includes(item.status)) {
       reservado += Math.max(0, item.quantidadePlanejada - registrado);

@@ -24,7 +24,7 @@ export default async function PlasmaConferenciaScannerPage() {
         <h1 className="mt-1 text-2xl font-bold uppercase text-white">LER QR CODE DA OP</h1>
         <p className="mt-1 text-sm text-slate-400">Aponte a câmera para o QR Code da peça do Plasma na ordem de produção.</p>
       </div>
-      <QrScanner modo="conferencia" />
+      <QrScanner modo="conferencia" iniciarAutomaticamente />
     </div>
   );
 }
