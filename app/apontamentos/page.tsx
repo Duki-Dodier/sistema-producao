@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
@@ -16,12 +17,27 @@ import { buscarOperadorLogado } from "@/lib/auth-operador";
 import { buscarConferenciaPlasmaFabrica } from "@/lib/plasma-conferencia-fabrica";
 import { podeConferirPlasma } from "@/lib/plasma-regras";
 
+export const dynamic = "force-dynamic";
+
+function parametrosDoDestinoRequisitado(destino: string | null) {
+  const inicioQuery = destino?.indexOf("?") ?? -1;
+  if (!destino || inicioQuery < 0) return {};
+  return Object.fromEntries(new URLSearchParams(destino.slice(inicioQuery + 1)).entries());
+}
+
 export default async function ApontamentosPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const sp = await searchParams;
+  const [spRecebido, requestHeaders] = await Promise.all([searchParams, headers()]);
+  // O Vinext pode fazer uma leitura preliminar da página sem repassar a query.
+  // Recuperamos os parâmetros do endereço original para não confundir um QR de OP
+  // com um acesso comum e devolver o operador ao scanner em um ciclo.
+  const sp = {
+    ...parametrosDoDestinoRequisitado(requestHeaders.get("x-mes-request-target")),
+    ...Object.fromEntries(Object.entries(spRecebido).filter((entrada): entrada is [string, string] => typeof entrada[1] === "string")),
+  };
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
   const setorSolicitadoId = sp.setor ? Number(sp.setor) : setores[0]?.id;
   const opIdFiltro = sp.op ? Number(sp.op) : null;
