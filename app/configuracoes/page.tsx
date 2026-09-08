@@ -19,17 +19,10 @@ export default async function ConfiguracoesPage() {
     include: {
       funcionarios: {
         orderBy: { nome: "asc" },
-        include: {
-          processosPermitidos: { orderBy: { processo: "asc" } },
-          contaAcesso: { select: { usuario: true, senhaTemporaria: true, ativo: true } },
-        },
+        include: { processosPermitidos: { orderBy: { processo: "asc" } } },
       },
     },
   });
-
-  const funcionariosAutenticacao = setores
-    .flatMap((setor) => setor.funcionarios.map((funcionario) => ({ funcionario, setor: setor.nome })))
-    .sort((a, b) => a.funcionario.nome.localeCompare(b.funcionario.nome, "pt-BR"));
 
   const totalFuncionarios = setores.reduce(
     (s, x) => s + x.funcionarios.filter((f) => f.ativo).length,
@@ -116,57 +109,6 @@ export default async function ConfiguracoesPage() {
           </button>
         </form>
       </div>
-
-      {/* TABELA DE AUTENTICAÇÃO */}
-      <section className="rounded-lg border border-cyan-400/20 bg-[#202A36]">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-lg border-b border-cyan-400/15 bg-[#1A222C] px-5 py-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100">Tabela de autenticação</h2>
-            <p className="mt-1 text-[10px] text-slate-500">
-              Login e senha usados pelos funcionários para entrar no sistema. Visível somente para o administrador.
-            </p>
-          </div>
-          <span className="rounded border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-300">
-            {funcionariosAutenticacao.length} acesso(s)
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left">
-            <thead className="border-b border-white/5 bg-[#151C26]">
-              <tr className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                <th className="px-5 py-3">Funcionário</th>
-                <th className="px-5 py-3">Setor</th>
-                <th className="px-5 py-3">Login / matrícula</th>
-                <th className="px-5 py-3">Senha</th>
-                <th className="px-5 py-3">Situação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {funcionariosAutenticacao.map(({ funcionario: f, setor }) => (
-                <tr key={`autenticacao-${f.id}`} className="text-xs text-slate-300 transition-colors hover:bg-white/[0.02]">
-                  <td className="px-5 py-3 font-semibold text-slate-100">{f.nome}</td>
-                  <td className="px-5 py-3 text-slate-400">{setor}</td>
-                  <td className="px-5 py-3 font-mono font-semibold text-cyan-300">
-                    {f.contaAcesso?.usuario ?? f.usuario ?? "Pendente"}
-                  </td>
-                  <td className="px-5 py-3 font-mono font-semibold text-amber-200">
-                    {f.contaAcesso?.senhaTemporaria ?? "Pendente"}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                      f.ativo && (f.contaAcesso?.ativo ?? true)
-                        ? "bg-emerald-500/10 text-emerald-300"
-                        : "bg-slate-700/60 text-slate-500"
-                    }`}>
-                      {f.ativo && (f.contaAcesso?.ativo ?? true) ? "Ativo" : "Inativo"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
       {/* UM CARD POR SETOR: config + funcionários */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -321,14 +263,10 @@ export default async function ConfiguracoesPage() {
                       </div>
 
                       <form action={boundAcesso} className="mt-4 space-y-4">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                           <label className="flex min-w-0 flex-col gap-1.5">
                             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Código / matrícula</span>
-                            <input key={`usuario-${f.id}-${f.contaAcesso?.usuario ?? f.usuario ?? ""}`} name="usuario" defaultValue={f.contaAcesso?.usuario ?? f.usuario ?? ""} placeholder="CBC-001" required className={INPUT_CLS} title="Código único usado no login" />
-                          </label>
-                          <label className="flex min-w-0 flex-col gap-1.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Senha de login</span>
-                            <input key={`senha-${f.id}-${f.contaAcesso?.senhaTemporaria ?? ""}`} name="senha" type="text" defaultValue={f.contaAcesso?.senhaTemporaria ?? "1234"} minLength={4} maxLength={64} required className={`${INPUT_CLS} font-mono`} title="Senha usada no login do sistema" autoComplete="off" />
+                            <input key={`usuario-${f.id}-${f.usuario ?? ""}`} name="usuario" defaultValue={f.usuario ?? ""} placeholder="CBC-001" required className={INPUT_CLS} title="Código único usado no login" />
                           </label>
                           <label className="flex min-w-0 flex-col gap-1.5">
                             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Setor atual</span>

@@ -80,7 +80,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   if (!usuario) {
     throw new Error("Informe um código/matrícula único para o funcionário.");
   }
-  if (senha.length < 4 || senha.length > 64) {
+  if (senha && (senha.length < 4 || senha.length > 64)) {
     throw new Error("A senha deve ter entre 4 e 64 caracteres.");
   }
   if (!PAPEIS.includes(papel as (typeof PAPEIS)[number]) || !Number.isInteger(setorId) || setorId <= 0) {
@@ -107,15 +107,32 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
     if (outro) throw new Error(`O conferente do Plasma já é ${outro.nome}. Altere essa pessoa primeiro.`);
   }
 
-  const senhaHash = await criarSenhaHash(senha);
+  const funcionarioAtual = await prisma.funcionario.findUnique({ where: { id }, select: { senhaHash: true } });
+  const contaAtual = await prisma.contaAcesso.findUnique({ where: { funcionarioId: id }, select: { senhaHash: true, senhaTemporaria: true } });
+  const senhaHash = senha
+    ? await criarSenhaHash(senha)
+    : contaAtual?.senhaHash ?? funcionarioAtual?.senhaHash;
+  if (!senhaHash) throw new Error("Este funcionário ainda não possui uma senha cadastrada.");
+
   await prisma.funcionario.update({
       where: { id },
       data: { usuario, senhaHash, papel, setorId, pin: pinRaw || null, bancada: bancadaRaw || null },
     });
   await prisma.contaAcesso.upsert({
     where: { funcionarioId: id },
-    update: { usuario, senhaHash, senhaTemporaria: senha, ativo: true },
-    create: { funcionarioId: id, usuario, senhaHash, senhaTemporaria: senha, ativo: true },
+    update: {
+      usuario,
+      senhaHash,
+      ...(senha ? { senhaTemporaria: senha } : {}),
+      ativo: true,
+    },
+    create: {
+      funcionarioId: id,
+      usuario,
+      senhaHash,
+      senhaTemporaria: senha || contaAtual?.senhaTemporaria || "1234",
+      ativo: true,
+    },
   });
   await prisma.funcionarioProcesso.deleteMany({ where: { funcionarioId: id } });
   if (processos.length > 0) {
