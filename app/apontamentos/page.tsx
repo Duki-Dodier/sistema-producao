@@ -96,7 +96,7 @@ export default async function ApontamentosPage({
   const setorPlasmaChapa = ehSetor(setor.nome, "Plasma Chapa");
   const setorTubo = ehSetor(setor.nome, "Tubo");
 
-  if (setorPlasmaChapa && opIdFiltro !== null && Number.isInteger(opIdFiltro) && opIdFiltro > 0) {
+  if (setorPlasmaChapa && opIdFiltro !== null && Number.isInteger(opIdFiltro) && opIdFiltro > 0 && operadorLogado?.papel !== "OPERADOR") {
     const conferencia = pecaIdFiltro !== null && Number.isInteger(pecaIdFiltro) && pecaIdFiltro > 0
       ? await buscarConferenciaPlasmaFabrica({ opId: opIdFiltro, pecaId: pecaIdFiltro, setorId: setor.id })
       : null;
