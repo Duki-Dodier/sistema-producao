@@ -201,8 +201,11 @@ export function OperadorApontamentoKiosk({
         setErro(resultado.error);
         return;
       }
+      const resumo = `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}. Tempo registrado: ${formatTempo(resultado.tempoSegundos)}.`;
       setSucesso(
-        `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}. Tempo registrado: ${formatTempo(resultado.tempoSegundos)}.`,
+        modoQr
+          ? `Apontamento concluído. ${resumo} Abrindo a câmera para ler a próxima OP.`
+          : resumo,
       );
       setQuantidade("");
       setProducaoId(null);
@@ -210,7 +213,7 @@ export function OperadorApontamentoKiosk({
       setInicioProducao(null);
       setTempoDecorrido(0);
       if (modoQr) {
-        window.setTimeout(() => window.location.assign("/apontamentos/scanner"), 3000);
+        window.setTimeout(() => window.location.replace("/apontamentos/scanner"), 3000);
       }
     } catch (error) {
       setErro(error instanceof Error ? error.message : "Não foi possível salvar o apontamento.");
@@ -490,7 +493,7 @@ export function OperadorApontamentoKiosk({
                     {modoQr && (
                       <button
                         type="button"
-                        onClick={() => window.location.assign("/apontamentos/scanner")}
+                        onClick={() => window.location.replace("/apontamentos/scanner")}
                         className="mt-3 w-full rounded-md border border-emerald-300/40 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-100 hover:bg-emerald-300/10"
                       >
                         Ler próximo QR Code

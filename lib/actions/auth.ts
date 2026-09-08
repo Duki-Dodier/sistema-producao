@@ -27,7 +27,8 @@ export async function loginSistema(formData: FormData) {
   const destinoSolicitado = destinoSeguro(String(formData.get("redirect") ?? ""));
 
   if (!usuario || !senha) {
-    redirect("/login?erro=Informe%20usuario%20e%20senha.");
+    const retorno = destinoSolicitado ? `&redirect=${encodeURIComponent(destinoSolicitado)}` : "";
+    redirect(`/login?erro=Informe%20usuario%20e%20senha.${retorno}`);
   }
 
   let conectado;

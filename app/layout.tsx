@@ -24,6 +24,10 @@ export default async function RootLayout({
 }>) {
   const requestHeaders = await headers();
   const pathname = requestHeaders.get("x-mes-pathname") ?? "/";
+  const requestTargetHeader = requestHeaders.get("x-mes-request-target");
+  const requestTarget = requestTargetHeader?.startsWith("/") && !requestTargetHeader.startsWith("//")
+    ? requestTargetHeader
+    : pathname;
   const paginaApontamento = pathname.startsWith("/apontamentos") || pathname.startsWith("/plasma/operar") || pathname.startsWith("/plasma/apontar") || pathname.startsWith("/plasma/conferencia/scanner") || pathname.startsWith("/plasma/conferencia/op");
   const telaFocadaConferencia = pathname === "/plasma/conferencia" || pathname.startsWith("/plasma/conferencia/");
 
@@ -36,7 +40,7 @@ export default async function RootLayout({
   }
 
   const usuario = await buscarOperadorLogado();
-  if (!usuario) redirect(`/login?redirect=${encodeURIComponent(pathname)}`);
+  if (!usuario) redirect(`/login?redirect=${encodeURIComponent(requestTarget)}`);
   if (!podeAcessarRota(usuario, pathname)) redirect(destinoInicial(usuario));
 
   return (
