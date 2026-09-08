@@ -23,8 +23,7 @@ export default async function ApontamentosPage({
 }) {
   const sp = await searchParams;
   const setores = await prisma.setor.findMany({ orderBy: { ordemPadrao: "asc" } });
-  const setorId = sp.setor ? Number(sp.setor) : setores[0]?.id;
-  const setor = setores.find((item) => item.id === setorId) ?? setores[0];
+  const setorSolicitadoId = sp.setor ? Number(sp.setor) : setores[0]?.id;
   const opIdFiltro = sp.op ? Number(sp.op) : null;
   const pecaIdFiltro = sp.peca ? Number(sp.peca) : null;
   const modoQr = sp.origem === "qrcode" || (Number.isInteger(opIdFiltro) && sp.origem !== "pc");
@@ -32,6 +31,17 @@ export default async function ApontamentosPage({
   const quantidadeInicialValida = typeof quantidadeInicial === "number" && Number.isInteger(quantidadeInicial) && quantidadeInicial > 0
     ? quantidadeInicial
     : null;
+
+  const operadorLogado = await buscarOperadorLogado();
+  // O setor gravado no QR identifica a etapa da OP, mas o operador deve
+  // continuar dentro do próprio posto. Assim, um operador do Tubo que leia
+  // um QR de Componente permanece no Tubo e recebe a mensagem de saldo
+  // inexistente, em vez de ser levado para o setor errado.
+  const usarSetorDoOperador = Boolean(
+    modoQr && operadorLogado?.papel === "OPERADOR" && !operadorLogado.administrador,
+  );
+  const setorId = usarSetorDoOperador ? operadorLogado?.setorId : setorSolicitadoId;
+  const setor = setores.find((item) => item.id === setorId) ?? setores[0];
 
   if (!setor) {
     return (
@@ -41,7 +51,6 @@ export default async function ApontamentosPage({
     );
   }
 
-  const operadorLogado = await buscarOperadorLogado();
   if (Number.isInteger(opIdFiltro) && !operadorLogado) {
     const destinoParams = new URLSearchParams({ op: String(opIdFiltro), setor: String(setor.id) });
     if (modoQr) destinoParams.set("origem", "qrcode");
@@ -479,6 +488,49 @@ export default async function ApontamentosPage({
     };
   });
 
+  const painelOperador = (
+    <OperadorApontamentoKiosk
+      setorId={setor.id}
+      setorNome={setor.nome}
+      operadores={funcionarios.map((f) => ({
+        id: f.id,
+        nome: f.nome,
+        temPin: Boolean(f.pin),
+        processosPermitidos: f.papel === "OPERADOR"
+          ? f.processosPermitidos.map((item) => item.processo)
+          : [...PROCESSOS],
+      }))}
+      sessao={operadorLogado ? {
+        id: operadorLogado.id,
+        nome: operadorLogado.nome,
+        temPin: operadorLogado.temPin,
+        processosPermitidos: operadorLogado.papel === "OPERADOR"
+          ? operadorLogado.processosPermitidos
+          : [...PROCESSOS],
+      } : undefined}
+      maquinas={maquinas}
+      producaoAtiva={producaoAtiva ? {
+        ...producaoAtiva,
+        iniciadoEm: producaoAtiva.iniciadoEm.toISOString(),
+      } as ProducaoAtivaKiosk : null}
+      itens={itensVisiveis}
+      opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
+      pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}
+      quantidadeInicial={quantidadeInicialValida}
+      modoQr={modoQr}
+    />
+  );
+
+  if (modoQr) {
+    return (
+      <div className="min-h-full bg-[#07101f] p-3 sm:p-6">
+        <div className="mx-auto w-full max-w-3xl">
+          {painelOperador}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-3 sm:gap-6 sm:p-6">
       <PageHeader
@@ -530,36 +582,7 @@ export default async function ApontamentosPage({
             <Link href="/apontamentos/scanner?destino=plasma" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-cyan-300">Abrir scanner do Plasma</Link>
           </section>}
 
-          <OperadorApontamentoKiosk
-            setorId={setor.id}
-            setorNome={setor.nome}
-            operadores={funcionarios.map((f) => ({
-              id: f.id,
-              nome: f.nome,
-              temPin: Boolean(f.pin),
-              processosPermitidos: f.papel === "OPERADOR"
-                ? f.processosPermitidos.map((item) => item.processo)
-                : [...PROCESSOS],
-            }))}
-            sessao={operadorLogado ? {
-              id: operadorLogado.id,
-              nome: operadorLogado.nome,
-              temPin: operadorLogado.temPin,
-              processosPermitidos: operadorLogado.papel === "OPERADOR"
-                ? operadorLogado.processosPermitidos
-                : [...PROCESSOS],
-            } : undefined}
-            maquinas={maquinas}
-            producaoAtiva={producaoAtiva ? {
-              ...producaoAtiva,
-              iniciadoEm: producaoAtiva.iniciadoEm.toISOString(),
-            } as ProducaoAtivaKiosk : null}
-            itens={itensVisiveis}
-            opIdInicial={Number.isInteger(opIdFiltro) ? opIdFiltro : null}
-            pecaIdInicial={Number.isInteger(pecaIdFiltro) ? pecaIdFiltro : null}
-            quantidadeInicial={quantidadeInicialValida}
-            modoQr={modoQr}
-          />
+          {painelOperador}
         </>
       )}
 

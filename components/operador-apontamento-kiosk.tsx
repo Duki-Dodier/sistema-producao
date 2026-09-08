@@ -228,8 +228,8 @@ export function OperadorApontamentoKiosk({
   }
 
   return (
-    <div className="grid gap-3 sm:gap-5 xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
-      <section className={`rounded-xl border border-[#2d3449] bg-[#131b2e] p-4 ${modoQr ? "hidden lg:block" : ""}`}>
+    <div className={modoQr ? "w-full" : "grid gap-3 sm:gap-5 xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]"}>
+      <section className={`rounded-xl border border-[#2d3449] bg-[#131b2e] p-4 ${modoQr ? "hidden" : ""}`}>
         <div className="mb-4 flex flex-wrap items-end gap-3">
           {sessao ? (
             <div className="flex min-w-48 flex-1 items-center justify-between gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-3">
@@ -375,10 +375,12 @@ export function OperadorApontamentoKiosk({
         </div>
       </section>
 
-      <section className={`rounded-xl border border-[#2d3449] bg-[#131b2e] p-3 sm:p-5 ${modoQr ? "order-first lg:order-none" : ""}`}>
+      <section className={`rounded-xl border border-[#2d3449] bg-[#131b2e] p-3 sm:p-5 ${modoQr ? "mx-auto max-w-xl" : ""}`}>
         {!item ? (
           <div className="flex min-h-96 items-center justify-center text-slate-500">
-            {modoQr ? "Nenhum processo disponível para este operador neste QR Code." : "Selecione uma OP para apontar."}
+            {modoQr
+              ? `Nenhum apontamento disponível para esta OP/peça no setor ${setorNome}.`
+              : "Selecione uma OP para apontar."}
           </div>
         ) : item.concluido ? (
           <div className="flex min-h-96 flex-col items-center justify-center text-center">
