@@ -12,10 +12,10 @@ export async function createFuncionario(formData: FormData) {
   if (!acesso.administrador) throw new Error("Apenas o administrador pode cadastrar funcionarios.");
   const nome = String(formData.get("nome") ?? "").trim();
   const setorId = Number(formData.get("setorId"));
-  const usuario = normalizarUsuario(nome.split(/\s+/)[0] ?? "");
+  const usuario = normalizarUsuario(String(formData.get("usuario") ?? ""));
 
-  if (!nome || !setorId) {
-    throw new Error("Preencha nome e setor do funcionário.");
+  if (!nome || !setorId || !usuario) {
+    throw new Error("Preencha nome, código/matrícula e setor do funcionário.");
   }
 
   const setor = await prisma.setor.findUnique({
@@ -41,9 +41,9 @@ export async function createFuncionario(formData: FormData) {
         bancada,
       },
     });
-    await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: funcionario.id, acao: "CRIADO", descricao: `Funcionário ${nome} cadastrado.`, usuario: acesso.nome, dadosDepois: { nome, setorId, bancada } });
+    await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: funcionario.id, acao: "CRIADO", descricao: `Funcionário ${nome} cadastrado.`, usuario: acesso.nome, dadosDepois: { nome, usuario, setorId, bancada } });
   } catch {
-    throw new Error("Já existe um funcionário com esse nome neste setor.");
+    throw new Error("Já existe um funcionário com esse código/matrícula.");
   }
 
   revalidatePath("/configuracoes");
@@ -59,6 +59,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   if (!acesso.administrador) throw new Error("Apenas o administrador pode alterar acessos.");
   const papel = String(formData.get("papel") ?? "OPERADOR");
   const setorId = Number(formData.get("setorId"));
+  const usuario = normalizarUsuario(String(formData.get("usuario") ?? ""));
   const pinRaw = String(formData.get("pin") ?? "").trim();
   const bancadaRaw = String(formData.get("bancada") ?? "").trim();
   const processosInformados = PROCESSOS.filter((processo) =>
@@ -66,9 +67,14 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   );
   const processos = papel === "CONFERENTE" ? [] : processosInformados;
 
+  if (!usuario) {
+    throw new Error("Informe um código/matrícula único para o funcionário.");
+  }
   if (!PAPEIS.includes(papel as (typeof PAPEIS)[number]) || !Number.isInteger(setorId) || setorId <= 0) {
     throw new Error("Papel ou setor inválido.");
   }
+  const usuarioExistente = await prisma.funcionario.findFirst({ where: { usuario, id: { not: id } }, select: { nome: true } });
+  if (usuarioExistente) throw new Error(`O código/matrícula já está em uso por ${usuarioExistente.nome}.`);
   if (pinRaw && !/^\d{4}$/.test(pinRaw)) {
     throw new Error("O PIN deve ter exatamente 4 dígitos.");
   }
@@ -88,7 +94,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
 
   await prisma.funcionario.update({
       where: { id },
-      data: { papel, setorId, pin: pinRaw || null, bancada: bancadaRaw || null },
+      data: { usuario, papel, setorId, pin: pinRaw || null, bancada: bancadaRaw || null },
     });
   await prisma.funcionarioProcesso.deleteMany({ where: { funcionarioId: id } });
   if (processos.length > 0) {
@@ -96,7 +102,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
       data: processos.map((processo) => ({ funcionarioId: id, processo })),
     });
   }
-  await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: id, acao: "ATUALIZADO", descricao: `Acesso do funcionário ${id} atualizado.`, usuario: acesso.nome, dadosDepois: { papel, setorId, bancada: bancadaRaw || null, processos } });
+  await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: id, acao: "ATUALIZADO", descricao: `Acesso do funcionário ${id} atualizado.`, usuario: acesso.nome, dadosDepois: { usuario, papel, setorId, bancada: bancadaRaw || null, processos } });
 
   revalidatePath("/configuracoes");
   revalidatePath("/apontamentos");

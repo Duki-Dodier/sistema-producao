@@ -33,7 +33,7 @@ export default async function PlanoCorteTuboDetalhe({ params }: { params: Promis
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><Link href="/tubo/plano-corte" className="font-mono text-xs text-cyan-300 hover:text-cyan-200">← VOLTAR AOS PLANOS</Link><p className="mt-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Sequência oficial de corte</p><h1 className="mt-1 text-2xl font-black text-white">{plano.codigo}</h1><p className="mt-1 text-sm text-slate-400">Emitido por {plano.criadoPor.nome} em {plano.emitidoEm.toLocaleString("pt-BR")} · {plano.maquina ? `${plano.maquina.codigo} · ${plano.maquina.nome}` : "Máquina não definida"}</p></div>
+        <div><Link href="/relatorios/plano-corte-tubo" className="font-mono text-xs text-cyan-300 hover:text-cyan-200">← VOLTAR AO OTIMIZADOR DE TUBOS</Link><p className="mt-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Sequência oficial de corte</p><h1 className="mt-1 text-2xl font-black text-white">{plano.codigo}</h1><p className="mt-1 text-sm text-slate-400">Emitido por {plano.criadoPor.nome} em {plano.emitidoEm.toLocaleString("pt-BR")} · {plano.maquina ? `${plano.maquina.codigo} · ${plano.maquina.nome}` : "Máquina não definida"}</p></div>
         <div className="flex items-center gap-2"><Status status={plano.status} /><Link href={`/tubo/planos/${plano.id}/pdf`} className="rounded-lg bg-cyan-400 px-4 py-2.5 font-mono text-xs font-black uppercase text-slate-950">Baixar PDF</Link></div>
       </div>
 

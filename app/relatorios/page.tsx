@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Scissors } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import {
   RelatoriosProducao,
@@ -167,6 +169,15 @@ export default async function RelatoriosPage() {
       <PageHeader
         title="Relatórios e Capacidade"
         subtitle="Produção, produtividade, ficha completa dos engates e capacidade dos setores"
+        actions={
+          <Link
+            href="/relatorios/plano-corte-tubo"
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-cyan-300 hover:bg-cyan-400/20 active:scale-95 transition-all"
+          >
+            <Scissors className="h-4 w-4" />
+            Otimizador de Corte de Tubos (6m)
+          </Link>
+        }
       />
       <RelatoriosProducao
         registros={registrosRelatorio}

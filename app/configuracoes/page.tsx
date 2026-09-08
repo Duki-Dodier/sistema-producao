@@ -62,7 +62,7 @@ export default async function ConfiguracoesPage() {
         </div>
         <form
           action={createFuncionario}
-          className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_14rem_auto] md:items-end"
+          className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_12rem_14rem_auto] md:items-end"
         >
           <div className="flex min-w-0 flex-col gap-1.5">
             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
@@ -72,6 +72,17 @@ export default async function ConfiguracoesPage() {
               name="nome"
               required
               placeholder="Ex.: Anderson"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+              Código / matrícula
+            </label>
+            <input
+              name="usuario"
+              required
+              placeholder="Ex.: CBC-001"
               className={INPUT_CLS}
             />
           </div>
@@ -252,7 +263,11 @@ export default async function ConfiguracoesPage() {
                       </div>
 
                       <form action={boundAcesso} className="mt-4 space-y-4">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                          <label className="flex min-w-0 flex-col gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Código / matrícula</span>
+                            <input key={`usuario-${f.id}-${f.usuario ?? ""}`} name="usuario" defaultValue={f.usuario ?? ""} placeholder="CBC-001" required className={INPUT_CLS} title="Código único usado no login" />
+                          </label>
                           <label className="flex min-w-0 flex-col gap-1.5">
                             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Setor atual</span>
                             <select name="setorId" defaultValue={f.setorId} className={INPUT_CLS} title="Setor atual do funcionário">

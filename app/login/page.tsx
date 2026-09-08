@@ -44,7 +44,7 @@ export default async function LoginPage({
         <div className="px-7 py-7">
           <h2 className="text-lg font-semibold text-white">Entre no sistema</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Use seu primeiro nome e a senha temporaria cadastrada.
+            Use sua matrícula e a senha temporária cadastrada.
           </p>
 
           <form action={loginSistema} className="mt-6 space-y-4">
@@ -64,7 +64,7 @@ export default async function LoginPage({
                 autoComplete="username"
                 autoCapitalize="none"
                 required
-                placeholder="Ex.: pedro ou tiago"
+                placeholder="Ex.: PCP-005"
                 className="w-full rounded-lg border border-slate-600 bg-[#07101f] px-4 py-3 text-base text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/10"
               />
             </div>
@@ -89,8 +89,9 @@ export default async function LoginPage({
           </form>
 
           <div className="mt-6 rounded-lg border border-amber-300/20 bg-amber-300/5 px-4 py-3 text-xs leading-relaxed text-amber-100/80">
-            Acesso de teste: use o primeiro nome do funcionario e a senha <strong className="font-mono text-amber-200">1234</strong>.
-            Administrador: <strong className="font-mono text-amber-200">tiago</strong>.
+            Senha inicial dos funcionários: <strong className="font-mono text-amber-200">1234</strong>.
+            Administrador: matrícula <strong className="font-mono text-amber-200">PCP-005</strong>.
+            Nos dois registros do Plasma, o login usa o sufixo <strong className="font-mono text-amber-200">CH</strong> ou <strong className="font-mono text-amber-200">TB</strong>.
           </div>
         </div>
       </section>
