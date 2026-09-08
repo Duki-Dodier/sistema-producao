@@ -204,8 +204,7 @@ export async function exigirAdministrador() {
 export function destinoInicial(usuario: OperadorLogado) {
   if (usuario.administrador || usuario.papel === "PCP") return "/";
   if (usuario.papel === "CONFERENTE" && ehSetor(usuario.setorNome, "Plasma Chapa")) return "/plasma/conferencia";
-  if (usuario.papel === "OPERADOR" && ehSetor(usuario.setorNome, "Plasma Chapa")) return `/apontamentos?setor=${usuario.setorId}`;
-  if (usuario.papel === "OPERADOR" && ehSetor(usuario.setorNome, "Plasma Tubo")) return "/plasma";
+  if (usuario.papel === "OPERADOR") return "/apontamentos/scanner";
   return `/apontamentos?setor=${usuario.setorId}`;
 }
 
@@ -214,11 +213,11 @@ export function podeAcessarRota(usuario: OperadorLogado, pathname: string) {
   if (pathname === "/login") return true;
   if (usuario.papel === "OPERADOR") {
     const operadorDoPlasma = ehSetor(usuario.setorNome, "Plasma Chapa") || ehSetor(usuario.setorNome, "Plasma Tubo");
-    if (ehSetor(usuario.setorNome, "Tubo")) return pathname.startsWith("/apontamentos") || pathname.startsWith("/tubo");
+    if (ehSetor(usuario.setorNome, "Tubo")) return pathname.startsWith("/apontamentos");
     return operadorDoPlasma ? pathname.startsWith("/plasma") || pathname.startsWith("/apontamentos") : pathname.startsWith("/apontamentos");
   }
   if (usuario.papel === "LIDER") {
-    return ["/", "/monitoramento", "/plasma", "/ponteiras", "/relatorios", "/agrupamento", "/solda", "/apontamentos", "/tubo"].some(
+    return ["/", "/monitoramento", "/plasma", "/ponteiras", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].some(
       (rota) => rota === "/" ? pathname === "/" : pathname.startsWith(rota),
     );
   }

@@ -88,6 +88,10 @@ export default async function ApontamentosPage({
     );
   }
 
+  if (operadorLogado?.papel === "OPERADOR" && !operadorLogado.administrador && !Number.isInteger(opIdFiltro)) {
+    redirect("/apontamentos/scanner");
+  }
+
   const setorSolda = ehSetor(setor.nome, "Solda");
   const setorPlasmaChapa = ehSetor(setor.nome, "Plasma Chapa");
   const setorTubo = ehSetor(setor.nome, "Tubo");
@@ -537,13 +541,6 @@ export default async function ApontamentosPage({
         title="Apontamentos da Fábrica"
         subtitle="Tela simples do operador · OP, peça, processo atual e quantidade executada."
       />
-
-      {setorTubo && (
-        <nav className="inline-flex w-fit rounded-xl border border-slate-700 bg-slate-900 p-1">
-          <span className="rounded-lg bg-cyan-400/15 px-5 py-2.5 font-mono text-xs font-black uppercase tracking-wider text-cyan-300">Produção</span>
-          <Link href="/tubo/plano-corte" className="rounded-lg px-5 py-2.5 font-mono text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white">Plano de corte</Link>
-        </nav>
-      )}
 
       <div className="flex items-center gap-2 overflow-x-auto rounded-lg border border-slate-700 bg-[#131b2e] p-3">
         <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">

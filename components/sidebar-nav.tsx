@@ -34,10 +34,14 @@ export function SidebarNav({
     ? NAV_ITEMS
     : papel === "CONFERENTE"
       ? NAV_ITEMS.filter((item) => item.href === "/plasma")
-    : papel === "OPERADOR"
-      ? NAV_ITEMS.filter((item) =>
-          operadorDoPlasma ? item.href === "/plasma" : item.href === "/apontamentos",
-      )
+      : papel === "OPERADOR"
+      ? [{
+          ...(operadorDoPlasma
+            ? NAV_ITEMS.find((item) => item.href === "/plasma")!
+            : NAV_ITEMS.find((item) => item.href === "/apontamentos")!),
+          href: "/apontamentos/scanner",
+          label: "Ler QR Code",
+        }]
       : papel === "LIDER"
         ? NAV_ITEMS.filter((item) =>
             ["/", "/monitoramento", "/plasma", "/ponteiras", "/relatorios", "/agrupamento", "/solda", "/apontamentos"].includes(item.href),

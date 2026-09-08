@@ -13,6 +13,14 @@ function destinoSeguro(valor: string) {
   return valor.startsWith("/") && !valor.startsWith("//") ? valor : "";
 }
 
+function destinoDeOperadorComLeitura(destino: string) {
+  if (destino === "/apontamentos/scanner" || destino.startsWith("/apontamentos/scanner?")) return true;
+  if (/^\/plasma\/(operar|apontar)\/\d+(?:\?|$)/.test(destino)) return true;
+  if (!destino.startsWith("/apontamentos?")) return false;
+  const parametros = new URLSearchParams(destino.slice(destino.indexOf("?") + 1));
+  return /^\d+$/.test(parametros.get("op") ?? "");
+}
+
 export async function loginSistema(formData: FormData) {
   const usuario = String(formData.get("usuario") ?? "").trim();
   const senha = String(formData.get("senha") ?? "");
@@ -31,7 +39,10 @@ export async function loginSistema(formData: FormData) {
     redirect(`/login?erro=${encodeURIComponent(mensagem)}${retorno}`);
   }
 
-  const destino = destinoSolicitado && podeAcessarRota(conectado, destinoSolicitado)
+  const destinoPermitido = conectado.papel === "OPERADOR"
+    ? destinoDeOperadorComLeitura(destinoSolicitado)
+    : Boolean(destinoSolicitado && podeAcessarRota(conectado, destinoSolicitado));
+  const destino = destinoPermitido
     ? destinoSolicitado
     : destinoInicial(conectado);
   redirect(destino);
