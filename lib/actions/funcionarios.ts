@@ -41,6 +41,15 @@ export async function createFuncionario(formData: FormData) {
         bancada,
       },
     });
+    await prisma.contaAcesso.create({
+      data: {
+        funcionarioId: funcionario.id,
+        usuario,
+        senhaHash: await criarSenhaHash("1234"),
+        senhaTemporaria: "1234",
+        ativo: true,
+      },
+    });
     await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: funcionario.id, acao: "CRIADO", descricao: `Funcionário ${nome} cadastrado.`, usuario: acesso.nome, dadosDepois: { nome, usuario, setorId, bancada } });
   } catch {
     throw new Error("Já existe um funcionário com esse código/matrícula.");
@@ -60,6 +69,7 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   const papel = String(formData.get("papel") ?? "OPERADOR");
   const setorId = Number(formData.get("setorId"));
   const usuario = normalizarUsuario(String(formData.get("usuario") ?? ""));
+  const senha = String(formData.get("senha") ?? "").trim();
   const pinRaw = String(formData.get("pin") ?? "").trim();
   const bancadaRaw = String(formData.get("bancada") ?? "").trim();
   const processosInformados = PROCESSOS.filter((processo) =>
@@ -70,11 +80,16 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
   if (!usuario) {
     throw new Error("Informe um código/matrícula único para o funcionário.");
   }
+  if (senha.length < 4 || senha.length > 64) {
+    throw new Error("A senha deve ter entre 4 e 64 caracteres.");
+  }
   if (!PAPEIS.includes(papel as (typeof PAPEIS)[number]) || !Number.isInteger(setorId) || setorId <= 0) {
     throw new Error("Papel ou setor inválido.");
   }
   const usuarioExistente = await prisma.funcionario.findFirst({ where: { usuario, id: { not: id } }, select: { nome: true } });
   if (usuarioExistente) throw new Error(`O código/matrícula já está em uso por ${usuarioExistente.nome}.`);
+  const contaExistente = await prisma.contaAcesso.findFirst({ where: { usuario, funcionarioId: { not: id } }, select: { funcionario: { select: { nome: true } } } });
+  if (contaExistente) throw new Error(`O código/matrícula já está em uso por ${contaExistente.funcionario.nome}.`);
   if (pinRaw && !/^\d{4}$/.test(pinRaw)) {
     throw new Error("O PIN deve ter exatamente 4 dígitos.");
   }
@@ -92,10 +107,16 @@ export async function updateFuncionarioAcesso(id: number, formData: FormData) {
     if (outro) throw new Error(`O conferente do Plasma já é ${outro.nome}. Altere essa pessoa primeiro.`);
   }
 
+  const senhaHash = await criarSenhaHash(senha);
   await prisma.funcionario.update({
       where: { id },
-      data: { usuario, papel, setorId, pin: pinRaw || null, bancada: bancadaRaw || null },
+      data: { usuario, senhaHash, papel, setorId, pin: pinRaw || null, bancada: bancadaRaw || null },
     });
+  await prisma.contaAcesso.upsert({
+    where: { funcionarioId: id },
+    update: { usuario, senhaHash, senhaTemporaria: senha, ativo: true },
+    create: { funcionarioId: id, usuario, senhaHash, senhaTemporaria: senha, ativo: true },
+  });
   await prisma.funcionarioProcesso.deleteMany({ where: { funcionarioId: id } });
   if (processos.length > 0) {
     await prisma.funcionarioProcesso.createMany({
@@ -123,6 +144,10 @@ export async function toggleFuncionario(id: number) {
 
   await prisma.funcionario.update({
     where: { id },
+    data: { ativo: !f.ativo },
+  });
+  await prisma.contaAcesso.updateMany({
+    where: { funcionarioId: id },
     data: { ativo: !f.ativo },
   });
   await registrarAlteracao({ entidade: "FUNCIONARIO", entidadeId: id, acao: "ATUALIZADO", descricao: `Funcionário ${id} ${f.ativo ? "desativado" : "ativado"}.`, usuario: acesso.nome, dadosDepois: { ativo: !f.ativo } });

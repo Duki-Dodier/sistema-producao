@@ -30,6 +30,7 @@ type FuncionarioComAcesso = {
   pin: string | null;
   setor: { nome: string };
   processosPermitidos: { processo: string }[];
+  contaAcesso?: { usuario: string; ativo: boolean } | null;
 };
 
 function bytesParaHex(bytes: Uint8Array) {
@@ -104,7 +105,7 @@ function mapOperador(funcionario: FuncionarioComAcesso): OperadorLogado {
   return {
     id: funcionario.id,
     nome: funcionario.nome,
-    usuario: funcionario.usuario ?? normalizarUsuario(funcionario.nome.split(/\s+/)[0] ?? ""),
+    usuario: funcionario.contaAcesso?.usuario ?? funcionario.usuario ?? normalizarUsuario(funcionario.nome.split(/\s+/)[0] ?? ""),
     setorId: funcionario.setorId,
     setorNome: funcionario.setor.nome,
     papel: funcionario.papel,
@@ -125,10 +126,32 @@ export async function buscarOperadorPorId(id: number) {
 
 export async function iniciarSessaoSistema(usuarioInformado: string, senha: string) {
   const usuario = normalizarUsuario(usuarioInformado);
-  const funcionario = usuario
-    ? await prisma.funcionario.findUnique({ where: { usuario }, include: acessoFuncionario })
-    : null;
-  if (!funcionario || !funcionario.ativo || !(await verificarSenha(senha, funcionario.senhaHash))) {
+  let funcionario: FuncionarioComAcesso | null = null;
+
+  // A tabela ContaAcesso é a fonte oficial do login. O fallback legado mantém
+  // o acesso funcionando durante a aplicação da migração no ambiente local.
+  if (usuario) {
+    try {
+      const conta = await prisma.contaAcesso.findUnique({
+        where: { usuario },
+        include: { funcionario: { include: acessoFuncionario } },
+      });
+      if (conta?.ativo && conta.funcionario.ativo && await verificarSenha(senha, conta.senhaHash)) {
+        funcionario = { ...conta.funcionario, contaAcesso: { usuario: conta.usuario, ativo: conta.ativo } };
+      }
+    } catch {
+      // A tabela ainda pode não existir no banco local antes da migração.
+    }
+  }
+
+  if (!funcionario && usuario) {
+    const legado = await prisma.funcionario.findUnique({ where: { usuario }, include: acessoFuncionario });
+    if (legado?.ativo && await verificarSenha(senha, legado.senhaHash)) {
+      funcionario = legado;
+    }
+  }
+
+  if (!funcionario) {
     throw new Error("Usuario ou senha incorretos.");
   }
 
@@ -159,10 +182,10 @@ export async function buscarOperadorLogado(): Promise<OperadorLogado | null> {
 
   const sessao = await prisma.operadorSessao.findUnique({
     where: { tokenHash: await hashToken(token) },
-    include: { funcionario: { include: acessoFuncionario } },
+    include: { funcionario: { include: { ...acessoFuncionario, contaAcesso: { select: { usuario: true, ativo: true } } } } },
   });
 
-  if (!sessao || sessao.expiraEm <= new Date() || !sessao.funcionario.ativo) return null;
+  if (!sessao || sessao.expiraEm <= new Date() || !sessao.funcionario.ativo || sessao.funcionario.contaAcesso?.ativo === false) return null;
   return mapOperador(sessao.funcionario);
 }
 

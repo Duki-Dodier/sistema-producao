@@ -63,6 +63,7 @@ model Funcionario {
   bancada       String? // bancada/box fixa do soldador, editável em Configurações
 
   setor                     Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
+  contaAcesso               ContaAcesso?
   processosPermitidos       FuncionarioProcesso[]
   apontamentos              Apontamento[]
   sessoes                   OperadorSessao[]
@@ -81,6 +82,25 @@ model Funcionario {
 
   @@unique([nome, setorId])
   @@index([setorId])
+}
+
+/// Conta usada exclusivamente para autenticação no MES. A senha em texto
+/// fica disponível apenas na área administrativa porque o administrador
+/// solicitou uma tabela para consultar e repassar os acessos; a validação do
+/// login continua usando `senhaHash`.
+model ContaAcesso {
+  id              Int      @id @default(autoincrement())
+  funcionarioId   Int      @unique
+  usuario         String   @unique
+  senhaHash       String
+  senhaTemporaria String   @default("1234")
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  funcionario Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@index([ativo])
 }
 
 model FuncionarioProcesso {
