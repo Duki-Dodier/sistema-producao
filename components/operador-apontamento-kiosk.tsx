@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { finalizarProducao, iniciarProducao } from "@/lib/actions/apontamentos";
 import { sairSistema } from "@/lib/actions/auth";
+import { filtrarMaquinasPorProcesso } from "@/lib/maquinas-processo";
 
 export type ItemApontamentoOperador = {
   chave: string;
@@ -85,10 +86,17 @@ export function OperadorApontamentoKiosk({
     ? itens.find((item) => item.opId === producaoAtiva.opId && item.pecaId === producaoAtiva.pecaId) ?? null
     : null;
   const itemParaQuantidade = itemAtivo ?? itemInicial;
+  const maquinasIniciais = filtrarMaquinasPorProcesso(
+    setorNome,
+    itemParaQuantidade?.proximoProcesso,
+    maquinas,
+  );
   const [busca, setBusca] = useState("");
   const [operador, setOperador] = useState(String(sessao?.id ?? ""));
   const [pin, setPin] = useState("");
-  const [maquinaId, setMaquinaId] = useState(String(producaoAtiva?.maquinaId ?? maquinas[0]?.id ?? ""));
+  const [maquinaId, setMaquinaId] = useState(
+    String(producaoAtiva?.maquinaId ?? maquinasIniciais[0]?.id ?? ""),
+  );
   const [producaoId, setProducaoId] = useState<number | null>(producaoAtiva?.id ?? null);
   const [tempoDecorrido, setTempoDecorrido] = useState(0);
   const [inicioProducao, setInicioProducao] = useState<number | null>(
@@ -129,6 +137,21 @@ export function OperadorApontamentoKiosk({
   }, [busca, itensPermitidos]);
 
   const item = itensPermitidos.find((opcao) => opcao.chave === selecionado) ?? null;
+  const maquinasDoProcesso = useMemo(
+    () => filtrarMaquinasPorProcesso(setorNome, item?.proximoProcesso, maquinas),
+    [item?.proximoProcesso, maquinas, setorNome],
+  );
+  const maquinasDisponiveis = useMemo(() => {
+    if (!emProducao || !producaoAtiva) return maquinasDoProcesso;
+    const maquinaEmUso = maquinas.find((maquina) => maquina.id === producaoAtiva.maquinaId);
+    if (!maquinaEmUso || maquinasDoProcesso.some((maquina) => maquina.id === maquinaEmUso.id)) {
+      return maquinasDoProcesso;
+    }
+    return [maquinaEmUso, ...maquinasDoProcesso];
+  }, [emProducao, maquinas, maquinasDoProcesso, producaoAtiva]);
+  const maquinaSelecionadaValida = maquinasDisponiveis.some(
+    (maquina) => String(maquina.id) === maquinaId,
+  );
 
   useEffect(() => {
     if (!item || item.concluido || !emProducao || inicioProducao === null) return;
@@ -151,6 +174,10 @@ export function OperadorApontamentoKiosk({
 
   const iniciar = async () => {
     if (!item) return;
+    if (!maquinaSelecionadaValida) {
+      setErro("Selecione uma máquina compatível com este processo.");
+      return;
+    }
     setErro(null);
     setSucesso(null);
     setEnviando(true);
@@ -266,7 +293,12 @@ export function OperadorApontamentoKiosk({
                 setOperador(event.target.value);
                 setPin("");
                 setSelecionado(primeiroItem?.chave ?? null);
-      setQuantidade("");
+                setMaquinaId(String(filtrarMaquinasPorProcesso(
+                  setorNome,
+                  primeiroItem?.proximoProcesso,
+                  maquinas,
+                )[0]?.id ?? ""));
+                setQuantidade("");
                 setErro(null);
                 setSucesso(null);
               }}
@@ -322,6 +354,11 @@ export function OperadorApontamentoKiosk({
                 disabled={emProducao}
                 onClick={() => {
                   setSelecionado(opcao.chave);
+                  setMaquinaId(String(filtrarMaquinasPorProcesso(
+                    setorNome,
+                    opcao.proximoProcesso,
+                    maquinas,
+                  )[0]?.id ?? ""));
                   setQuantidade("");
                   setInicioProducao(null);
                   setTempoDecorrido(0);
@@ -437,7 +474,7 @@ export function OperadorApontamentoKiosk({
                 <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Máquina usada
                 </span>
-                {maquinas.length > 0 ? (
+                {maquinasDisponiveis.length > 0 ? (
                   <select
                     name="maquinaId"
                     required
@@ -447,13 +484,13 @@ export function OperadorApontamentoKiosk({
                     className="w-full rounded-xl border border-[#3d494c] bg-[#060e20] px-4 py-3 text-sm font-semibold text-white outline-none focus:border-[#4cd7f6]"
                   >
                     <option value="" disabled>Selecione a máquina...</option>
-                    {maquinas.map((maquina) => (
+                    {maquinasDisponiveis.map((maquina) => (
                       <option key={maquina.id} value={maquina.id}>{maquina.nome}</option>
                     ))}
                   </select>
                 ) : (
                   <span className="rounded-xl border border-slate-700 bg-[#060e20] px-4 py-3 text-sm text-slate-500">
-                    Sem máquina cadastrada para este setor
+                    Sem máquina cadastrada para este processo
                   </span>
                 )}
               </label>
@@ -529,7 +566,7 @@ export function OperadorApontamentoKiosk({
             <button
               type={emProducao ? "submit" : "button"}
               onClick={emProducao ? undefined : () => { void iniciar(); }}
-              disabled={!operador || pinPendente || enviando || (emProducao && !quantidade) || (maquinas.length > 0 && !maquinaId)}
+              disabled={!operador || pinPendente || enviando || (emProducao && !quantidade) || !maquinaSelecionadaValida}
               className={`mt-5 w-full rounded-xl bg-[#0ea5c9] py-4 font-mono text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[0_0_18px_rgba(14,165,201,0.25)] transition hover:bg-[#0891b2] disabled:cursor-not-allowed disabled:opacity-40 ${modoQr ? "sticky bottom-3 z-10" : ""}`}
             >
               {enviando
@@ -538,8 +575,8 @@ export function OperadorApontamentoKiosk({
                   ? "Selecione o operador"
                   : pinPendente
                     ? "Digite o PIN de 4 dígitos"
-                    : maquinas.length > 0 && !maquinaId
-                      ? "Selecione a máquina"
+                    : !maquinaSelecionadaValida
+                      ? maquinasDisponiveis.length > 0 ? "Selecione a máquina" : "Sem máquina para este processo"
                     : emProducao
                       ? "Finalizar e apontar produção"
                       : "Iniciar processo"}

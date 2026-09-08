@@ -6,6 +6,7 @@ import { ehSetor } from "@/lib/setores";
 import { processosDaPeca, PROCESSOS, type Processo } from "@/lib/processos";
 import { exigirUsuarioLogado } from "@/lib/auth-operador";
 import { exigirCorteCompleto } from "@/lib/plasma-saldo";
+import { maquinaCompativelComProcesso } from "@/lib/maquinas-processo";
 
 const revalidarApontamentos = () => {
   revalidatePath("/apontamentos");
@@ -143,7 +144,10 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
 
   const [setorApontamento, maquinasAtivas] = await Promise.all([
     prisma.setor.findUnique({ where: { id: setorId }, select: { nome: true } }),
-    prisma.maquina.findMany({ where: { setorId, ativo: true }, select: { id: true } }),
+    prisma.maquina.findMany({
+      where: { setorId, ativo: true },
+      select: { id: true, codigo: true, nome: true },
+    }),
   ]);
   if (!setorApontamento) throw new Error("Setor não encontrado.");
   if (ehSetor(setorApontamento.nome, "Plasma Chapa") || ehSetor(setorApontamento.nome, "Plasma Tubo")) {
@@ -152,8 +156,17 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
   if (maquinasAtivas.length > 0 && maquinaId === null) {
     throw new Error("Selecione a máquina usada neste apontamento.");
   }
-  if (maquinaId !== null && !maquinasAtivas.some((maquina) => maquina.id === maquinaId)) {
+  const maquinaSelecionada = maquinaId === null
+    ? null
+    : maquinasAtivas.find((maquina) => maquina.id === maquinaId) ?? null;
+  if (maquinaId !== null && !maquinaSelecionada) {
     throw new Error("A máquina selecionada não pertence a este setor ou está inativa.");
+  }
+  if (
+    maquinaSelecionada &&
+    !maquinaCompativelComProcesso(setorApontamento.nome, processo, maquinaSelecionada)
+  ) {
+    throw new Error("A máquina selecionada não é compatível com este processo.");
   }
 
   const dadosRastreabilidade = () => {
@@ -498,11 +511,14 @@ export async function iniciarProducao(formData: FormData): Promise<ResultadoInic
 
     const maquina = await prisma.maquina.findFirst({
       where: { id: maquinaId, setorId, ativo: true },
-      select: { id: true, setor: { select: { nome: true } } },
+      select: { id: true, codigo: true, nome: true, setor: { select: { nome: true } } },
     });
     if (!maquina) throw new Error("A máquina selecionada não pertence a este setor ou está inativa.");
     if (ehSetor(maquina.setor.nome, "Plasma Chapa") || ehSetor(maquina.setor.nome, "Plasma Tubo")) {
       throw new Error("No Plasma, inicie a operação pelo NEST para manter a rastreabilidade e a conferência.");
+    }
+    if (!maquinaCompativelComProcesso(maquina.setor.nome, processo, maquina)) {
+      throw new Error("A máquina selecionada não é compatível com este processo.");
     }
 
     const op = await prisma.oP.findUnique({
