@@ -441,8 +441,8 @@ model Apontamento {
   roteiroEtapaId    Int? // etapa exata do roteiro entre setores
   origem            String    @default("OPERADOR") // OPERADOR | LEGADO
   maquinaId         Int? // máquina/posto usado no apontamento
-  tempoSegundos     Int? // tempo efetivo informado pelo operador/monitor
-  inicioEm          DateTime? // início estimado do ciclo; dataHora é o fim
+  tempoSegundos     Int? // intervalo interno desde o apontamento anterior; dataHora é o fim
+  inicioEm          DateTime? // início interno calculado pela liberação/último apontamento
 
   op             OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
   setor          Setor               @relation(fields: [setorId], references: [id], onDelete: Restrict)

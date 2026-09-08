@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { finalizarProducao, iniciarProducao } from "@/lib/actions/apontamentos";
+import { useMemo, useState } from "react";
+import { createApontamento, finalizarProducao } from "@/lib/actions/apontamentos";
 import { sairSistema } from "@/lib/actions/auth";
 import { filtrarMaquinasPorProcesso } from "@/lib/maquinas-processo";
 
@@ -98,11 +98,7 @@ export function OperadorApontamentoKiosk({
     String(producaoAtiva?.maquinaId ?? maquinasIniciais[0]?.id ?? ""),
   );
   const [producaoId, setProducaoId] = useState<number | null>(producaoAtiva?.id ?? null);
-  const [tempoDecorrido, setTempoDecorrido] = useState(0);
-  const [inicioProducao, setInicioProducao] = useState<number | null>(
-    producaoAtiva ? Date.parse(producaoAtiva.iniciadoEm) : null,
-  );
-  const [emProducao, setEmProducao] = useState(Boolean(producaoAtiva));
+  const cicloLegadoAtivo = producaoId !== null;
   const [selecionado, setSelecionado] = useState<string | null>(
     (producaoAtiva
       ? itens.find((item) => item.opId === producaoAtiva.opId && item.pecaId === producaoAtiva.pecaId)?.chave
@@ -142,28 +138,16 @@ export function OperadorApontamentoKiosk({
     [item?.proximoProcesso, maquinas, setorNome],
   );
   const maquinasDisponiveis = useMemo(() => {
-    if (!emProducao || !producaoAtiva) return maquinasDoProcesso;
+    if (!cicloLegadoAtivo || !producaoAtiva) return maquinasDoProcesso;
     const maquinaEmUso = maquinas.find((maquina) => maquina.id === producaoAtiva.maquinaId);
     if (!maquinaEmUso || maquinasDoProcesso.some((maquina) => maquina.id === maquinaEmUso.id)) {
       return maquinasDoProcesso;
     }
     return [maquinaEmUso, ...maquinasDoProcesso];
-  }, [emProducao, maquinas, maquinasDoProcesso, producaoAtiva]);
+  }, [cicloLegadoAtivo, maquinas, maquinasDoProcesso, producaoAtiva]);
   const maquinaSelecionadaValida = maquinasDisponiveis.some(
     (maquina) => String(maquina.id) === maquinaId,
   );
-
-  useEffect(() => {
-    if (!item || item.concluido || !emProducao || inicioProducao === null) return;
-    const atualizarTempo = () => {
-      setTempoDecorrido(Math.max(0, Math.floor((Date.now() - inicioProducao) / 1000)));
-    };
-    atualizarTempo();
-    const timer = window.setInterval(() => {
-      atualizarTempo();
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [emProducao, inicioProducao, item]);
 
   const digitar = (valor: string) => {
     setQuantidade((atual) => {
@@ -172,7 +156,7 @@ export function OperadorApontamentoKiosk({
     });
   };
 
-  const iniciar = async () => {
+  const confirmar = async () => {
     if (!item) return;
     if (!maquinaSelecionadaValida) {
       setErro("Selecione uma máquina compatível com este processo.");
@@ -182,53 +166,32 @@ export function OperadorApontamentoKiosk({
     setSucesso(null);
     setEnviando(true);
     try {
-      const dados = new FormData();
-      dados.set("setorId", String(setorId));
-      dados.set("opId", String(item.opId));
-      dados.set("pecaId", item.pecaId === null ? "" : String(item.pecaId));
-      dados.set("roteiroEtapaId", item.roteiroEtapaId === null ? "" : String(item.roteiroEtapaId));
-      dados.set("processo", item.proximoProcesso ?? "");
-      dados.set("funcionarioId", operador);
-      dados.set("pin", pin);
-      dados.set("usarSessao", sessao ? "1" : "");
-      dados.set("soldador", item.soldador ?? "");
-      dados.set("maquinaId", maquinaId);
-      dados.set("quantidadePrevista", quantidade);
-      const resultado = await iniciarProducao(dados);
+      let resultado;
+      if (producaoId !== null) {
+        const dados = new FormData();
+        dados.set("producaoId", String(producaoId));
+        dados.set("quantidadeBoa", quantidade);
+        resultado = await finalizarProducao(dados);
+      } else {
+        const dados = new FormData();
+        dados.set("setorId", String(setorId));
+        dados.set("opId", String(item.opId));
+        dados.set("pecaId", item.pecaId === null ? "" : String(item.pecaId));
+        dados.set("roteiroEtapaId", item.roteiroEtapaId === null ? "" : String(item.roteiroEtapaId));
+        dados.set("processo", item.proximoProcesso ?? "");
+        dados.set("funcionarioId", operador);
+        dados.set("pin", pin);
+        dados.set("usarSessao", sessao ? "1" : "");
+        dados.set("soldador", item.soldador ?? "");
+        dados.set("maquinaId", maquinaId);
+        dados.set("quantidadeBoa", quantidade);
+        resultado = await createApontamento(dados);
+      }
       if (!resultado.ok) {
         setErro(resultado.error);
         return;
       }
-      setProducaoId(resultado.id);
-      setInicioProducao(new Date(resultado.iniciadoEm).getTime());
-      setTempoDecorrido(0);
-      setEmProducao(true);
-      setSucesso("Processo iniciado. Finalize quando a produção da peça terminar.");
-    } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não foi possível iniciar a produção.");
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  const confirmar = async () => {
-    setErro(null);
-    setSucesso(null);
-    setEnviando(true);
-    try {
-      if (producaoId === null) {
-        setErro("Inicie o processo antes de finalizar o apontamento.");
-        return;
-      }
-      const dados = new FormData();
-      dados.set("producaoId", String(producaoId));
-      dados.set("quantidadeBoa", quantidade);
-      const resultado = await finalizarProducao(dados);
-      if (!resultado.ok) {
-        setErro(resultado.error);
-        return;
-      }
-      const resumo = `${quantidade} peça(s) apontada(s) em ${item?.proximoLabel ?? "produção"}. Tempo registrado: ${formatTempo(resultado.tempoSegundos)}.`;
+      const resumo = `${quantidade} peça(s) apontada(s) em ${item.proximoLabel}.`;
       setSucesso(
         modoQr
           ? `Apontamento concluído. ${resumo} Abrindo a câmera para ler a próxima OP.`
@@ -236,9 +199,6 @@ export function OperadorApontamentoKiosk({
       );
       setQuantidade("");
       setProducaoId(null);
-      setEmProducao(false);
-      setInicioProducao(null);
-      setTempoDecorrido(0);
       if (modoQr) {
         window.setTimeout(() => window.location.replace("/apontamentos/scanner"), 3000);
       }
@@ -283,7 +243,7 @@ export function OperadorApontamentoKiosk({
             </label>
             <select
               value={operador}
-              disabled={emProducao}
+              disabled={cicloLegadoAtivo}
               onChange={(event) => {
                 const proximoOperador = operadores.find((opcao) => String(opcao.id) === event.target.value);
                 const permitidos = new Set(proximoOperador?.processosPermitidos ?? []);
@@ -318,7 +278,7 @@ export function OperadorApontamentoKiosk({
               type="password"
               inputMode="numeric"
               value={pin}
-              disabled={emProducao}
+              disabled={cicloLegadoAtivo}
               onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
               placeholder="••••"
               className="w-full rounded-lg border border-[#3d494c] bg-[#060e20] px-3 py-3 text-center font-mono text-base tracking-[0.4em] text-white outline-none placeholder:text-slate-600 focus:border-[#4cd7f6]"
@@ -351,7 +311,7 @@ export function OperadorApontamentoKiosk({
               <button
                 key={opcao.chave}
                 type="button"
-                disabled={emProducao}
+                disabled={cicloLegadoAtivo}
                 onClick={() => {
                   setSelecionado(opcao.chave);
                   setMaquinaId(String(filtrarMaquinasPorProcesso(
@@ -360,8 +320,6 @@ export function OperadorApontamentoKiosk({
                     maquinas,
                   )[0]?.id ?? ""));
                   setQuantidade("");
-                  setInicioProducao(null);
-                  setTempoDecorrido(0);
                   setErro(null);
                   setSucesso(null);
                 }}
@@ -442,7 +400,6 @@ export function OperadorApontamentoKiosk({
             <input type="hidden" name="usarSessao" value={sessao ? "1" : ""} />
             <input type="hidden" name="soldador" value={item.soldador ?? ""} />
             <input type="hidden" name="quantidadeBoa" value={quantidade} />
-            <input type="hidden" name="tempoSegundos" value={tempoDecorrido || ""} />
 
             <div className="rounded-lg border border-[#2d3449] bg-[#0b1326] p-3 sm:p-4">
               {Number.isInteger(opIdInicial) && (
@@ -469,7 +426,7 @@ export function OperadorApontamentoKiosk({
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div className="mt-4">
               <label className="flex flex-col gap-2">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Máquina usada
@@ -479,7 +436,7 @@ export function OperadorApontamentoKiosk({
                     name="maquinaId"
                     required
                     value={maquinaId}
-                    disabled={emProducao}
+                    disabled={cicloLegadoAtivo}
                     onChange={(event) => setMaquinaId(event.target.value)}
                     className="w-full rounded-xl border border-[#3d494c] bg-[#060e20] px-4 py-3 text-sm font-semibold text-white outline-none focus:border-[#4cd7f6]"
                   >
@@ -494,16 +451,12 @@ export function OperadorApontamentoKiosk({
                   </span>
                 )}
               </label>
-              <div className={`rounded-xl border px-4 py-3 text-right ${emProducao ? "border-amber-400/30 bg-amber-400/10" : "border-cyan-400/20 bg-cyan-400/5"}`}>
-                <div className="font-mono text-[10px] uppercase tracking-wider text-slate-500">{emProducao ? "Processo em andamento" : "Tempo aguardando início"}</div>
-                <div className="mt-1 font-mono text-xl font-bold text-cyan-200">{formatTempo(tempoDecorrido)}</div>
-              </div>
             </div>
 
             <div className="mt-4 grid gap-3 sm:mt-5 sm:gap-4 md:grid-cols-[1fr_280px]">
               <div>
                 <label className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  {emProducao ? "Quantidade produzida" : "Quantidade prevista (opcional)"}
+                  Quantidade concluída
                 </label>
                 <input
                   inputMode="numeric"
@@ -558,39 +511,27 @@ export function OperadorApontamentoKiosk({
             </div>
 
             <p className="mt-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
-              {emProducao
-                ? "Quando terminar esta peça, informe a quantidade produzida e finalize o apontamento."
-                : "Selecione a máquina e clique em Iniciar processo. O tempo será contado até a finalização."}
+              Informe a quantidade concluída. O horário do processo será registrado automaticamente pelo sistema.
             </p>
 
             <button
-              type={emProducao ? "submit" : "button"}
-              onClick={emProducao ? undefined : () => { void iniciar(); }}
-              disabled={!operador || pinPendente || enviando || (emProducao && !quantidade) || !maquinaSelecionadaValida}
+              type="submit"
+              disabled={!operador || pinPendente || enviando || !quantidade || !maquinaSelecionadaValida}
               className={`mt-5 w-full rounded-xl bg-[#0ea5c9] py-4 font-mono text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[0_0_18px_rgba(14,165,201,0.25)] transition hover:bg-[#0891b2] disabled:cursor-not-allowed disabled:opacity-40 ${modoQr ? "sticky bottom-3 z-10" : ""}`}
             >
               {enviando
-                ? emProducao ? "Finalizando..." : "Iniciando..."
+                ? "Salvando..."
                 : !operador
                   ? "Selecione o operador"
                   : pinPendente
                     ? "Digite o PIN de 4 dígitos"
                     : !maquinaSelecionadaValida
                       ? maquinasDisponiveis.length > 0 ? "Selecione a máquina" : "Sem máquina para este processo"
-                    : emProducao
-                      ? "Finalizar e apontar produção"
-                      : "Iniciar processo"}
+                    : "Confirmar apontamento"}
             </button>
           </form>
         )}
       </section>
     </div>
   );
-}
-
-function formatTempo(segundos: number) {
-  const horas = Math.floor(segundos / 3600);
-  const minutos = Math.floor((segundos % 3600) / 60);
-  const resto = segundos % 60;
-  return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}:${String(resto).padStart(2, "0")}`;
 }

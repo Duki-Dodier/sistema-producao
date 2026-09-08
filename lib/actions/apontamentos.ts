@@ -169,18 +169,6 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
     throw new Error("A máquina selecionada não é compatível com este processo.");
   }
 
-  const dadosRastreabilidade = () => {
-    const dataHora = new Date();
-    return {
-      maquinaId,
-      tempoSegundos: tempoInformado,
-      inicioEm: tempoInformado !== null
-        ? inicioEmInformado ?? new Date(dataHora.getTime() - tempoInformado * 1000)
-        : null,
-      dataHora,
-    };
-  };
-
   // O adaptador Prisma do Cloudflare D1 não oferece transações interativas.
   // Este fluxo faz várias leituras de validação, mas somente uma gravação; por
   // isso, executamos as consultas diretamente e preservamos a mesma sequência.
@@ -191,6 +179,7 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
       select: {
         status: true,
         quantidade: true,
+        dataLiberacao: true,
         modelo: {
           select: {
             roteiro: { select: { setorId: true, setor: { select: { nome: true } } } },
@@ -214,6 +203,35 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
     });
     if (!op) throw new Error("OP nao encontrada.");
     if (op.status !== "ABERTA") throw new Error("So e possivel apontar uma OP aberta.");
+
+    const dadosRastreabilidade = async () => {
+      const dataHora = new Date();
+      if (tempoInformado !== null) {
+        return {
+          maquinaId,
+          tempoSegundos: tempoInformado,
+          inicioEm: inicioEmInformado ?? new Date(dataHora.getTime() - tempoInformado * 1000),
+          dataHora,
+        };
+      }
+
+      // O apontamento anterior encerra uma etapa e inicia internamente a
+      // contagem da próxima. Para o primeiro processo, usamos a liberação da OP.
+      const ultimoApontamento = await tx.apontamento.findFirst({
+        where: { opId, pecaId },
+        orderBy: [{ dataHora: "desc" }, { id: "desc" }],
+        select: { dataHora: true },
+      });
+      const inicioCalculado = ultimoApontamento?.dataHora ?? op.dataLiberacao;
+      const inicioEm = inicioCalculado <= dataHora ? inicioCalculado : dataHora;
+
+      return {
+        maquinaId,
+        tempoSegundos: Math.max(1, Math.floor((dataHora.getTime() - inicioEm.getTime()) / 1000)),
+        inicioEm,
+        dataHora,
+      };
+    };
     const etapa = op.modelo.roteiro.find((item) => item.setorId === setorId);
     if (!etapa && roteiroEtapaId === null) {
       throw new Error("O setor informado nao faz parte do roteiro desta OP.");
@@ -313,7 +331,7 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
           pecaId,
           processo,
           roteiroEtapaId,
-          ...dadosRastreabilidade(),
+          ...(await dadosRastreabilidade()),
           origem: "OPERADOR",
         },
       });
@@ -406,7 +424,7 @@ export async function createApontamento(formData: FormData): Promise<ResultadoAp
         quantidadeBoa,
         pecaId,
         processo,
-        ...dadosRastreabilidade(),
+        ...(await dadosRastreabilidade()),
         origem: "OPERADOR",
       },
     });
