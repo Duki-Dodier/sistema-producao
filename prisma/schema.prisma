@@ -41,7 +41,6 @@ model Setor {
   maquinas                Maquina[]
   producoesEmAndamento    ProducaoEmAndamento[]
   nestsCorte              NestCorte[]
-  planosCorteTubo         PlanoCorteTubo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -74,8 +73,6 @@ model Funcionario {
   lancamentosNest           NestLancamento[]      @relation("NestLancamentoOperador")
   conferenciasNest          NestLancamento[]      @relation("NestLancamentoConferente")
   planosCorteTuboCriados    PlanoCorteTubo[]      @relation("PlanoTuboCriador")
-  planosCorteTuboConcluidos PlanoCorteTubo[]      @relation("PlanoTuboConcluidor")
-  planosCorteTuboCancelados PlanoCorteTubo[]      @relation("PlanoTuboCancelador")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -127,7 +124,6 @@ model Maquina {
   apontamentos         Apontamento[]
   producoesEmAndamento ProducaoEmAndamento[]
   nestsCorte           NestCorte[]
-  planosCorteTubo      PlanoCorteTubo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -638,113 +634,80 @@ model ConferenciaPCPItem {
   @@index([conferenciaId])
 }
 
-/// Plano emitido para otimizar o corte de tubos de 6 metros.
+/// Documento orientativo emitido pelo PCP para otimizar barras novas de tubo.
+/// Não reserva demanda, não altera OPs e não gera apontamentos.
 model PlanoCorteTubo {
-  id                          Int       @id @default(autoincrement())
-  codigo                      String    @unique
-  setorId                     Int
-  maquinaId                   Int?
-  criadoPorId                 Int
-  concluidoPorId              Int?
-  canceladoPorId              Int?
-  status                      String    @default("EMITIDO") // EMITIDO | CONCLUIDO | CANCELADO
-  comprimentoBarraMm          Float     @default(6000)
-  perdaCorteMm                Float
-  margemInicialMm             Float
-  margemFinalMm               Float
-  minimoSobraMm               Float
-  snapshotHash                String    @unique
-  totalBarrasNovas            Int       @default(0)
-  totalSobrasUsadas           Int       @default(0)
-  totalPecas                  Int       @default(0)
-  comprimentoPecasMm          Float     @default(0)
-  perdaCortesTotalMm          Float     @default(0)
-  sobraReutilizavelPrevistaMm Float     @default(0)
-  desperdicioPrevistoMm       Float     @default(0)
-  aproveitamentoPct           Float     @default(0)
-  emitidoEm                   DateTime  @default(now())
-  concluidoEm                 DateTime?
-  canceladoEm                 DateTime?
-  createdAt                   DateTime  @default(now())
-  updatedAt                   DateTime  @updatedAt
+  id                 Int      @id @default(autoincrement())
+  codigo             String   @unique
+  criadoPorId        Int
+  comprimentoBarraMm Float    @default(6000)
+  perdaCorteMm       Float    @default(3)
+  refileInicialMm    Float    @default(10)
+  snapshotHash       String
+  totalOps           Int      @default(0)
+  totalPadroes       Int      @default(0)
+  totalBarras        Int      @default(0)
+  totalPecas         Int      @default(0)
+  comprimentoPecasMm Float    @default(0)
+  perdaCortesTotalMm Float    @default(0)
+  refileTotalMm      Float    @default(0)
+  sobraTotalMm       Float    @default(0)
+  aproveitamentoPct  Float    @default(0)
+  emitidoEm          DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  setor            Setor                 @relation(fields: [setorId], references: [id], onDelete: Restrict)
-  maquina          Maquina?              @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
-  criadoPor        Funcionario           @relation("PlanoTuboCriador", fields: [criadoPorId], references: [id], onDelete: Restrict)
-  concluidoPor     Funcionario?          @relation("PlanoTuboConcluidor", fields: [concluidoPorId], references: [id], onDelete: SetNull)
-  canceladoPor     Funcionario?          @relation("PlanoTuboCancelador", fields: [canceladoPorId], references: [id], onDelete: SetNull)
-  barras           PlanoCorteTuboBarra[]
-  sobrasOrigem     SobraTubo[]           @relation("SobraPlanoOrigem")
-  sobrasReservadas SobraTubo[]           @relation("SobraPlanoReserva")
-  sobrasConsumidas SobraTubo[]           @relation("SobraPlanoConsumo")
+  criadoPor Funcionario                @relation("PlanoTuboCriador", fields: [criadoPorId], references: [id], onDelete: Restrict)
+  padroes   PlanoCorteTuboPadrao[]
 
-  @@index([setorId, status])
   @@index([emitidoEm])
+  @@index([criadoPorId, emitidoEm])
 }
 
-model PlanoCorteTuboBarra {
-  id                     Int    @id @default(autoincrement())
-  planoId                Int
-  ordem                  Int
-  perfilA                Float
-  perfilB                Float?
-  espessuraMm            Float
-  origem                 String // NOVA | SOBRA
-  comprimentoOrigemMm    Float
-  sobraOrigemId          Int?
-  comprimentoConsumidoMm Float
-  sobraPrevistaMm        Float
-  sobraRealMm            Float?
-  aproveitamentoPct      Float
+/// Receita de corte repetível: uma combinação idêntica aplicada a N barras.
+model PlanoCorteTuboPadrao {
+  id                         Int   @id @default(autoincrement())
+  planoId                    Int
+  ordem                      Int
+  codigo                     String
+  perfilMm                   Float
+  espessuraMm                Float
+  repeticoes                 Int
+  comprimentoBarraMm         Float @default(6000)
+  comprimentoPecasPorBarraMm Float
+  perdaCortesPorBarraMm      Float
+  refileInicialMm            Float
+  sobraPorBarraMm            Float
+  aproveitamentoPct          Float
 
   plano PlanoCorteTubo       @relation(fields: [planoId], references: [id], onDelete: Cascade)
   itens PlanoCorteTuboItem[]
 
   @@unique([planoId, ordem])
+  @@unique([planoId, codigo])
   @@index([planoId])
-  @@index([sobraOrigemId])
 }
 
 model PlanoCorteTuboItem {
-  id                    Int   @id @default(autoincrement())
-  barraId               Int
-  opId                  Int
-  pecaId                Int
+  id                    Int    @id @default(autoincrement())
+  padraoId              Int
+  opId                  Int?
+  pecaId                Int?
   ordem                 Int
-  quantidade            Int   @default(1)
+  opNumero              Int
+  lote                  String
+  modeloCodigo          String
+  pecaCodigo            String
+  pecaNome              String
+  quantidadePorBarra    Int
+  quantidadeTotal       Int
   comprimentoUnitarioMm Float
-  consumoTotalMm        Float
 
-  barra PlanoCorteTuboBarra @relation(fields: [barraId], references: [id], onDelete: Cascade)
-  op    OP                  @relation(fields: [opId], references: [id], onDelete: Restrict)
-  peca  Peca                @relation(fields: [pecaId], references: [id], onDelete: Restrict)
+  padrao PlanoCorteTuboPadrao @relation(fields: [padraoId], references: [id], onDelete: Cascade)
+  op     OP?                   @relation(fields: [opId], references: [id], onDelete: SetNull)
+  peca   Peca?                 @relation(fields: [pecaId], references: [id], onDelete: SetNull)
 
-  @@unique([barraId, ordem])
+  @@unique([padraoId, ordem])
   @@index([opId])
   @@index([pecaId])
-}
-
-/// Estoque auditável de pontas de tubo que ainda podem ser reaproveitadas.
-model SobraTubo {
-  id             Int      @id @default(autoincrement())
-  codigo         String   @unique
-  perfilA        Float
-  perfilB        Float?
-  espessuraMm    Float
-  comprimentoMm  Float
-  status         String   @default("DISPONIVEL") // DISPONIVEL | RESERVADA | CONSUMIDA | DESCARTADA
-  planoOrigemId  Int?
-  planoReservaId Int?
-  planoConsumoId Int?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  planoOrigem  PlanoCorteTubo? @relation("SobraPlanoOrigem", fields: [planoOrigemId], references: [id], onDelete: SetNull)
-  planoReserva PlanoCorteTubo? @relation("SobraPlanoReserva", fields: [planoReservaId], references: [id], onDelete: SetNull)
-  planoConsumo PlanoCorteTubo? @relation("SobraPlanoConsumo", fields: [planoConsumoId], references: [id], onDelete: SetNull)
-
-  @@index([status, perfilA, perfilB, espessuraMm])
-  @@index([planoOrigemId])
-  @@index([planoReservaId])
-  @@index([planoConsumoId])
 }

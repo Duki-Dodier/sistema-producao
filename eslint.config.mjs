@@ -9,8 +9,14 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    "dist/**",
     "out/**",
+    "output/**",
+    "outputs/**",
     "build/**",
+    "tmp/**",
+    ".wrangler/**",
+    ".wrangler-config/**",
     "next-env.d.ts",
     "fix-theme.js",
     "update-sectors.js",
